@@ -6,8 +6,9 @@
 // Direct (Quickshell): KH_VIEW_LIST=/path/to/list quickshell -p <config-dir>
 //   where the list file contains one file path per line.
 //
-// Tab cycles panes. q / Esc quits.
-// hjkl / Ctrl+D/U scroll. v/V/Ctrl+V visual select. y copies selection.
+// Split mode (default): Tab cycles focus between panes.
+// Carousel mode (c):    h/l steps through files fullscreen.
+// Both modes:           hjkl/Ctrl+D/U scroll; v/V/Ctrl+V visual; y yank; q/Esc quit.
 import QtQuick
 import Quickshell
 import Quickshell.Io
@@ -24,6 +25,7 @@ ShellRoot {
     property var  _listLines:   []
     property bool _ready:       false
     property int  _focusedPane: 0
+    property bool _carousel:    false
 
     Component.onCompleted: listProcess.running = true
 
@@ -75,10 +77,30 @@ ShellRoot {
                 if (event.text === "q" || event.key === Qt.Key_Escape) {
                     Qt.quit(); event.accepted = true; return
                 }
-                if (event.key === Qt.Key_Tab && root._paths.length > 1) {
-                    root._focusedPane = (root._focusedPane + 1) % root._paths.length
-                    event.accepted = true; return
+
+                // Toggle carousel mode
+                if (event.text === "c" && root._paths.length > 1) {
+                    root._carousel = !root._carousel; event.accepted = true; return
                 }
+
+                if (root._carousel) {
+                    // h/l navigate between files
+                    if (event.key === Qt.Key_H || event.key === Qt.Key_Left) {
+                        root._focusedPane = Math.max(0, root._focusedPane - 1)
+                        event.accepted = true; return
+                    }
+                    if (event.key === Qt.Key_L || event.key === Qt.Key_Right) {
+                        root._focusedPane = Math.min(root._paths.length - 1, root._focusedPane + 1)
+                        event.accepted = true; return
+                    }
+                } else {
+                    // Tab cycles focus in split mode
+                    if (event.key === Qt.Key_Tab && root._paths.length > 1) {
+                        root._focusedPane = (root._focusedPane + 1) % root._paths.length
+                        event.accepted = true; return
+                    }
+                }
+
                 const pane = paneRepeater.itemAt(root._focusedPane)
                 if (pane && pane.handleViewerKey(event)) event.accepted = true
             }
@@ -92,10 +114,12 @@ ShellRoot {
                     required property string modelData  // file path
                     required property int    index
 
-                    x:      pane.index * keyHandler._paneWidth
-                    width:  pane.index < root._paths.length - 1
-                            ? keyHandler._paneWidth
-                            : keyHandler.width - pane.index * keyHandler._paneWidth
+                    visible: !root._carousel || pane.index === root._focusedPane
+                    x:      root._carousel ? 0 : pane.index * keyHandler._paneWidth
+                    width:  root._carousel ? keyHandler.width
+                            : pane.index < root._paths.length - 1
+                              ? keyHandler._paneWidth
+                              : keyHandler.width - pane.index * keyHandler._paneWidth
                     height: keyHandler.height
 
                     property string _text:    ""
@@ -126,9 +150,9 @@ ShellRoot {
                         }
                     }
 
-                    // Divider on the left edge (all panes except the first)
+                    // Divider on the left edge (split mode only, not first pane)
                     Rectangle {
-                        visible: pane.index > 0
+                        visible: !root._carousel && pane.index > 0
                         x: 0; width: 1; height: parent.height
                         color: root._focusedPane === pane.index ? cfg.color.base0D : cfg.color.base02
                     }
@@ -154,6 +178,18 @@ ShellRoot {
                         onYankTextRequested: (t) => root._yank(t)
                     }
                 }
+            }
+
+            // Carousel position indicator: "2 / 5"
+            Text {
+                visible: root._carousel && root._paths.length > 1
+                anchors.bottom: parent.bottom
+                anchors.right: parent.right
+                anchors.margins: 12
+                text: (root._focusedPane + 1) + " / " + root._paths.length
+                color: cfg.color.base03
+                font.family: cfg.fontFamily
+                font.pixelSize: cfg.fontSize - 2
             }
         }
     }
