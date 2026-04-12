@@ -1,7 +1,7 @@
 ---
 name: screenshot
 description: Take one or more headless screenshots of a quickshell app, then display them in a new tmux pane using the kitty image protocol.
-allowed-tools: Bash(nix run .#screenshot:*), Bash(nix run nixpkgs#timg:*), Bash(tmux:*)
+allowed-tools: Bash(nix run .#screenshot:*), Bash(tmux:*), Bash(kitty:*)
 ---
 
 Take screenshots using the headless screenshot app, then render them in a new tmux pane.
@@ -31,15 +31,16 @@ The window is **opened automatically** (toggle is implicit) for each shot.
 
 ## Step 2 — Display
 
-After capturing, open a new tmux pane and render the images there using timg with the kitty image protocol:
+After capturing, open a new tmux pane and render the images there using `kitty +kitten icat`:
 
 ```bash
-tmux split-window -h "tmux set-option -p allow-passthrough on && nix run nixpkgs#timg -- <paths...>; echo; read -rp ''"
+tmux split-window -h
+tmux send-keys "tmux set-option -p allow-passthrough on && kitty +kitten icat <paths...>" Enter
 ```
 
-- Pass all output paths from step 1 as arguments to timg
+- Open the pane first with no command so the shell stays alive after rendering
 - `allow-passthrough` is set on the new pane so kitty graphics sequences reach the terminal
-- The pane stays open until the user presses Enter
+- The pane remains open for the user to inspect
 
 ## Example (two comparison shots)
 
@@ -50,5 +51,6 @@ nix run .#screenshot -- kh-launcher shot-a 'type chrm' -- shot-b "type 'chrm"
 # → /tmp/qs-screenshots/20260412-140000/shot-b.png
 
 # Display
-tmux split-window -h "tmux set-option -p allow-passthrough on && nix run nixpkgs#timg -- /tmp/qs-screenshots/20260412-140000/shot-a.png /tmp/qs-screenshots/20260412-140000/shot-b.png; echo; read -rp ''"
+tmux split-window -h
+tmux send-keys "tmux set-option -p allow-passthrough on && kitty +kitten icat /tmp/qs-screenshots/20260412-140000/shot-a.png /tmp/qs-screenshots/20260412-140000/shot-b.png" Enter
 ```
