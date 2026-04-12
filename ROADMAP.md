@@ -10,6 +10,7 @@ Features to implement. Each entry becomes its own Quickshell component or launch
 - Overlays are modal, following vim bindings as closely as the UI context allows.
 - Everything controllable via keyboard must also be controllable via IPC, so
   overlays can be driven programmatically (automation, agentic development).
+- Keyboard-first. Mouse support is a future concern.
 
 ---
 
