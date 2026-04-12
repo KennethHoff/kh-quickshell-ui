@@ -128,7 +128,6 @@
             set -e
             out=/tmp/qs-screenshots/$(date +%Y%m%d-%H%M%S)
             mkdir -p "$out"
-            ln -sfn "$out" /tmp/qs-screenshots/latest
             qs=${lib.getExe' pkgs.quickshell "quickshell"}
             grim=${lib.getExe pkgs.grim}
             sway=${lib.getExe pkgs.sway}
@@ -162,7 +161,7 @@
               sleep 0.4
               WAYLAND_DISPLAY=$WAYLAND_DISPLAY "$grim" "$outfile"
               echo "$outfile"
-              kill "$pid" 2>/dev/null; wait "$pid" 2>/dev/null
+              disown "$pid" 2>/dev/null; kill -9 "$pid" 2>/dev/null
             }
 
             shoot kh-launcher-list    ${launcherConfig}  launcher ""
@@ -171,7 +170,7 @@
             shoot kh-cliphist-detail  ${cliphistConfig}  viewer   detail
             shoot kh-cliphist-help    ${cliphistConfig}  viewer   help
 
-            kill $SWAY_PID 2>/dev/null; wait $SWAY_PID 2>/dev/null
+            kill -9 $SWAY_PID 2>/dev/null; wait $SWAY_PID 2>/dev/null
             rm -rf "$xdg_runtime"
           '');
         };
