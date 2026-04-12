@@ -40,9 +40,10 @@ tmux send-keys 'tmux set-option -p allow-passthrough on && for f in <paths...>; 
 
 - Open the pane first with no command so the shell stays alive after rendering
 - `allow-passthrough` is set on the new pane so kitty graphics sequences reach the terminal
-- Each image is resized to 200px tall via ImageMagick before display so both fit on screen
+- Each image is resized to 200px tall via ImageMagick so multiple shots fit on screen without scrolling
+  - Note: `kitty +kitten icat --place` uses absolute screen coordinates and breaks inside a tmux pane
 - Each image is preceded by its name (filename without extension) as a label
-- Read the pane with `tmux capture-pane -p -t 1` to verify rendering before reporting back
+- After sending the command, read the pane with `tmux capture-pane -p -t 1` to verify rendering before reporting back
 
 ## Example (two comparison shots)
 
