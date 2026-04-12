@@ -33,7 +33,6 @@ ShellRoot {
     property var    _processedIdx: ({})  // id → index in _processed for O(1) full-text updates
     property bool   _pendingG: false
 
-    property bool   detailShowing: false
     property bool   _detailIsImage: false
     property string _detailText: ""
     property var    _detailLines: []
@@ -49,6 +48,7 @@ ShellRoot {
         const entries = root.filteredEntries
         return (idx >= 0 && idx < entries.length) ? entries[idx] : ""
     }
+    onSelectedEntryChanged: detailRefreshTimer.restart()
 
     // ── Filtering ────────────────────────────────────────────────────────────
     function _runFilter() {
@@ -111,8 +111,15 @@ ShellRoot {
         else normalModeHandler.forceActiveFocus()
     }
 
-    function openDetail() {
-        if (root.selectedEntry === "") return
+    function _refreshDetail() {
+        if (root.selectedEntry === "") {
+            root._detailText    = ""
+            root._detailLines   = []
+            root._detailLoading = false
+            root._detailImgSource = ""
+            root._detailImgSize = ""
+            return
+        }
         const preview = clipEntry.entryPreview(root.selectedEntry)
         root._detailIsImage  = preview.startsWith("[[")
         root._detailText     = ""
@@ -122,8 +129,6 @@ ShellRoot {
         root._detailImgSize  = ""
         const eid = clipEntry.entryId(root.selectedEntry)
         root._detailImgPath  = "/tmp/kh-cliphist-" + eid
-        root.detailShowing   = true
-        normalModeHandler.forceActiveFocus()
         if (root._detailIsImage) {
             detailDecodeProcess.command = [
                 bin.bash, "-c",
@@ -138,11 +143,6 @@ ShellRoot {
             ]
         }
         detailDecodeProcess.running = true
-    }
-
-    function closeDetail() {
-        root.detailShowing = false
-        normalModeHandler.forceActiveFocus()
     }
 
     function navUp()       { if (resultList.currentIndex > 0) resultList.currentIndex-- }
@@ -261,6 +261,13 @@ ShellRoot {
         onTriggered: { root._pendingG = false }
     }
 
+    Timer {
+        id: detailRefreshTimer
+        interval: 120
+        repeat: false
+        onTriggered: root._refreshDetail()
+    }
+
     // ── IPC ──────────────────────────────────────────────────────────────────
     IpcHandler {
         target: "viewer"
@@ -295,16 +302,10 @@ ShellRoot {
             } else if (lk === "/" && root.helpShowing) {
                 root._helpFiltering = true
                 root.helpText = ""
-            } else if (lk === "l") {
-                root.openDetail()
-            } else if (lk === "h" && root.detailShowing) {
-                root.closeDetail()
             } else if (lk === "escape" || lk === "esc") {
                 if (root.helpShowing) {
                     if (root.helpText) { root.helpText = ""; root._helpFiltering = false }
                     else root.closeHelp()
-                } else if (root.detailShowing) {
-                    root.closeDetail()
                 } else if (root.mode === "insert") {
                     root.enterNormalMode()
                 } else {
@@ -348,11 +349,11 @@ ShellRoot {
                 root.helpShowing     = false
                 root._helpFiltering  = false
                 root.helpText        = ""
-                root.detailShowing   = false
                 root._detailText     = ""
                 root._detailLines    = []
                 root._detailLoading  = false
                 root._detailImgSource = ""
+                detailRefreshTimer.stop()
                 searchDebounce.stop()
                 fullTextDecodeProcess.running = false
                 searchField.text = ""
@@ -391,19 +392,6 @@ ShellRoot {
                 Keys.onPressed: (event) => {
                     if (event.key === Qt.Key_Shift || event.key === Qt.Key_Control ||
                         event.key === Qt.Key_Alt   || event.key === Qt.Key_Meta) return
-
-                    // ── Detail panel ─────────────────────────────────────────
-                    if (root.detailShowing) {
-                        if (event.key === Qt.Key_H || event.key === Qt.Key_Escape) {
-                            root.closeDetail()
-                        } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                            if (root.selectedEntry !== "") root.paste(root.selectedEntry)
-                        } else {
-                            return
-                        }
-                        event.accepted = true
-                        return
-                    }
 
                     // ── Help popup ────────────────────────────────────────────
                     if (root.helpShowing) {
@@ -481,8 +469,6 @@ ShellRoot {
                         root.navHalfUp()
                     } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
                         if (root.selectedEntry !== "") root.paste(root.selectedEntry)
-                    } else if (event.key === Qt.Key_L) {
-                        root.openDetail()
                     } else if (event.key === Qt.Key_Slash) {
                         root.enterInsertMode()
                     } else {
@@ -585,97 +571,240 @@ ShellRoot {
                     }
                 }
 
-                // Entry list ──────────────────────────────────────────────────
-                ListView {
-                    id: resultList
+                // Content area (list + detail side-by-side) ──────────────────
+                Item {
+                    id: contentArea
                     width: parent.width
                     height: panel.height - searchBox.height - footer.height
                             - column.spacing * 2 - 16
-                    clip: true
-                    currentIndex: 0
-                    model: root.filteredEntries
-                    highlightMoveDuration: 0
 
-                    onCountChanged: if (count > 0 && currentIndex < 0) currentIndex = 0
+                    // Entry list
+                    ListView {
+                        id: resultList
+                        width: Math.round(parent.width * 0.4)
+                        height: parent.height
+                        clip: true
+                        currentIndex: 0
+                        model: root.filteredEntries
+                        highlightMoveDuration: 0
 
-                    Text {
-                        anchors.centerIn: parent
-                        visible: resultList.count === 0 && searchField.text.length > 0
-                        text: "No results"
-                        color: cfg.color.base03
-                        font.family: cfg.fontFamily
-                        font.pixelSize: cfg.fontSize
-                    }
+                        onCountChanged: if (count > 0 && currentIndex < 0) currentIndex = 0
 
-                    delegate: Item {
-                        id: delegateRoot
-                        required property var modelData
-                        required property int index
-                        width: resultList.width
-                        height: isImage ? 64 : 40
-
-                        readonly property bool   isCurrent: resultList.currentIndex === index
-                        readonly property string preview:   clipEntry.entryPreview(modelData)
-                        readonly property bool   isImage:   preview.startsWith("[[")
-                        readonly property string entryId:   clipEntry.entryId(modelData)
-                        readonly property string tmpPath:   "/tmp/kh-cliphist-" + entryId
-
-                        Process {
-                            id: imgDecode
-                            command: [
-                                bin.bash, "-c",
-                                "[ -f \"$1\" ] || printf '%s\\n' \"$2\" | " + bin.cliphist + " decode > \"$1\"",
-                                "--", delegateRoot.tmpPath, delegateRoot.modelData
-                            ]
-                            onExited: imgThumb.source = "file://" + delegateRoot.tmpPath
+                        Text {
+                            anchors.centerIn: parent
+                            visible: resultList.count === 0 && searchField.text.length > 0
+                            text: "No results"
+                            color: cfg.color.base03
+                            font.family: cfg.fontFamily
+                            font.pixelSize: cfg.fontSize
                         }
-                        Component.onCompleted: { if (isImage) imgDecode.running = true }
 
-                        Rectangle {
-                            anchors.fill: parent
-                            anchors.margins: 2
-                            color: delegateRoot.isCurrent ? cfg.color.base02 : "transparent"
-                            radius: 6
+                        delegate: Item {
+                            id: delegateRoot
+                            required property var modelData
+                            required property int index
+                            width: resultList.width
+                            height: isImage ? 64 : 40
 
-                            Image {
-                                id: imgThumb
-                                visible: delegateRoot.isImage
-                                width: 90
-                                anchors { top: parent.top; bottom: parent.bottom; left: parent.left; margins: 4 }
-                                fillMode: Image.PreserveAspectFit
-                                smooth: true; mipmap: true; asynchronous: true
+                            readonly property bool   isCurrent: resultList.currentIndex === index
+                            readonly property string preview:   clipEntry.entryPreview(modelData)
+                            readonly property bool   isImage:   preview.startsWith("[[")
+                            readonly property string entryId:   clipEntry.entryId(modelData)
+                            readonly property string tmpPath:   "/tmp/kh-cliphist-" + entryId
+
+                            Process {
+                                id: imgDecode
+                                command: [
+                                    bin.bash, "-c",
+                                    "[ -f \"$1\" ] || printf '%s\\n' \"$2\" | " + bin.cliphist + " decode > \"$1\"",
+                                    "--", delegateRoot.tmpPath, delegateRoot.modelData
+                                ]
+                                onExited: imgThumb.source = "file://" + delegateRoot.tmpPath
                             }
-
-                            Text {
-                                visible: !delegateRoot.isImage
-                                anchors.fill: parent
-                                anchors.leftMargin: 10
-                                anchors.rightMargin: 10
-                                text: delegateRoot.preview
-                                color: cfg.color.base05
-                                font.family: cfg.fontFamily
-                                font.pixelSize: cfg.fontSize
-                                verticalAlignment: Text.AlignVCenter
-                                elide: Text.ElideRight
-                            }
+                            Component.onCompleted: { if (isImage) imgDecode.running = true }
 
                             Rectangle {
-                                id: flashOverlay
                                 anchors.fill: parent
+                                anchors.margins: 2
+                                color: delegateRoot.isCurrent ? cfg.color.base02 : "transparent"
                                 radius: 6
-                                color: cfg.color.base0D
-                                opacity: 0
-                                SequentialAnimation {
-                                    id: blinkAnim
-                                    NumberAnimation { target: flashOverlay; property: "opacity"; to: 0.55; duration: 60;  easing.type: Easing.OutQuad }
-                                    NumberAnimation { target: flashOverlay; property: "opacity"; to: 0;    duration: 140; easing.type: Easing.InQuad }
+
+                                Image {
+                                    id: imgThumb
+                                    visible: delegateRoot.isImage
+                                    width: 90
+                                    anchors { top: parent.top; bottom: parent.bottom; left: parent.left; margins: 4 }
+                                    fillMode: Image.PreserveAspectFit
+                                    smooth: true; mipmap: true; asynchronous: true
+                                }
+
+                                Text {
+                                    visible: !delegateRoot.isImage
+                                    anchors.fill: parent
+                                    anchors.leftMargin: 10
+                                    anchors.rightMargin: 10
+                                    text: delegateRoot.preview
+                                    color: cfg.color.base05
+                                    font.family: cfg.fontFamily
+                                    font.pixelSize: cfg.fontSize
+                                    verticalAlignment: Text.AlignVCenter
+                                    elide: Text.ElideRight
+                                }
+
+                                Rectangle {
+                                    id: flashOverlay
+                                    anchors.fill: parent
+                                    radius: 6
+                                    color: cfg.color.base0D
+                                    opacity: 0
+                                    SequentialAnimation {
+                                        id: blinkAnim
+                                        NumberAnimation { target: flashOverlay; property: "opacity"; to: 0.55; duration: 60;  easing.type: Easing.OutQuad }
+                                        NumberAnimation { target: flashOverlay; property: "opacity"; to: 0;    duration: 140; easing.type: Easing.InQuad }
+                                    }
+                                }
+                                Connections {
+                                    target: root
+                                    function onItemPasted(idx) {
+                                        if (idx === delegateRoot.index) blinkAnim.restart()
+                                    }
                                 }
                             }
-                            Connections {
-                                target: root
-                                function onItemPasted(idx) {
-                                    if (idx === delegateRoot.index) blinkAnim.restart()
+                        }
+                    }
+
+                    // Divider
+                    Rectangle {
+                        x: resultList.width
+                        width: 1
+                        height: parent.height
+                        color: cfg.color.base02
+                    }
+
+                    // Detail panel
+                    Item {
+                        id: detailPanel
+                        x: resultList.width + 1
+                        width: parent.width - resultList.width - 1
+                        height: parent.height
+
+                        // Header: type badge + preview
+                        Item {
+                            id: detailHeader
+                            anchors.top: parent.top
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            height: 36
+
+                            Text {
+                                anchors.left: parent.left
+                                anchors.leftMargin: 12
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: root._detailIsImage ? "IMAGE" : "TEXT"
+                                color: cfg.color.base0D
+                                font.family: cfg.fontFamily
+                                font.pixelSize: cfg.fontSize - 3
+                                font.bold: true
+                                font.letterSpacing: 1
+                            }
+                            Text {
+                                anchors.left: parent.left
+                                anchors.leftMargin: 68
+                                anchors.right: parent.right
+                                anchors.rightMargin: 12
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: root.selectedEntry !== "" ? clipEntry.entryPreview(root.selectedEntry) : ""
+                                color: cfg.color.base03
+                                font.family: cfg.fontFamily
+                                font.pixelSize: cfg.fontSize - 3
+                                elide: Text.ElideRight
+                            }
+                            Rectangle {
+                                anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom
+                                height: 1; color: cfg.color.base02
+                            }
+                        }
+
+                        // Stats bar
+                        Item {
+                            id: detailStatsBar
+                            anchors.bottom: parent.bottom
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            height: 28
+
+                            Rectangle {
+                                anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top
+                                height: 1; color: cfg.color.base02
+                            }
+                            Text {
+                                anchors.left: parent.left
+                                anchors.leftMargin: 12
+                                anchors.verticalCenter: parent.verticalCenter
+                                color: cfg.color.base03
+                                font.family: cfg.fontFamily
+                                font.pixelSize: cfg.fontSize - 3
+                                text: {
+                                    if (root._detailLoading) return ""
+                                    if (root._detailIsImage) {
+                                        const dim = detailImg.status === Image.Ready
+                                            ? detailImg.implicitWidth + " \u00d7 " + detailImg.implicitHeight + " px"
+                                            : ""
+                                        return dim + (dim && root._detailImgSize ? "  \u00b7  " : "") + root._detailImgSize
+                                    }
+                                    const t = root._detailText
+                                    const chars = t.length
+                                    const words = t.trim() ? t.trim().split(/\s+/).length : 0
+                                    const lines = t ? t.split("\n").length : 0
+                                    return chars + " chars  \u00b7  " + words + " words  \u00b7  " + lines + " lines"
                                 }
+                            }
+                        }
+
+                        // Content area
+                        Item {
+                            anchors.top: detailHeader.bottom
+                            anchors.bottom: detailStatsBar.top
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+
+                            Text {
+                                anchors.centerIn: parent
+                                visible: root._detailLoading
+                                text: "Loading..."
+                                color: cfg.color.base03
+                                font.family: cfg.fontFamily
+                                font.pixelSize: cfg.fontSize
+                            }
+
+                            Flickable {
+                                anchors.fill: parent
+                                visible: !root._detailIsImage && !root._detailLoading
+                                contentHeight: detailTextContent.implicitHeight
+                                contentWidth: width
+                                clip: true
+
+                                Text {
+                                    id: detailTextContent
+                                    width: parent.width
+                                    leftPadding: 12; rightPadding: 12; topPadding: 10; bottomPadding: 10
+                                    text: root._detailText
+                                    color: cfg.color.base05
+                                    font.family: cfg.fontFamily
+                                    font.pixelSize: cfg.fontSize
+                                    wrapMode: Text.Wrap
+                                }
+                            }
+
+                            Image {
+                                id: detailImg
+                                anchors.fill: parent
+                                anchors.margins: 10
+                                visible: root._detailIsImage && !root._detailLoading
+                                fillMode: Image.PreserveAspectFit
+                                smooth: true; mipmap: true; asynchronous: true
+                                source: root._detailImgSource
+                                onStatusChanged: if (status === Image.Ready) root._detailLoading = false
                             }
                         }
                     }
@@ -690,11 +819,9 @@ ShellRoot {
                     Text {
                         anchors.left: parent.left
                         anchors.verticalCenter: parent.verticalCenter
-                        text: root.detailShowing
-                            ? "h / Esc  back  \u00b7  Enter  paste"
-                            : root.mode === "normal"
-                                ? "j/k  navigate  \u00b7  l  detail  \u00b7  Enter  paste  \u00b7  /  search  \u00b7  ?  help  \u00b7  Esc  close"
-                                : "Esc  normal mode  \u00b7  ?  help"
+                        text: root.mode === "normal"
+                            ? "j/k  navigate  \u00b7  Enter  paste  \u00b7  /  search  \u00b7  ?  help  \u00b7  Esc  close"
+                            : "Esc  normal mode  \u00b7  ?  help"
                         color: cfg.color.base03
                         font.family: cfg.fontFamily
                         font.pixelSize: cfg.fontSize - 3
@@ -708,142 +835,6 @@ ShellRoot {
                         color: cfg.color.base03
                         font.family: cfg.fontFamily
                         font.pixelSize: cfg.fontSize - 3
-                    }
-                }
-            }
-
-            // Detail popup backdrop ───────────────────────────────────────────
-            Rectangle {
-                anchors.fill: parent
-                visible: root.detailShowing
-                color: "#88000000"
-                z: 9
-                radius: panel.radius
-                MouseArea { anchors.fill: parent; onClicked: root.closeDetail() }
-            }
-
-            // Detail popup ────────────────────────────────────────────────────
-            Rectangle {
-                id: detailPopup
-                visible: root.detailShowing
-                z: 10
-                width: panel.width - 48
-                height: panel.height - 48
-                anchors.centerIn: parent
-                color: cfg.color.base01
-                radius: 10
-
-                // Title bar
-                Rectangle {
-                    id: detailTitleBar
-                    anchors.top: parent.top
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    height: 38
-                    color: cfg.color.base02
-                    radius: detailPopup.radius
-                    Rectangle {
-                        anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom
-                        height: detailPopup.radius; color: parent.color
-                    }
-                    Text {
-                        anchors.left: parent.left; anchors.leftMargin: 16
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: root._detailIsImage ? "IMAGE" : "TEXT"
-                        color: cfg.color.base0D
-                        font.family: cfg.fontFamily; font.pixelSize: cfg.fontSize - 3
-                        font.bold: true; font.letterSpacing: 1
-                    }
-                    Text {
-                        anchors.left: parent.left; anchors.leftMargin: 64
-                        anchors.right: parent.right; anchors.rightMargin: 16
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: root.selectedEntry !== "" ? clipEntry.entryPreview(root.selectedEntry) : ""
-                        color: cfg.color.base03
-                        font.family: cfg.fontFamily; font.pixelSize: cfg.fontSize - 3
-                        elide: Text.ElideRight
-                    }
-                }
-
-                // Stats bar
-                Rectangle {
-                    id: detailStatsBar
-                    anchors.bottom: parent.bottom
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    height: 36
-                    color: cfg.color.base02
-                    radius: detailPopup.radius
-                    Rectangle {
-                        anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top
-                        height: detailPopup.radius; color: parent.color
-                    }
-                    Text {
-                        anchors.left: parent.left; anchors.leftMargin: 16
-                        anchors.verticalCenter: parent.verticalCenter
-                        color: cfg.color.base03
-                        font.family: cfg.fontFamily; font.pixelSize: cfg.fontSize - 3
-                        text: {
-                            if (root._detailLoading) return ""
-                            if (root._detailIsImage) {
-                                const dim = detailImg.status === Image.Ready
-                                    ? detailImg.implicitWidth + " \u00d7 " + detailImg.implicitHeight + " px"
-                                    : ""
-                                return dim + (dim && root._detailImgSize ? "  \u00b7  " : "") + root._detailImgSize
-                            }
-                            const t = root._detailText
-                            const chars = t.length
-                            const words = t.trim() ? t.trim().split(/\s+/).length : 0
-                            const lines = t ? t.split("\n").length : 0
-                            return chars + " chars  \u00b7  " + words + " words  \u00b7  " + lines + " lines"
-                        }
-                    }
-                }
-
-                // Content area
-                Item {
-                    anchors.top: detailTitleBar.bottom
-                    anchors.bottom: detailStatsBar.top
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-
-                    Text {
-                        anchors.centerIn: parent
-                        visible: root._detailLoading
-                        text: "Loading..."
-                        color: cfg.color.base03
-                        font.family: cfg.fontFamily; font.pixelSize: cfg.fontSize
-                    }
-
-                    // Text content
-                    Flickable {
-                        anchors.fill: parent
-                        visible: !root._detailIsImage && !root._detailLoading
-                        contentHeight: detailTextContent.implicitHeight
-                        contentWidth: width
-                        clip: true
-
-                        Text {
-                            id: detailTextContent
-                            width: parent.width
-                            leftPadding: 16; rightPadding: 16; topPadding: 12; bottomPadding: 12
-                            text: root._detailText
-                            color: cfg.color.base05
-                            font.family: cfg.fontFamily; font.pixelSize: cfg.fontSize
-                            wrapMode: Text.Wrap
-                        }
-                    }
-
-                    // Image content
-                    Image {
-                        id: detailImg
-                        anchors.fill: parent
-                        anchors.margins: 12
-                        visible: root._detailIsImage && !root._detailLoading
-                        fillMode: Image.PreserveAspectFit
-                        smooth: true; mipmap: true; asynchronous: true
-                        source: root._detailImgSource
-                        onStatusChanged: if (status === Image.Ready) root._detailLoading = false
                     }
                 }
             }
