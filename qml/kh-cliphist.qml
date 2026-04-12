@@ -458,11 +458,6 @@ ShellRoot {
                         Keys.onEscapePressed: root.enterNormalMode()
 
                         Keys.onPressed: (event) => {
-                            if (event.text === "?") {
-                                root.openHelp()
-                                event.accepted = true
-                                return
-                            }
                             if (!(event.modifiers & Qt.ControlModifier)) return
                             const pos = searchField.cursorPosition
                             const len = searchField.text.length
