@@ -61,7 +61,21 @@ Item {
     property int    _pendingDeleteAnimHi:    -1
     property bool   _confirmingDelete:       false
 
-    property bool   _attrReady: false   // true once attrStore path is resolved
+    property bool   _attrReady:    false  // true once attrStore path is resolved
+    property bool   _suppressAttr: false  // true while a copy-from-overlay is in flight
+
+    // Call before any copy initiated from within this overlay, so the resulting
+    // wl-paste event isn't recorded as a new attribution.
+    function suppressNextAttribution() {
+        _suppressAttr = true
+        suppressAttrTimer.restart()
+    }
+
+    Timer {
+        id: suppressAttrTimer
+        interval: 2000  // safety net — clear flag if wl-paste never fires
+        onTriggered: clipList._suppressAttr = false
+    }
 
     // ── Properties out ────────────────────────────────────────────────────────
     readonly property string selectedEntry: {
@@ -576,8 +590,11 @@ Item {
                 if (tab > 0) {
                     const id  = line.substring(0, tab)
                     const app = line.substring(tab + 1)
-                    if (id && app && !(id in attrStore.values))
+                    if (clipList._suppressAttr) {
+                        clipList._suppressAttr = false
+                    } else if (id && app && !(id in attrStore.values)) {
                         attrStore.set(id, app)
+                    }
                 }
             }
         }
