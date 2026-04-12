@@ -110,12 +110,15 @@ progress bar and icon, then fades out automatically.
 
 ## File Viewer
 
-One-shot fullscreen viewer for arbitrary text or image files. Accepts a file
-argument or stdin; wraps TextViewer in a full-screen overlay window.
+One-shot viewer for arbitrary text or image files. Accepts N file arguments
+or stdin; shows all files side-by-side with Tab to cycle focus between panes.
 
-- ✅ `nix run .#kh-view -- <file>` or `<cmd> | nix run .#kh-view`
+- ✅ `nix run .#kh-view -- <file> [<file2> ...]` or `<cmd> | nix run .#kh-view`
 - ✅ Image detection by extension (png/jpg/jpeg/gif/webp/bmp/svg)
-- ✅ `hjkl`/`gg`/`G`/`Ctrl+D`/`U` navigation; `v`/`V`/`Ctrl+V` visual select; `y` copies selection; `q`/`Esc` quits
+- ✅ N files shown side-by-side in equal-width panes; Tab cycles focus; active divider highlights
+- ✅ Per-pane: `hjkl`/`gg`/`G`/`Ctrl+D`/`U` scroll; `v`/`V`/`Ctrl+V` visual select; `y` copies selection
+- ✅ `q`/`Esc` quits
+- ⬜ Carousel mode — single fullscreen pane; `h`/`l` steps through all loaded files; useful for browsing image sequences
 - ⬜ IPC support for scripted control
 
 ---
