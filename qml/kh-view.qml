@@ -51,8 +51,8 @@ ShellRoot {
         readonly property int  currentIndex: root._focusedPane
         readonly property int  count:        root._paths.length
         readonly property bool fullscreen:   root._fullscreen
-        readonly property bool atStart:      root._focusedPane === 0
-        readonly property bool atEnd:        root._focusedPane === root._paths.length - 1
+        readonly property bool hasPrev:      root._focusedPane > 0
+        readonly property bool hasNext:      root._focusedPane < root._paths.length - 1
 
         function quit()                  { Qt.quit() }
         function next()                  { root._focusedPane = Math.min(root._paths.length - 1, root._focusedPane + 1) }
