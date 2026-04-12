@@ -24,7 +24,6 @@ ShellRoot {
 
     // ── Paste / yank ─────────────────────────────────────────────────────────
     function pasteEntry(rawLine) {
-        list.suppressNextAttribution()
         pasteProcess.command = [
             bin.bash, "-c",
             "printf '%s\\n' \"$1\" | " + bin.cliphist + " decode | " + bin.wlCopy,
@@ -35,7 +34,6 @@ ShellRoot {
     }
 
     function yankText(text) {
-        list.suppressNextAttribution()
         yankTextProcess.command = [
             bin.bash, "-c",
             "printf '%s' \"$1\" | " + bin.wlCopy, "--", text

@@ -61,22 +61,6 @@ Item {
     property int    _pendingDeleteAnimHi:    -1
     property bool   _confirmingDelete:       false
 
-    property bool   _attrReady:    false  // true once attrStore path is resolved
-    property bool   _suppressAttr: false  // true while a copy-from-overlay is in flight
-
-    // Call before any copy initiated from within this overlay, so the resulting
-    // wl-paste event isn't recorded as a new attribution.
-    function suppressNextAttribution() {
-        _suppressAttr = true
-        suppressAttrTimer.restart()
-    }
-
-    Timer {
-        id: suppressAttrTimer
-        interval: 2000  // safety net — clear flag if wl-paste never fires
-        onTriggered: clipList._suppressAttr = false
-    }
-
     // ── Properties out ────────────────────────────────────────────────────────
     readonly property string selectedEntry: {
         const idx = list.currentIndex
@@ -212,10 +196,6 @@ Item {
     // ── Metadata stores ───────────────────────────────────────────────────────
     MetaStore { id: pinStore;  bash: bin.bash; storeKey: "pins" }
     MetaStore { id: tsStore;   bash: bin.bash; storeKey: "timestamps" }
-    MetaStore {
-        id: attrStore; bash: bin.bash; storeKey: "attribution"
-        onLoaded: { clipList._attrReady = true; attrWatchProcess.running = true }
-    }
 
     function _entryId(rawLine) {
         const t = rawLine.indexOf("\t")
@@ -285,7 +265,6 @@ Item {
         _processedIdx = newIdx
 
         pinStore.removeMany(idsToDelete)
-        attrStore.removeMany(idsToDelete)
 
         _runFilter()
 
@@ -519,9 +498,8 @@ Item {
 
             // Prune stale entries + first-seen timestamps for new ones.
             tsStore.pruneAndFill(idx, String(Math.floor(Date.now() / 1000)))
-            // Prune pins and attribution that no longer exist in cliphist.
+            // Prune pins that no longer exist in cliphist.
             pinStore.prune(idx)
-            attrStore.prune(idx)
 
             fullTextDecodeProcess.exec([bin.cliphistDecodeAll])
         }
@@ -572,35 +550,6 @@ Item {
     Component.onCompleted: {
         pinStore.load()
         tsStore.load()
-        attrStore.load()   // attrStore.onLoaded starts attrWatchProcess
-    }
-
-    // Persistent clipboard watcher — runs wl-paste --watch for the daemon's
-    // lifetime. Queries hyprctl immediately (at copy time), then waits for
-    // cliphist to write the entry before emitting id<TAB>app_class.
-    // Only records attribution for IDs not already attributed, so re-copying
-    // an entry from the cliphist overlay doesn't overwrite the original source.
-    // Auto-restarts on unexpected exit.
-    Process {
-        id: attrWatchProcess
-        command: [bin.wlPaste, "--watch", bin.cliphistAttrWatch]
-        stdout: SplitParser {
-            onRead: (line) => {
-                const tab = line.indexOf("\t")
-                if (tab > 0) {
-                    const id  = line.substring(0, tab)
-                    const app = line.substring(tab + 1)
-                    if (clipList._suppressAttr) {
-                        clipList._suppressAttr = false
-                    } else if (id && app && !(id in attrStore.values)) {
-                        attrStore.set(id, app)
-                    }
-                }
-            }
-        }
-        onExited: Qt.callLater(function() {
-            if (clipList._attrReady) attrWatchProcess.running = true
-        })
     }
 
     // ── UI ────────────────────────────────────────────────────────────────────
@@ -785,12 +734,7 @@ Item {
                         anchors.right: parent.right
                         anchors.rightMargin: 10
                         anchors.verticalCenter: parent.verticalCenter
-                        text: {
-                            const ts  = (tsStore.values,   clipList._relTime(tsStore.values[delegateRoot.entryId]   || "0"))
-                            const app = (attrStore.values, attrStore.values[delegateRoot.entryId] || "")
-                            if (app && ts) return app + "  \u00b7  " + ts
-                            return app || ts
-                        }
+                        text: (tsStore.values, clipList._relTime(tsStore.values[delegateRoot.entryId] || "0"))
                         color: cfg.color.base03
                         font.family: cfg.fontFamily
                         font.pixelSize: cfg.fontSize - 4

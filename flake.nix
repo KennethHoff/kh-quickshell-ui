@@ -38,7 +38,6 @@
       '';
 
       cliphistDecodeAllScript  = import ./scripts/cliphist-decode-all.nix  { inherit pkgs lib; };
-      cliphistAttrWatchScript  = import ./scripts/cliphist-attr-watch.nix  { inherit pkgs lib; };
 
       viewConfig = pkgs.runCommand "kh-view-config" { } ''
         mkdir -p $out/lib
@@ -82,7 +81,6 @@
           inherit pkgs lib;
           extraBins = {
             cliphistDecodeAll = toString cliphistDecodeAllScript;
-            cliphistAttrWatch = toString cliphistAttrWatchScript;
           };
         }} $out/NixBins.qml
       '';
