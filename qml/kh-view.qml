@@ -25,7 +25,8 @@ ShellRoot {
     property var  _listLines:   []
     property bool _ready:       false
     property int  _focusedPane: 0
-    property bool _fullscreen:    false
+    property bool _fullscreen:  false
+    property bool _wrap:        false
 
     Component.onCompleted: listProcess.running = true
 
@@ -51,19 +52,21 @@ ShellRoot {
         readonly property int  currentIndex: root._focusedPane
         readonly property int  count:        root._paths.length
         readonly property bool fullscreen:   root._fullscreen
-        readonly property bool hasPrev:      root._focusedPane > 0
-        readonly property bool hasNext:      root._focusedPane < root._paths.length - 1
+        readonly property bool wrap:         root._wrap
+        readonly property bool hasPrev:      root._wrap || root._focusedPane > 0
+        readonly property bool hasNext:      root._wrap || root._focusedPane < root._paths.length - 1
 
         function quit()                  { Qt.quit() }
-        function next()                  { root._focusedPane = Math.min(root._paths.length - 1, root._focusedPane + 1) }
-        function prev()                  { root._focusedPane = Math.max(0, root._focusedPane - 1) }
+        function next()                  { root._focusedPane = root._wrap ? (root._focusedPane + 1) % root._paths.length : Math.min(root._paths.length - 1, root._focusedPane + 1) }
+        function prev()                  { root._focusedPane = root._wrap ? (root._focusedPane - 1 + root._paths.length) % root._paths.length : Math.max(0, root._focusedPane - 1) }
         function seek(n: int)            { root._focusedPane = Math.max(0, Math.min(root._paths.length - 1, n)) }
         function setFullscreen(on: bool) { root._fullscreen = on }
+        function setWrap(on: bool)       { root._wrap = on }
         function key(k: string) {
             const lk = k.toLowerCase()
             if      (lk === "f")                    root._fullscreen = !root._fullscreen
-            else if (lk === "h" || lk === "left")   root._focusedPane = Math.max(0, root._focusedPane - 1)
-            else if (lk === "l" || lk === "right")  root._focusedPane = Math.min(root._paths.length - 1, root._focusedPane + 1)
+            else if (lk === "h" || lk === "left")   root._focusedPane = root._wrap ? (root._focusedPane - 1 + root._paths.length) % root._paths.length : Math.max(0, root._focusedPane - 1)
+            else if (lk === "l" || lk === "right")  root._focusedPane = root._wrap ? (root._focusedPane + 1) % root._paths.length : Math.min(root._paths.length - 1, root._focusedPane + 1)
             else if (lk === "q" || lk === "escape") Qt.quit()
             else if (lk === "tab" && !root._fullscreen)
                 root._focusedPane = (root._focusedPane + 1) % root._paths.length
@@ -112,11 +115,11 @@ ShellRoot {
                 if (root._fullscreen) {
                     // h/l navigate between files
                     if (event.key === Qt.Key_H || event.key === Qt.Key_Left) {
-                        root._focusedPane = Math.max(0, root._focusedPane - 1)
+                        root._focusedPane = root._wrap ? (root._focusedPane - 1 + root._paths.length) % root._paths.length : Math.max(0, root._focusedPane - 1)
                         event.accepted = true; return
                     }
                     if (event.key === Qt.Key_L || event.key === Qt.Key_Right) {
-                        root._focusedPane = Math.min(root._paths.length - 1, root._focusedPane + 1)
+                        root._focusedPane = root._wrap ? (root._focusedPane + 1) % root._paths.length : Math.min(root._paths.length - 1, root._focusedPane + 1)
                         event.accepted = true; return
                     }
                 } else {

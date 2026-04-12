@@ -14,8 +14,9 @@ All keyboard actions are reachable via IPC. The canonical client is
 | `currentIndex` | int    | Index of the currently focused pane (0-based)    |
 | `count`        | int    | Total number of loaded files                     |
 | `fullscreen`   | bool   | Whether fullscreen mode is active                |
-| `hasPrev`      | bool   | `true` if `currentIndex > 0`                     |
-| `hasNext`      | bool   | `true` if `currentIndex < count - 1`             |
+| `wrap`         | bool   | Whether navigation wraps around at the ends      |
+| `hasPrev`      | bool   | `true` if `currentIndex > 0` or `wrap` is set   |
+| `hasNext`      | bool   | `true` if `currentIndex < count - 1` or `wrap`  |
 
 ```bash
 qs ipc --pid $PID prop get viewer currentIndex
@@ -28,11 +29,11 @@ qs ipc --pid $PID prop get viewer hasNext
 
 ### Navigation
 
-| Function   | Description                                        |
-|------------|----------------------------------------------------|
-| `next()`   | Advance to the next file; no-op at end             |
-| `prev()`   | Go back to the previous file; no-op at start       |
-| `seek(n)`  | Jump to file at index `n` (clamped to valid range) |
+| Function   | Description                                                          |
+|------------|----------------------------------------------------------------------|
+| `next()`   | Advance to the next file; wraps to start if `wrap` is set            |
+| `prev()`   | Go back to the previous file; wraps to end if `wrap` is set          |
+| `seek(n)`  | Jump to file at index `n` (clamped to valid range; ignores `wrap`)   |
 
 ```bash
 qs ipc --pid $PID call viewer next
@@ -45,10 +46,12 @@ qs ipc --pid $PID call viewer seek 2
 | Function              | Description                              |
 |-----------------------|------------------------------------------|
 | `setFullscreen(bool)` | Enter or exit fullscreen mode            |
+| `setWrap(bool)`       | Enable or disable wrap-around navigation |
 | `key(k)`              | Send a key by name (see table below)     |
 
 ```bash
 qs ipc --pid $PID call viewer setFullscreen true
+qs ipc --pid $PID call viewer setWrap true
 qs ipc --pid $PID call viewer key f        # toggle fullscreen
 qs ipc --pid $PID call viewer key h        # prev in fullscreen
 qs ipc --pid $PID call viewer key l        # next in fullscreen
