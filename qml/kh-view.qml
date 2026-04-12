@@ -51,11 +51,13 @@ ShellRoot {
         readonly property int  currentIndex: root._focusedPane
         readonly property int  count:        root._paths.length
         readonly property bool fullscreen:   root._fullscreen
+        readonly property bool atStart:      root._focusedPane === 0
+        readonly property bool atEnd:        root._focusedPane === root._paths.length - 1
 
-        function quit()                { Qt.quit() }
-        function next()                { root._focusedPane = Math.min(root._paths.length - 1, root._focusedPane + 1) }
-        function prev()                { root._focusedPane = Math.max(0, root._focusedPane - 1) }
-        function goto(n: int)          { root._focusedPane = Math.max(0, Math.min(root._paths.length - 1, n)) }
+        function quit()                  { Qt.quit() }
+        function next()                  { root._focusedPane = Math.min(root._paths.length - 1, root._focusedPane + 1) }
+        function prev()                  { root._focusedPane = Math.max(0, root._focusedPane - 1) }
+        function seek(n: int)            { root._focusedPane = Math.max(0, Math.min(root._paths.length - 1, n)) }
         function setFullscreen(on: bool) { root._fullscreen = on }
         function key(k: string) {
             const lk = k.toLowerCase()
