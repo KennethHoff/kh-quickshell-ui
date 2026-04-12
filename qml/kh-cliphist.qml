@@ -327,32 +327,7 @@ ShellRoot {
                 id: helpOverlay
                 anchors.fill: parent
 
-                sections: list.mode === "insert" ? [{
-                    title: "INSERT MODE",
-                    bindings: [
-                        { key: "Esc",    desc: "normal mode" },
-                        { key: "Ctrl+A", desc: "cursor to start" },
-                        { key: "Ctrl+E", desc: "cursor to end" },
-                        { key: "Ctrl+F", desc: "cursor forward" },
-                        { key: "Ctrl+B", desc: "cursor back" },
-                        { key: "Ctrl+D", desc: "delete char forward" },
-                        { key: "Ctrl+K", desc: "delete to end of line" },
-                        { key: "Ctrl+W", desc: "delete word back" },
-                        { key: "Ctrl+U", desc: "delete to line start" }
-                    ]
-                }] : list.mode === "visual" ? [{
-                    title: "VISUAL MODE",
-                    bindings: [
-                        { key: "j / \u2193", desc: "down" },
-                        { key: "k / \u2191", desc: "up" },
-                        { key: "gg",         desc: "jump to top" },
-                        { key: "G",          desc: "jump to bottom" },
-                        { key: "Ctrl+D",     desc: "half-page down" },
-                        { key: "Ctrl+U",     desc: "half-page up" },
-                        { key: "d",          desc: "delete selected entries" },
-                        { key: "v / Esc",    desc: "normal mode" }
-                    ]
-                }] : [{
+                sections: [{
                     title: "NORMAL MODE",
                     bindings: [
                         { key: "j / \u2193", desc: "down" },
@@ -369,6 +344,31 @@ ShellRoot {
                         { key: "Tab / Esc",  desc: "focus list (from detail)" },
                         { key: "/",          desc: "focus search" },
                         { key: "Esc",        desc: "close" }
+                    ]
+                }, {
+                    title: "VISUAL MODE",
+                    bindings: [
+                        { key: "j / \u2193", desc: "down" },
+                        { key: "k / \u2191", desc: "up" },
+                        { key: "gg",         desc: "jump to top" },
+                        { key: "G",          desc: "jump to bottom" },
+                        { key: "Ctrl+D",     desc: "half-page down" },
+                        { key: "Ctrl+U",     desc: "half-page up" },
+                        { key: "d",          desc: "delete selected entries" },
+                        { key: "v / Esc",    desc: "normal mode" }
+                    ]
+                }, {
+                    title: "INSERT MODE",
+                    bindings: [
+                        { key: "Esc",    desc: "normal mode" },
+                        { key: "Ctrl+A", desc: "cursor to start" },
+                        { key: "Ctrl+E", desc: "cursor to end" },
+                        { key: "Ctrl+F", desc: "cursor forward" },
+                        { key: "Ctrl+B", desc: "cursor back" },
+                        { key: "Ctrl+D", desc: "delete char forward" },
+                        { key: "Ctrl+K", desc: "delete to end of line" },
+                        { key: "Ctrl+W", desc: "delete word back" },
+                        { key: "Ctrl+U", desc: "delete to line start" }
                     ]
                 }]
 
