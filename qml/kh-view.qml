@@ -44,6 +44,30 @@ ShellRoot {
         }
     }
 
+    // ── IPC ───────────────────────────────────────────────────────────────────
+    IpcHandler {
+        target: "viewer"
+
+        readonly property int  currentIndex: root._focusedPane
+        readonly property int  count:        root._paths.length
+        readonly property bool fullscreen:   root._fullscreen
+
+        function quit()                { Qt.quit() }
+        function next()                { root._focusedPane = Math.min(root._paths.length - 1, root._focusedPane + 1) }
+        function prev()                { root._focusedPane = Math.max(0, root._focusedPane - 1) }
+        function goto(n: int)          { root._focusedPane = Math.max(0, Math.min(root._paths.length - 1, n)) }
+        function setFullscreen(on: bool) { root._fullscreen = on }
+        function key(k: string) {
+            const lk = k.toLowerCase()
+            if      (lk === "f")                    root._fullscreen = !root._fullscreen
+            else if (lk === "h" || lk === "left")   root._focusedPane = Math.max(0, root._focusedPane - 1)
+            else if (lk === "l" || lk === "right")  root._focusedPane = Math.min(root._paths.length - 1, root._focusedPane + 1)
+            else if (lk === "q" || lk === "escape") Qt.quit()
+            else if (lk === "tab" && !root._fullscreen)
+                root._focusedPane = (root._focusedPane + 1) % root._paths.length
+        }
+    }
+
     // ── Yank ──────────────────────────────────────────────────────────────────
     Process { id: yankProcess }
     function _yank(text) {

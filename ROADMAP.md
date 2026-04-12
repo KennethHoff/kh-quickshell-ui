@@ -119,7 +119,7 @@ or stdin; shows all files side-by-side with Tab to cycle focus between panes.
 - ✅ Per-pane: `hjkl`/`gg`/`G`/`Ctrl+D`/`U` scroll; `v`/`V`/`Ctrl+V` visual select; `y` copies selection
 - ✅ `q`/`Esc` quits
 - ✅ Fullscreen mode — `f` toggles single fullscreen pane; `h`/`l` steps through all loaded files; position shown as "N / total" in corner
-- ⬜ IPC support for scripted control
+- ✅ IPC support — `target: "viewer"`; `next()`/`prev()`/`goto(n)`/`quit()`/`setFullscreen(bool)`/`key(k)`; readable props `currentIndex`, `count`, `fullscreen`
 
 ---
 
