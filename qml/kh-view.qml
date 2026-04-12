@@ -26,7 +26,7 @@ ShellRoot {
     property bool _ready:       false
     property int  _focusedPane: 0
     property bool _fullscreen:  false
-    property bool _wrap:        false
+    property bool _wrap:        true
 
     Component.onCompleted: listProcess.running = true
 
