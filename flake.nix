@@ -10,22 +10,33 @@
       pkgs = nixpkgs.legacyPackages.${system};
       lib = pkgs.lib;
 
-      nixffiDir = pkgs.runCommand "nixffi-dir" { } ''
-        mkdir -p $out/NixFFI
-        echo "module NixFFI"          > $out/NixFFI/qmldir
-        echo "NixFFI 1.0 NixFFI.qml" >> $out/NixFFI/qmldir
-        cp ${import ./ffi.nix {
-          inherit pkgs lib;
-          colors = {
-            base00 = "000000"; base01 = "111111"; base02 = "222222"; base03 = "333333";
-            base04 = "444444"; base05 = "555555"; base06 = "666666"; base07 = "777777";
-            base08 = "888888"; base09 = "999999"; base0A = "aaaaaa"; base0B = "bbbbbb";
-            base0C = "cccccc"; base0D = "dddddd"; base0E = "eeeeee"; base0F = "ffffff";
-          };
+      stubColors = {
+        base00 = "000000"; base01 = "111111"; base02 = "222222"; base03 = "333333";
+        base04 = "444444"; base05 = "555555"; base06 = "666666"; base07 = "777777";
+        base08 = "888888"; base09 = "999999"; base0A = "aaaaaa"; base0B = "bbbbbb";
+        base0C = "cccccc"; base0D = "dddddd"; base0E = "eeeeee"; base0F = "ffffff";
+      };
+
+      # Named QML module directories for qmltestrunner / devShell.
+      nixGenDir = pkgs.runCommand "nix-gen-dir" { } ''
+        mkdir -p $out/NixConfig $out/NixBins
+
+        printf '%s\n' "module NixConfig" "NixConfig 1.0 NixConfig.qml" \
+          > $out/NixConfig/qmldir
+        cp ${import ./config.nix {
+          inherit pkgs;
+          colors   = stubColors;
           fontName = "TestFont";
           fontSize = 12;
-        }} $out/NixFFI/NixFFI.qml
+        }} $out/NixConfig/NixConfig.qml
+
+        printf '%s\n' "module NixBins" "NixBins 1.0 NixBins.qml" \
+          > $out/NixBins/qmldir
+        cp ${import ./ffi.nix {
+          inherit pkgs lib;
+        }} $out/NixBins/NixBins.qml
       '';
+
       cliphistDecodeAllScript = pkgs.writeShellScript "kh-cliphist-decode-all" ''
         ${lib.getExe pkgs.cliphist} list | while IFS=$'\t' read -r id preview; do
             [[ "$preview" == "[[binary"* ]] && continue
@@ -40,8 +51,8 @@
         mkdir $out
         cp ${self}/lib/*.qml $out/
         cp ${self}/qml/kh-cliphist.qml $out/shell.qml
-        cp ${import ./ffi.nix {
-          inherit pkgs lib;
+        cp ${import ./config.nix {
+          inherit pkgs;
           colors = {
             base00 = "1e1e2e"; base01 = "181825"; base02 = "313244"; base03 = "45475a";
             base04 = "585b70"; base05 = "cdd6f4"; base06 = "f5c2e7"; base07 = "b4befe";
@@ -50,8 +61,11 @@
           };
           fontName = "monospace";
           fontSize = 14;
+        }} $out/NixConfig.qml
+        cp ${import ./ffi.nix {
+          inherit pkgs lib;
           extraBins.cliphistDecodeAll = toString cliphistDecodeAllScript;
-        }} $out/NixFFI.qml
+        }} $out/NixBins.qml
       '';
     in
     {
@@ -66,7 +80,7 @@
         qmltestrunner \
           -import ${pkgs.qt6.qtdeclarative}/lib/qt-6/qml \
           -import lib \
-          -import ${nixffiDir} \
+          -import ${nixGenDir} \
           -input tests/
         touch $out
       '';
@@ -75,7 +89,7 @@
         packages = [ pkgs.qt6.qtdeclarative ];
         shellHook = ''
           export QT_QPA_PLATFORM=offscreen
-          export QML_IMPORT_PATH=${pkgs.qt6.qtdeclarative}/lib/qt-6/qml:$PWD/lib:${nixffiDir}
+          export QML_IMPORT_PATH=${pkgs.qt6.qtdeclarative}/lib/qt-6/qml:$PWD/lib:${nixGenDir}
           echo "Run tests: qmltestrunner -input tests/"
         '';
       };

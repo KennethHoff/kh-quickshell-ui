@@ -16,7 +16,8 @@ ShellRoot {
     id: root
 
     // ── Config (injected by Nix) ─────────────────────────────────────────────
-    NixFFI        { id: cfg }
+    NixConfig     { id: cfg }
+    NixBins       { id: bin }
     FuzzyScore    { id: fuzzy }
     SearchParser  { id: searchParser }
     CliphistEntry { id: clipEntry }
@@ -74,8 +75,8 @@ ShellRoot {
     // ── Actions ──────────────────────────────────────────────────────────────
     function paste(rawLine) {
         pasteProcess.command = [
-            cfg.bin.bash, "-c",
-            "printf '%s\\n' \"$1\" | " + cfg.bin.cliphist + " decode | " + cfg.bin.wlCopy,
+            bin.bash, "-c",
+            "printf '%s\\n' \"$1\" | " + bin.cliphist + " decode | " + bin.wlCopy,
             "--", rawLine
         ]
         root.itemPasted(resultList.currentIndex)
@@ -86,7 +87,7 @@ ShellRoot {
     // ── Processes ────────────────────────────────────────────────────────────
     Process {
         id: listProcess
-        command: [cfg.bin.cliphist, "list"]
+        command: [bin.cliphist, "list"]
         stdout: SplitParser {
             onRead: (line) => { if (line !== "") root._buf.push(line) }
         }
@@ -95,7 +96,7 @@ ShellRoot {
             root._buf = []
             root._fullTextCache = {}
             root._cacheVersion = 0
-            fullTextDecodeProcess.exec([cfg.bin.cliphistDecodeAll])
+            fullTextDecodeProcess.exec([bin.cliphistDecodeAll])
         }
     }
 
@@ -123,8 +124,8 @@ ShellRoot {
         id: detailImgDecode
         property string targetPath: ""
         command: [
-            cfg.bin.bash, "-c",
-            "[ -f \"$1\" ] || printf '%s\\n' \"$2\" | " + cfg.bin.cliphist + " decode > \"$1\"",
+            bin.bash, "-c",
+            "[ -f \"$1\" ] || printf '%s\\n' \"$2\" | " + bin.cliphist + " decode > \"$1\"",
             "--", targetPath, root.selectedEntry
         ]
         onExited: {
@@ -139,7 +140,7 @@ ShellRoot {
         id: detailStatProcess
         property string targetPath: ""
         property string _buf: ""
-        command: [cfg.bin.stat, "--printf=%s", targetPath]
+        command: [bin.stat, "--printf=%s", targetPath]
         stdout: SplitParser {
             onRead: (line) => { detailStatProcess._buf += line }
         }
@@ -175,8 +176,8 @@ ShellRoot {
                 detailImgDecode.exec(detailImgDecode.command)
             } else {
                 detailTextProcess.exec([
-                    cfg.bin.bash, "-c",
-                    "printf '%s\\n' \"$1\" | " + cfg.bin.cliphist + " decode",
+                    bin.bash, "-c",
+                    "printf '%s\\n' \"$1\" | " + bin.cliphist + " decode",
                     "--", root.selectedEntry
                 ])
             }
@@ -473,8 +474,8 @@ ShellRoot {
                                 Process {
                                     id: imgDecode
                                     command: [
-                                        cfg.bin.bash, "-c",
-                                        "[ -f \"$1\" ] || printf '%s\\n' \"$2\" | " + cfg.bin.cliphist + " decode > \"$1\"",
+                                        bin.bash, "-c",
+                                        "[ -f \"$1\" ] || printf '%s\\n' \"$2\" | " + bin.cliphist + " decode > \"$1\"",
                                         "--", delegateRoot.tmpPath, delegateRoot.modelData
                                     ]
                                     onExited: { imgThumb.source = "file://" + delegateRoot.tmpPath }
