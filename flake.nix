@@ -37,15 +37,7 @@
         }} $out/NixBins/NixBins.qml
       '';
 
-      cliphistDecodeAllScript = pkgs.writeShellScript "kh-cliphist-decode-all" ''
-        ${lib.getExe pkgs.cliphist} list | while IFS=$'\t' read -r id preview; do
-            [[ "$preview" == "[[binary"* ]] && continue
-            [[ ''${#preview} -lt 100 ]] && continue
-            text=$(printf '%s\t%s\n' "$id" "$preview" | ${lib.getExe pkgs.cliphist} decode)
-            json=$(printf '%s' "$text" | ${lib.getExe pkgs.jq} -Rs .)
-            printf '%s\t%s\n' "$id" "$json"
-        done
-      '';
+      cliphistDecodeAllScript = import ./scripts/cliphist-decode-all.nix { inherit pkgs lib; };
 
       launcherColors = {
         base00 = "1e1e2e"; base01 = "181825"; base02 = "313244"; base03 = "45475a";
@@ -91,6 +83,8 @@
       '';
     in
     {
+      homeManagerModules.default = import ./hm-module.nix self;
+
       checks.${system}.tests = pkgs.runCommand "qml-tests" {
         src = self;
         nativeBuildInputs = [ pkgs.qt6.qtdeclarative ];

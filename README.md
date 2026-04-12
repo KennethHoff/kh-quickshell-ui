@@ -30,71 +30,29 @@ inputs.quickshell-ui = {
 };
 ```
 
-### 2. Build the configs
+### 2. Import the home-manager module
 
-There are two approaches depending on whether you want to use your own theme colors.
+The flake exports a home-manager module at `homeManagerModules.default` that handles everything — building configs from Stylix colors, registering them, and defining the `kh-ui` option.
 
-#### Option A — Pre-built packages (Catppuccin Mocha, no customization)
-
-Use the packages directly:
+Import it alongside your other home-manager modules (e.g. in `sharedModules` or a home-manager aspect):
 
 ```nix
-programs.quickshell = {
-  enable = true;
-  configs.kh-launcher = inputs.quickshell-ui.packages.${pkgs.system}.kh-launcher;
-  configs.kh-cliphist = inputs.quickshell-ui.packages.${pkgs.system}.kh-cliphist;
-};
+imports = [ inputs.quickshell-ui.homeManagerModules.default ];
 ```
 
-#### Option B — Build with custom colors (Stylix or manual)
+The module requires [Stylix](https://github.com/nix-community/stylix) — colors and fonts are read from `config.lib.stylix` at build time.
 
-Import `config.nix` and `ffi.nix` from the flake source with your own colors and font settings. This is the recommended approach for flakes using Stylix:
+### 3. Enable the components
+
+With the module imported, enabling both components is a single option:
 
 ```nix
-{ inputs, config, pkgs, lib, ... }:
-let
-  src = inputs.quickshell-ui;
-
-  nixConfig = import (src + "/config.nix") {
-    inherit pkgs;
-    colors   = config.lib.stylix.colors;      # base00–base0F as 6-char hex strings
-    fontName = config.stylix.fonts.monospace.name;
-    fontSize = config.stylix.fonts.sizes.applications;
-  };
-
-  nixBins = import (src + "/ffi.nix") { inherit pkgs lib; };
-
-  mkConfig = { name, qml }: pkgs.runCommandLocal "qs-${name}" { } ''
-    mkdir -p $out/lib
-    cp ${src}/lib/*.qml $out/lib/
-    cp ${src}/qml/${qml} $out/shell.qml
-    cp ${nixConfig} $out/NixConfig.qml
-    cp ${nixBins}   $out/NixBins.qml
-  '';
-in
-{
-  config = lib.mkIf config.wayland.windowManager.hyprland.enable {
-    programs.quickshell = {
-      enable = true;
-      configs.kh-launcher = mkConfig { name = "kh-launcher"; qml = "kh-launcher.qml"; };
-      configs.kh-cliphist = mkConfig { name = "kh-cliphist"; qml = "kh-cliphist.qml"; };
-    };
-  };
-}
+programs.quickshell.kh-ui.enable = true;
 ```
 
-`config.nix` accepts `colors` as an attrset of `base00`–`base0F` keys with 6-character lowercase hex values (no `#` prefix) — the format Stylix uses directly.
+This also sets `programs.quickshell.enable = true` implicitly via `mkDefault`. Set it to `false` explicitly to disable the whole program while keeping `kh-ui.enable` declared.
 
-If `kh-cliphist` needs an extra binary (e.g. a custom decode script), pass it via `extraBins`:
-
-```nix
-nixBins = import (src + "/ffi.nix") {
-  inherit pkgs lib;
-  extraBins.cliphistDecodeAll = toString myDecodeScript;
-};
-```
-
-### 3. Autostart and keybinds (Hyprland)
+### 4. Autostart and keybinds (Hyprland)
 
 Both daemons must be started at login and toggled via IPC:
 
