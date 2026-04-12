@@ -36,6 +36,17 @@ ShellRoot {
     property bool   detailFocused: false
     property bool   fullscreenShowing: false
     property int    _visualAnchor: 0
+    // "" | "char" | "line" | "block" — active in whichever text pane is focused
+    property string _visualMode: ""
+    property int    _visualAnchorPos: 0   // char/line: anchor char index
+    property int    _visualAnchorRow: 0   // line/block: anchor logical row
+    property int    _visualAnchorCol: 0   // block: anchor logical col
+    property int    _visualCurRow: 0      // line/block: current logical row
+    property int    _visualCurCol: 0      // block: current logical col
+
+    readonly property bool _detailVisual: _visualMode !== "" && detailFocused
+    readonly property bool _fsVisual:     _visualMode !== "" && fullscreenShowing
+
     property bool   _detailIsImage: false
     property string _detailText: ""
     property var    _detailLines: []
@@ -85,6 +96,14 @@ ShellRoot {
         ]
         root.itemPasted(resultList.currentIndex)
         pasteProcess.running = true
+        closeTimer.restart()
+    }
+
+    function yankText(text) {
+        yankTextProcess.command = [
+            bin.bash, "-c", "printf '%s' \"$1\" | " + bin.wlCopy, "--", text
+        ]
+        yankTextProcess.running = true
         closeTimer.restart()
     }
 
@@ -139,7 +158,244 @@ ShellRoot {
 
     function closeFullscreen() {
         root.fullscreenShowing = false
+        root._visualMode = ""
         normalModeHandler.forceActiveFocus()
+    }
+
+    // ── Text-visual helpers ──────────────────────────────────────────────────
+    function _logicalLineAt(text, pos) {
+        let n = 0
+        for (let i = 0; i < pos && i < text.length; i++)
+            if (text[i] === '\n') n++
+        return n
+    }
+
+    function _lineStartAt(text, row) {
+        let n = 0, i = 0
+        while (i < text.length && n < row) {
+            if (text[i] === '\n') n++
+            i++
+        }
+        return i
+    }
+
+    function _lineEndAt(text, row) {
+        let i = root._lineStartAt(text, row)
+        while (i < text.length && text[i] !== '\n') i++
+        return i
+    }
+
+    function _lineCount(text) {
+        if (!text) return 1
+        let n = 1
+        for (let i = 0; i < text.length; i++)
+            if (text[i] === '\n') n++
+        return n
+    }
+
+    function _scrollEditIntoView(edit, flick, pos) {
+        const r = edit.positionToRectangle(pos)
+        if (r.y + r.height > flick.contentY + flick.height)
+            flick.contentY = Math.min(Math.max(0, flick.contentHeight - flick.height),
+                                      r.y + r.height - flick.height)
+        else if (r.y < flick.contentY)
+            flick.contentY = Math.max(0, r.y)
+    }
+
+    function _applyLineSelection(edit) {
+        const text = edit.text
+        const lo   = Math.min(root._visualAnchorRow, root._visualCurRow)
+        const hi   = Math.max(root._visualAnchorRow, root._visualCurRow)
+        const start = root._lineStartAt(text, lo)
+        const end   = root._lineEndAt(text, hi)
+        if (root._visualCurRow >= root._visualAnchorRow) edit.select(start, end)
+        else                                              edit.select(end, start)
+    }
+
+    function _enterTextVisual(mode, edit, flick) {
+        const sp   = edit.positionAt(edit.leftPadding, flick.contentY + edit.topPadding)
+        const text = edit.text
+        root._visualMode = mode
+        if (mode === "char") {
+            root._visualAnchorPos = sp
+            edit.select(sp, sp)
+        } else if (mode === "line") {
+            const row = root._logicalLineAt(text, sp)
+            root._visualAnchorRow = row
+            root._visualCurRow    = row
+            root._visualAnchorPos = root._lineStartAt(text, row)
+            root._applyLineSelection(edit)
+        } else if (mode === "block") {
+            const row = root._logicalLineAt(text, sp)
+            const col = sp - root._lineStartAt(text, row)
+            root._visualAnchorRow = row; root._visualAnchorCol = col
+            root._visualCurRow    = row; root._visualCurCol    = col
+            root._visualAnchorPos = sp
+            edit.select(0, 0)
+        }
+    }
+
+    function _handleTextVisualKey(event, edit, flick) {
+        const text = edit.text
+
+        // ── Exit / mode-switch ───────────────────────────────────────────────
+        if (event.key === Qt.Key_Escape) {
+            root._visualMode = ""; edit.select(0, 0); return true
+        }
+        if (event.text === "v") {
+            if (root._visualMode === "char") { root._visualMode = ""; edit.select(0, 0) }
+            else {
+                // Switch to char mode at the current cursor position
+                let cp = edit.cursorPosition
+                if (root._visualMode === "block") {
+                    const ls = root._lineStartAt(text, root._visualCurRow)
+                    cp = Math.min(ls + root._visualCurCol, root._lineEndAt(text, root._visualCurRow))
+                }
+                root._visualMode = "char"; root._visualAnchorPos = cp
+                edit.select(cp, cp)
+            }
+            return true
+        }
+        if (event.text === "V") {
+            if (root._visualMode === "line") { root._visualMode = ""; edit.select(0, 0) }
+            else {
+                const cp  = edit.cursorPosition
+                const cur = root._logicalLineAt(text, cp)
+                const anc = root._logicalLineAt(text, root._visualAnchorPos)
+                root._visualMode = "line"
+                root._visualAnchorRow = anc; root._visualCurRow = cur
+                root._visualAnchorPos = root._lineStartAt(text, anc)
+                root._applyLineSelection(edit)
+            }
+            return true
+        }
+        if (event.key === Qt.Key_V && (event.modifiers & Qt.ControlModifier)) {
+            if (root._visualMode === "block") { root._visualMode = ""; edit.select(0, 0) }
+            else {
+                const cp   = edit.cursorPosition
+                const cur  = root._logicalLineAt(text, cp)
+                const ccol = cp - root._lineStartAt(text, cur)
+                const anc  = root._logicalLineAt(text, root._visualAnchorPos)
+                const acol = root._visualAnchorPos - root._lineStartAt(text, anc)
+                root._visualMode = "block"
+                root._visualAnchorRow = anc; root._visualAnchorCol = acol
+                root._visualCurRow    = cur; root._visualCurCol    = ccol
+                root._visualAnchorPos = root._lineStartAt(text, anc) + acol
+                edit.select(0, 0)
+            }
+            return true
+        }
+
+        // ── Char mode ────────────────────────────────────────────────────────
+        if (root._visualMode === "char") {
+            if (event.text === "y") {
+                const sel = edit.selectedText
+                if (sel) root.yankText(sel); else root.yank(root.selectedEntry)
+                root._visualMode = ""; edit.select(0, 0); return true
+            }
+            if (event.text === "o" || event.text === "O") {
+                const oldAnchor = root._visualAnchorPos, oldCursor = edit.cursorPosition
+                root._visualAnchorPos = oldCursor
+                edit.select(oldCursor, oldAnchor); return true
+            }
+            if (event.key === Qt.Key_J || event.key === Qt.Key_Down) {
+                const r  = edit.positionToRectangle(edit.cursorPosition)
+                const np = edit.positionAt(edit.leftPadding, r.y + r.height + 1)
+                if (np !== edit.cursorPosition) {
+                    edit.moveCursorSelection(np, TextEdit.SelectCharacters)
+                    root._scrollEditIntoView(edit, flick, np)
+                }
+                return true
+            }
+            if (event.key === Qt.Key_K || event.key === Qt.Key_Up) {
+                const r  = edit.positionToRectangle(edit.cursorPosition)
+                const np = edit.positionAt(edit.leftPadding, r.y - 1)
+                if (np !== edit.cursorPosition) {
+                    edit.moveCursorSelection(np, TextEdit.SelectCharacters)
+                    root._scrollEditIntoView(edit, flick, np)
+                }
+                return true
+            }
+            return false
+        }
+
+        // ── Line mode ────────────────────────────────────────────────────────
+        if (root._visualMode === "line") {
+            if (event.text === "y") {
+                const lo = Math.min(root._visualAnchorRow, root._visualCurRow)
+                const hi = Math.max(root._visualAnchorRow, root._visualCurRow)
+                root.yankText(text.substring(root._lineStartAt(text, lo), root._lineEndAt(text, hi)))
+                root._visualMode = ""; edit.select(0, 0); return true
+            }
+            if (event.text === "o" || event.text === "O") {
+                const tmp = root._visualAnchorRow
+                root._visualAnchorRow = root._visualCurRow; root._visualCurRow = tmp
+                root._applyLineSelection(edit)
+                root._scrollEditIntoView(edit, flick, edit.cursorPosition); return true
+            }
+            if (event.key === Qt.Key_J || event.key === Qt.Key_Down) {
+                const max = root._lineCount(text) - 1
+                if (root._visualCurRow < max) {
+                    root._visualCurRow++
+                    root._applyLineSelection(edit)
+                    root._scrollEditIntoView(edit, flick, edit.cursorPosition)
+                }
+                return true
+            }
+            if (event.key === Qt.Key_K || event.key === Qt.Key_Up) {
+                if (root._visualCurRow > 0) {
+                    root._visualCurRow--
+                    root._applyLineSelection(edit)
+                    root._scrollEditIntoView(edit, flick, edit.cursorPosition)
+                }
+                return true
+            }
+            return false
+        }
+
+        // ── Block mode ───────────────────────────────────────────────────────
+        if (root._visualMode === "block") {
+            if (event.text === "y") {
+                const lo    = Math.min(root._visualAnchorRow, root._visualCurRow)
+                const hi    = Math.max(root._visualAnchorRow, root._visualCurRow)
+                const loCol = Math.min(root._visualAnchorCol, root._visualCurCol)
+                const hiCol = Math.max(root._visualAnchorCol, root._visualCurCol)
+                const lines = []
+                for (let row = lo; row <= hi; row++) {
+                    const ls = root._lineStartAt(text, row), le = root._lineEndAt(text, row)
+                    lines.push(text.substring(ls, le).substring(loCol, hiCol + 1))
+                }
+                root.yankText(lines.join("\n"))
+                root._visualMode = ""; return true
+            }
+            if (event.text === "o") {
+                // Swap to diagonally opposite corner
+                const tr = root._visualAnchorRow, tc = root._visualAnchorCol
+                root._visualAnchorRow = root._visualCurRow; root._visualAnchorCol = root._visualCurCol
+                root._visualCurRow    = tr;                 root._visualCurCol    = tc; return true
+            }
+            if (event.text === "O") {
+                // Swap to same-row opposite column
+                const tc = root._visualAnchorCol
+                root._visualAnchorCol = root._visualCurCol; root._visualCurCol = tc; return true
+            }
+            if (event.key === Qt.Key_J || event.key === Qt.Key_Down) {
+                const max = root._lineCount(text) - 1
+                if (root._visualCurRow < max) root._visualCurRow++; return true
+            }
+            if (event.key === Qt.Key_K || event.key === Qt.Key_Up) {
+                if (root._visualCurRow > 0) root._visualCurRow--; return true
+            }
+            if (event.key === Qt.Key_L || event.key === Qt.Key_Right) {
+                root._visualCurCol++; return true
+            }
+            if (event.key === Qt.Key_H || event.key === Qt.Key_Left) {
+                if (root._visualCurCol > 0) root._visualCurCol--; return true
+            }
+            return false
+        }
+
+        return false
     }
 
     function _refreshDetail() {
@@ -160,6 +416,7 @@ ShellRoot {
         root._detailImgSize  = ""
         const eid = clipEntry.entryId(root.selectedEntry)
         root._detailImgPath  = "/tmp/kh-cliphist-" + eid
+        root._visualMode     = ""
         detailFlick.contentY = 0
         if (root._detailIsImage) {
             detailDecodeProcess.command = [
@@ -238,6 +495,7 @@ ShellRoot {
     }
 
     Process { id: pasteProcess }
+    Process { id: yankTextProcess }
 
     Process {
         id: detailDecodeProcess
@@ -336,8 +594,16 @@ ShellRoot {
                 root._helpFiltering = true
                 root.helpText = ""
             } else if (lk === "v" && !root.helpShowing) {
-                if (root.mode === "visual") root.mode = "normal"
-                else root.enterVisualMode()
+                if (root.fullscreenShowing && !root._detailIsImage) {
+                    if (root._visualMode !== "") { root._visualMode = ""; fsTextEdit.select(0, 0) }
+                    else root._enterTextVisual("char", fsTextEdit, fullscreenFlick)
+                } else if (root.detailFocused && !root._detailIsImage) {
+                    if (root._visualMode !== "") { root._visualMode = ""; detailTextEdit.select(0, 0) }
+                    else root._enterTextVisual("char", detailTextEdit, detailFlick)
+                } else {
+                    if (root.mode === "visual") root.mode = "normal"
+                    else root.enterVisualMode()
+                }
             } else if (lk === "l" && !root.helpShowing) {
                 root.detailFocused = true
             } else if (lk === "h" && root.detailFocused) {
@@ -397,6 +663,7 @@ ShellRoot {
                 root.helpText         = ""
                 root.detailFocused    = false
                 root.fullscreenShowing = false
+                root._visualMode      = ""
                 root._detailText     = ""
                 root._detailLines    = []
                 root._detailLoading  = false
@@ -493,10 +760,21 @@ ShellRoot {
 
                     // ── Fullscreen ────────────────────────────────────────────
                     if (root.fullscreenShowing) {
+                        if (root._visualMode !== "") {
+                            if (root._handleTextVisualKey(event, fsTextEdit, fullscreenFlick))
+                                event.accepted = true
+                            return
+                        }
                         const lineH = cfg.fontSize + 6
                         const halfPg = Math.max(lineH, Math.floor(fullscreenFlick.height / 2))
                         if (event.key === Qt.Key_Escape) {
                             root.closeFullscreen()
+                        } else if (event.text === "v" && !root._detailIsImage) {
+                            root._enterTextVisual("char", fsTextEdit, fullscreenFlick)
+                        } else if (event.text === "V" && !root._detailIsImage) {
+                            root._enterTextVisual("line", fsTextEdit, fullscreenFlick)
+                        } else if (event.key === Qt.Key_V && (event.modifiers & Qt.ControlModifier) && !root._detailIsImage) {
+                            root._enterTextVisual("block", fsTextEdit, fullscreenFlick)
                         } else if (event.text === "y") {
                             if (root.selectedEntry !== "") root.yank(root.selectedEntry)
                         } else if (!root._detailIsImage && (event.key === Qt.Key_J || event.key === Qt.Key_Down)) {
@@ -548,6 +826,11 @@ ShellRoot {
 
                     // ── Detail focus ──────────────────────────────────────────
                     if (root.detailFocused) {
+                        if (root._visualMode !== "") {
+                            if (root._handleTextVisualKey(event, detailTextEdit, detailFlick))
+                                event.accepted = true
+                            return
+                        }
                         const lineH = cfg.fontSize + 6
                         const halfPg = Math.max(lineH, Math.floor(detailFlick.height / 2))
                         if (event.key === Qt.Key_H || event.key === Qt.Key_Escape) {
@@ -556,6 +839,12 @@ ShellRoot {
                             root.openFullscreen()
                         } else if (event.text === "y") {
                             if (root.selectedEntry !== "") root.yank(root.selectedEntry)
+                        } else if (event.text === "v" && !root._detailIsImage) {
+                            root._enterTextVisual("char", detailTextEdit, detailFlick)
+                        } else if (event.text === "V" && !root._detailIsImage) {
+                            root._enterTextVisual("line", detailTextEdit, detailFlick)
+                        } else if (event.key === Qt.Key_V && (event.modifiers & Qt.ControlModifier) && !root._detailIsImage) {
+                            root._enterTextVisual("block", detailTextEdit, detailFlick)
                         } else if (!root._detailIsImage && (event.key === Qt.Key_J || event.key === Qt.Key_Down)) {
                             detailFlick.contentY = Math.min(
                                 Math.max(0, detailFlick.contentHeight - detailFlick.height),
@@ -646,8 +935,14 @@ ShellRoot {
                         Text {
                             id: modeLabel
                             anchors.centerIn: parent
-                            text: root.mode === "visual" ? "VIS" : "NOR"
-                            color: root.mode === "visual" ? cfg.color.base0E : cfg.color.base0D
+                            text: {
+                                if (root._visualMode === "char")  return "CHR"
+                                if (root._visualMode === "line")  return "LIN"
+                                if (root._visualMode === "block") return "BLK"
+                                return root.mode === "visual" ? "VIS" : "NOR"
+                            }
+                            color: (root._visualMode !== "" || root.mode === "visual")
+                                   ? cfg.color.base0E : cfg.color.base0D
                             font.family: cfg.fontFamily
                             font.pixelSize: cfg.fontSize - 3
                             font.bold: true
@@ -930,19 +1225,56 @@ ShellRoot {
                                 id: detailFlick
                                 anchors.fill: parent
                                 visible: !root._detailIsImage && !root._detailLoading
-                                contentHeight: detailTextContent.implicitHeight
+                                contentHeight: detailTextEdit.implicitHeight
                                 contentWidth: width
                                 clip: true
 
-                                Text {
-                                    id: detailTextContent
+                                // Block-visual overlay rectangles (Ctrl+V mode)
+                                property var _blockRects: {
+                                    if (root._visualMode !== "block" || !root.detailFocused || !root._detailText) return []
+                                    const text  = root._detailText
+                                    const lo    = Math.min(root._visualAnchorRow, root._visualCurRow)
+                                    const hi    = Math.max(root._visualAnchorRow, root._visualCurRow)
+                                    const loCol = Math.min(root._visualAnchorCol, root._visualCurCol)
+                                    const hiCol = Math.max(root._visualAnchorCol, root._visualCurCol)
+                                    const rects = []
+                                    for (let row = lo; row <= hi; row++) {
+                                        const ls = root._lineStartAt(text, row)
+                                        const le = root._lineEndAt(text, row)
+                                        const sp = ls + loCol <= le ? ls + loCol : le
+                                        const ep = ls + hiCol <= le ? ls + hiCol : (le > 0 ? le - 1 : le)
+                                        const sr = detailTextEdit.positionToRectangle(sp)
+                                        const er = ep >= sp ? detailTextEdit.positionToRectangle(ep) : sr
+                                        rects.push({ x: sr.x, y: sr.y, w: Math.max(4, er.x + er.width - sr.x), h: sr.height })
+                                    }
+                                    return rects
+                                }
+
+                                TextEdit {
+                                    id: detailTextEdit
                                     width: parent.width
                                     leftPadding: 12; rightPadding: 12; topPadding: 10; bottomPadding: 10
                                     text: root._detailText
                                     color: cfg.color.base05
                                     font.family: cfg.fontFamily
                                     font.pixelSize: cfg.fontSize
-                                    wrapMode: Text.Wrap
+                                    wrapMode: TextEdit.Wrap
+                                    readOnly: true
+                                    selectByMouse: false
+                                    selectByKeyboard: false
+                                    cursorVisible: root._detailVisual
+                                    selectedTextColor: cfg.color.base00
+                                    selectionColor: cfg.color.base0D
+                                }
+
+                                Repeater {
+                                    model: detailFlick._blockRects
+                                    delegate: Rectangle {
+                                        required property var modelData
+                                        x: modelData.x; y: modelData.y
+                                        width: modelData.w; height: modelData.h
+                                        color: cfg.color.base0D; opacity: 0.4
+                                    }
                                 }
                             }
 
@@ -969,8 +1301,14 @@ ShellRoot {
                     Text {
                         anchors.left: parent.left
                         anchors.verticalCenter: parent.verticalCenter
-                        text: root.detailFocused
-                            ? "h / Esc  list  \u00b7  j/k  scroll  \u00b7  Enter  fullscreen  \u00b7  y  copy"
+                        text: root._detailVisual
+                            ? (root._visualMode === "char"
+                                ? "v/Esc exit  \u00b7  j/k extend  \u00b7  o swap  \u00b7  V line  \u00b7  Ctrl+V block  \u00b7  y copy"
+                               : root._visualMode === "line"
+                                ? "V/Esc exit  \u00b7  j/k extend  \u00b7  o swap  \u00b7  v char  \u00b7  Ctrl+V block  \u00b7  y copy"
+                               : "Ctrl+V/Esc exit  \u00b7  j/k/h/l move  \u00b7  o diag  \u00b7  O col  \u00b7  v char  \u00b7  y copy")
+                            : root.detailFocused
+                            ? "h/Esc list  \u00b7  j/k scroll  \u00b7  v/V/Ctrl+V visual  \u00b7  Enter fullscreen  \u00b7  y copy"
                             : root.mode === "visual"
                                 ? "j/k  select  \u00b7  v / Esc  normal mode"
                                 : root.mode === "normal"
@@ -1076,7 +1414,13 @@ ShellRoot {
                         anchors.right: parent.right
                         anchors.rightMargin: 16
                         anchors.verticalCenter: parent.verticalCenter
-                        text: "Esc  back  \u00b7  y  copy"
+                        text: root._fsVisual
+                            ? (root._visualMode === "char"
+                                ? "v/Esc exit  \u00b7  j/k extend  \u00b7  o swap  \u00b7  V line  \u00b7  Ctrl+V block  \u00b7  y copy"
+                               : root._visualMode === "line"
+                                ? "V/Esc exit  \u00b7  j/k extend  \u00b7  o swap  \u00b7  v char  \u00b7  Ctrl+V block  \u00b7  y copy"
+                               : "Ctrl+V/Esc exit  \u00b7  j/k/h/l move  \u00b7  o diag  \u00b7  O col  \u00b7  v char  \u00b7  y copy")
+                            : "Esc back  \u00b7  v/V/Ctrl+V visual  \u00b7  y copy"
                         color: cfg.color.base03
                         font.family: cfg.fontFamily
                         font.pixelSize: cfg.fontSize - 3
@@ -1103,19 +1447,56 @@ ShellRoot {
                         id: fullscreenFlick
                         anchors.fill: parent
                         visible: !root._detailIsImage && !root._detailLoading
-                        contentHeight: fsTextContent.implicitHeight
+                        contentHeight: fsTextEdit.implicitHeight
                         contentWidth: width
                         clip: true
 
-                        Text {
-                            id: fsTextContent
+                        // Block-visual overlay rectangles (Ctrl+V mode)
+                        property var _blockRects: {
+                            if (root._visualMode !== "block" || !root.fullscreenShowing || !root._detailText) return []
+                            const text  = root._detailText
+                            const lo    = Math.min(root._visualAnchorRow, root._visualCurRow)
+                            const hi    = Math.max(root._visualAnchorRow, root._visualCurRow)
+                            const loCol = Math.min(root._visualAnchorCol, root._visualCurCol)
+                            const hiCol = Math.max(root._visualAnchorCol, root._visualCurCol)
+                            const rects = []
+                            for (let row = lo; row <= hi; row++) {
+                                const ls = root._lineStartAt(text, row)
+                                const le = root._lineEndAt(text, row)
+                                const sp = ls + loCol <= le ? ls + loCol : le
+                                const ep = ls + hiCol <= le ? ls + hiCol : (le > 0 ? le - 1 : le)
+                                const sr = fsTextEdit.positionToRectangle(sp)
+                                const er = ep >= sp ? fsTextEdit.positionToRectangle(ep) : sr
+                                rects.push({ x: sr.x, y: sr.y, w: Math.max(4, er.x + er.width - sr.x), h: sr.height })
+                            }
+                            return rects
+                        }
+
+                        TextEdit {
+                            id: fsTextEdit
                             width: parent.width
                             leftPadding: 16; rightPadding: 16; topPadding: 14; bottomPadding: 14
                             text: root._detailText
                             color: cfg.color.base05
                             font.family: cfg.fontFamily
                             font.pixelSize: cfg.fontSize
-                            wrapMode: Text.Wrap
+                            wrapMode: TextEdit.Wrap
+                            readOnly: true
+                            selectByMouse: false
+                            selectByKeyboard: false
+                            cursorVisible: root._fsVisual
+                            selectedTextColor: cfg.color.base00
+                            selectionColor: cfg.color.base0D
+                        }
+
+                        Repeater {
+                            model: fullscreenFlick._blockRects
+                            delegate: Rectangle {
+                                required property var modelData
+                                x: modelData.x; y: modelData.y
+                                width: modelData.w; height: modelData.h
+                                color: cfg.color.base0D; opacity: 0.4
+                            }
                         }
                     }
 
