@@ -47,10 +47,8 @@ The module requires [Stylix](https://github.com/nix-community/stylix) — colors
 With the module imported, enabling both components is a single option:
 
 ```nix
-programs.quickshell = {
-  enable = true;
-  kh-ui.enable = true;
-};
+programs.quickshell.enable = true;
+programs.kh-ui.enable = true;
 ```
 
 ### 4. Autostart and keybinds (Hyprland)
