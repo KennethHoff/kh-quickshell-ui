@@ -30,13 +30,13 @@ list of clipboard entries from `cliphist`. SUPER+V toggles it via IPC.
 - ✅ Emacs bindings in insert mode — `Ctrl+A`/`E` start/end, `Ctrl+F`/`B` forward/back char, `Ctrl+D` delete forward, `Ctrl+K` delete to end, `Ctrl+W` delete word, `Ctrl+U` delete to line start
 - ✅ Detail panel — always-visible side pane (40/60 split); auto-loads selected entry on navigation (120 ms debounce); text with char/word/line count; image with dimensions and file size; `Tab`/`l` enters, `Tab`/`Esc` returns to list; `hjkl`/`w`/`b`/`e`/`W`/`B`/`E` cursor; `0`/`$`/`^` line; `v`/`V`/`Ctrl+V` char/line/block visual select; `h`/`l`/word motions extend char selection; `o`/`O` swap anchor corner; `y` copies selection
 - ✅ Fullscreen view — `Enter` from detail (when focused); `Escape` back; full text/image view filling the panel; `y` copies; `hjkl`/`w`/`b`/`e`/`W`/`B`/`E` cursor; `0`/`$`/`^` line; `gg`/`G`/`Ctrl+D`/`U` navigate; `v`/`V`/`Ctrl+V` char/line/block visual select; word motions extend char selection; `o`/`O` swap anchor corner; `y` copies selection
-- ✅ Help overlay — `?` opens a context-specific popup (insert vs normal mode bindings) overlaid on the list; `/` filters rows inline; popup shrinks to fit matches
+- ✅ Help overlay — `?` opens a context-specific popup (insert / normal / visual mode bindings) overlaid on the list; `/` filters rows inline; popup shrinks to fit matches
 - ✅ Fast search — haystacks pre-processed at load time; filter debounced at 80 ms; full-text cache updated via O(1) index lookup as decode streams in
 - ⬜ Insert mode in preview/fullscreen — edit the text content of an entry inline before copying; vim operator bindings (`ciw`, `dw`, `cit`, etc.); `i`/`a`/`I`/`A`/`o`/`O` to enter insert; Escape back to normal; `y` copies the (modified) content
 - ⬜ Timestamp on entries
 - ⬜ Source app attribution — record active Hyprland window (`hyprctl activewindow`) at copy time, stored in a side-store alongside the cliphist entry (needs a storage solution that doesn't corrupt binary clipboard data)
 - ⬜ Auto-paste — close the window and simulate Ctrl+V into the previously focused app via `wtype`
-- ✅ Delete from UI — `d` in normal mode removes the selected entry via `cliphist delete` and splices it from local state immediately
+- ✅ Delete from UI — `d` in normal mode deletes the selected entry; `d` in visual mode deletes the selected range; confirms via popup before executing; fade-out animation on deleted entries; cursor repositions to the entry above the deleted one; executed via `cliphist delete`
 - ⬜ Pinned entries — star entries to keep them permanently at the top, surviving clipboard history rotation
 
 ---
@@ -116,7 +116,7 @@ or stdin; shows all files side-by-side with Tab to cycle focus between panes.
 - ✅ `nix run .#kh-view -- <file> [<file2> ...]` or `<cmd> | nix run .#kh-view`
 - ✅ Image detection by extension (png/jpg/jpeg/gif/webp/bmp/svg)
 - ✅ N files shown side-by-side in equal-width panes; Tab cycles focus; active divider highlights
-- ✅ Per-pane: `hjkl`/`gg`/`G`/`Ctrl+D`/`U` scroll; `v`/`V`/`Ctrl+V` visual select; `y` copies selection
+- ✅ Per-pane: `hjkl`/`w`/`b`/`e`/`W`/`B`/`E` cursor; `0`/`$`/`^` line; `gg`/`G`/`Ctrl+D`/`U` scroll; `v`/`V`/`Ctrl+V` char/line/block visual select; word motions extend char selection; `y` copies selection
 - ✅ `q`/`Esc` quits
 - ✅ Fullscreen mode — `f` toggles single fullscreen pane; `h`/`l` steps through all loaded files; dot indicators at bottom center show position
 - ✅ IPC support — `target: "viewer"`; `next()`/`prev()`/`seek(n)`/`quit()`/`setFullscreen(bool)`/`key(k)`; readable props `currentIndex`, `count`, `fullscreen`, `hasPrev`, `hasNext`; enables scripted slideshows and library review workflows
