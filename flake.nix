@@ -132,8 +132,9 @@
           program = toString (pkgs.writeShellScript "qs-screenshot" ''
             set -e
             app=$1 name=$2; shift 2
-            outfile=/tmp/qs-screenshots/$name.png
-            mkdir -p /tmp/qs-screenshots
+            run=/tmp/qs-screenshots/$(date +%Y%m%d-%H%M%S)
+            mkdir -p "$run"
+            outfile=$run/$name.png
             case "$app" in
               kh-launcher) config=${launcherConfig}; target=launcher ;;
               kh-cliphist) config=${cliphistConfig}; target=viewer   ;;
