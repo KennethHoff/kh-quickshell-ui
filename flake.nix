@@ -26,6 +26,33 @@
           fontSize = 12;
         }} $out/NixFFI/NixFFI.qml
       '';
+      cliphistDecodeAllScript = pkgs.writeShellScript "kh-cliphist-decode-all" ''
+        ${lib.getExe pkgs.cliphist} list | while IFS=$'\t' read -r id preview; do
+            [[ "$preview" == "[[binary"* ]] && continue
+            [[ ''${#preview} -lt 100 ]] && continue
+            text=$(printf '%s\t%s\n' "$id" "$preview" | ${lib.getExe pkgs.cliphist} decode)
+            json=$(printf '%s' "$text" | ${lib.getExe pkgs.jq} -Rs .)
+            printf '%s\t%s\n' "$id" "$json"
+        done
+      '';
+
+      cliphistConfig = pkgs.runCommand "kh-cliphist-config" { } ''
+        mkdir $out
+        cp ${self}/lib/*.qml $out/
+        cp ${self}/qml/kh-cliphist.qml $out/shell.qml
+        cp ${import ./ffi.nix {
+          inherit pkgs lib;
+          colors = {
+            base00 = "1e1e2e"; base01 = "181825"; base02 = "313244"; base03 = "45475a";
+            base04 = "585b70"; base05 = "cdd6f4"; base06 = "f5c2e7"; base07 = "b4befe";
+            base08 = "f38ba8"; base09 = "fab387"; base0A = "f9e2af"; base0B = "a6e3a1";
+            base0C = "94e2d5"; base0D = "89b4fa"; base0E = "cba6f7"; base0F = "f2cdcd";
+          };
+          fontName = "monospace";
+          fontSize = 14;
+          extraBins.cliphistDecodeAll = toString cliphistDecodeAllScript;
+        }} $out/NixFFI.qml
+      '';
     in
     {
       checks.${system}.tests = pkgs.runCommand "qml-tests" {
@@ -35,9 +62,10 @@
       } ''
         export HOME=$TMPDIR
         cp -r $src/tests .
+        cp -r $src/lib .
         qmltestrunner \
           -import ${pkgs.qt6.qtdeclarative}/lib/qt-6/qml \
-          -import $src/lib \
+          -import lib \
           -import ${nixffiDir} \
           -input tests/
         touch $out
@@ -50,6 +78,26 @@
           export QML_IMPORT_PATH=${pkgs.qt6.qtdeclarative}/lib/qt-6/qml:$PWD/lib:${nixffiDir}
           echo "Run tests: qmltestrunner -input tests/"
         '';
+      };
+
+      packages.${system}.kh-cliphist = cliphistConfig;
+
+      apps.${system}.kh-cliphist = {
+        type = "app";
+        program = toString (pkgs.writeShellScript "run-kh-cliphist" ''
+          qs=${lib.getExe' pkgs.quickshell "quickshell"}
+          "$qs" -p ${cliphistConfig} &
+          QS_PID=$!
+          for i in $(seq 30); do
+            sleep 0.1
+            "$qs" ipc --pid "$QS_PID" call viewer toggle 2>/dev/null && break
+          done
+          while [[ "$("$qs" ipc --pid "$QS_PID" prop get viewer showing 2>/dev/null)" == "true" ]]; do
+            sleep 0.2
+          done
+          kill "$QS_PID" 2>/dev/null
+          wait "$QS_PID" 2>/dev/null
+        '');
       };
     };
 }
