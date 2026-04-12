@@ -39,28 +39,6 @@
 
       cliphistDecodeAllScript = import ./scripts/cliphist-decode-all.nix { inherit pkgs lib; };
 
-      launcherColors = {
-        base00 = "1e1e2e"; base01 = "181825"; base02 = "313244"; base03 = "45475a";
-        base04 = "585b70"; base05 = "cdd6f4"; base06 = "f5c2e7"; base07 = "b4befe";
-        base08 = "f38ba8"; base09 = "fab387"; base0A = "f9e2af"; base0B = "a6e3a1";
-        base0C = "94e2d5"; base0D = "89b4fa"; base0E = "cba6f7"; base0F = "f2cdcd";
-      };
-
-      launcherConfig = pkgs.runCommand "kh-launcher-config" { } ''
-        mkdir -p $out/lib
-        cp ${self}/lib/*.qml $out/lib/
-        cp ${self}/qml/kh-launcher.qml $out/shell.qml
-        cp ${import ./config.nix {
-          inherit pkgs;
-          colors   = launcherColors;
-          fontName = "monospace";
-          fontSize = 14;
-        }} $out/NixConfig.qml
-        cp ${import ./ffi.nix {
-          inherit pkgs lib;
-        }} $out/NixBins.qml
-      '';
-
       cliphistConfig = pkgs.runCommand "kh-cliphist-config" { } ''
         mkdir -p $out/lib
         cp ${self}/lib/*.qml $out/lib/
@@ -111,7 +89,6 @@
       };
 
       packages.${system} = {
-        kh-launcher = launcherConfig;
         kh-cliphist = cliphistConfig;
         cliphistDecodeAll = cliphistDecodeAllScript;
       };
@@ -130,7 +107,6 @@
             if [[ "$1" == --run ]]; then run=$2; shift 2; fi
             app=$1; shift
             case "$app" in
-              kh-launcher) config=${launcherConfig}; target=launcher ;;
               kh-cliphist) config=${cliphistConfig}; target=viewer   ;;
               *) echo "usage: screenshot [--run <dir>] <app> <name> [<ipc-call>...] [-- <name> [<ipc-call>...]]..." >&2; exit 1 ;;
             esac
@@ -188,23 +164,6 @@
 
             kill -9 "$SWAY_PID" 2>/dev/null
             rm -rf "$xdg_runtime"
-          '');
-        };
-        kh-launcher = {
-          type = "app";
-          program = toString (pkgs.writeShellScript "run-kh-launcher" ''
-            qs=${lib.getExe' pkgs.quickshell "quickshell"}
-            "$qs" -p ${launcherConfig} &
-            QS_PID=$!
-            for i in $(seq 30); do
-              sleep 0.1
-              "$qs" ipc --pid "$QS_PID" call launcher toggle 2>/dev/null && break
-            done
-            while [[ "$("$qs" ipc --pid "$QS_PID" prop get launcher showing 2>/dev/null)" == "true" ]]; do
-              sleep 0.2
-            done
-            kill "$QS_PID" 2>/dev/null
-            wait "$QS_PID" 2>/dev/null
           '');
         };
         kh-cliphist = {
