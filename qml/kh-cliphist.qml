@@ -34,6 +34,7 @@ ShellRoot {
     property bool   _pendingG: false
 
     property bool   detailFocused: false
+    property bool   fullscreenShowing: false
     property bool   _detailIsImage: false
     property string _detailText: ""
     property var    _detailLines: []
@@ -121,6 +122,17 @@ ShellRoot {
         root.helpText = ""
         if (root.mode === "insert") root.enterInsertMode()
         else normalModeHandler.forceActiveFocus()
+    }
+
+    function openFullscreen() {
+        root.fullscreenShowing = true
+        fullscreenFlick.contentY = 0
+        normalModeHandler.forceActiveFocus()
+    }
+
+    function closeFullscreen() {
+        root.fullscreenShowing = false
+        normalModeHandler.forceActiveFocus()
     }
 
     function _refreshDetail() {
@@ -297,6 +309,7 @@ ShellRoot {
         function setView(v: string) {
             if (v === "help") root.openHelp()
             else if (v === "list") root.closeHelp()
+            else if (v === "fullscreen") root.openFullscreen()
         }
 
         function nav(dir: string) {
@@ -319,10 +332,14 @@ ShellRoot {
                 root.detailFocused = true
             } else if (lk === "h" && root.detailFocused) {
                 root.detailFocused = false
+            } else if (lk === "enter" || lk === "return") {
+                if (root.detailFocused && !root.fullscreenShowing) root.openFullscreen()
             } else if (lk === "escape" || lk === "esc") {
                 if (root.helpShowing) {
                     if (root.helpText) { root.helpText = ""; root._helpFiltering = false }
                     else root.closeHelp()
+                } else if (root.fullscreenShowing) {
+                    root.closeFullscreen()
                 } else if (root.detailFocused) {
                     root.detailFocused = false
                 } else if (root.mode === "insert") {
@@ -365,10 +382,11 @@ ShellRoot {
                 root._buf            = []
                 root._processed      = []
                 root._processedIdx   = {}
-                root.helpShowing     = false
-                root._helpFiltering  = false
-                root.helpText        = ""
-                root.detailFocused   = false
+                root.helpShowing      = false
+                root._helpFiltering   = false
+                root.helpText         = ""
+                root.detailFocused    = false
+                root.fullscreenShowing = false
                 root._detailText     = ""
                 root._detailLines    = []
                 root._detailLoading  = false
@@ -463,12 +481,45 @@ ShellRoot {
                         return
                     }
 
+                    // ── Fullscreen ────────────────────────────────────────────
+                    if (root.fullscreenShowing) {
+                        const lineH = cfg.fontSize + 6
+                        const halfPg = Math.max(lineH, Math.floor(fullscreenFlick.height / 2))
+                        if (event.key === Qt.Key_Escape) {
+                            root.closeFullscreen()
+                        } else if (event.text === "y") {
+                            if (root.selectedEntry !== "") root.yank(root.selectedEntry)
+                        } else if (!root._detailIsImage && (event.key === Qt.Key_J || event.key === Qt.Key_Down)) {
+                            fullscreenFlick.contentY = Math.min(
+                                Math.max(0, fullscreenFlick.contentHeight - fullscreenFlick.height),
+                                fullscreenFlick.contentY + lineH)
+                        } else if (!root._detailIsImage && (event.key === Qt.Key_K || event.key === Qt.Key_Up)) {
+                            fullscreenFlick.contentY = Math.max(0, fullscreenFlick.contentY - lineH)
+                        } else if (!root._detailIsImage && event.key === Qt.Key_D && (event.modifiers & Qt.ControlModifier)) {
+                            fullscreenFlick.contentY = Math.min(
+                                Math.max(0, fullscreenFlick.contentHeight - fullscreenFlick.height),
+                                fullscreenFlick.contentY + halfPg)
+                        } else if (!root._detailIsImage && event.key === Qt.Key_U && (event.modifiers & Qt.ControlModifier)) {
+                            fullscreenFlick.contentY = Math.max(0, fullscreenFlick.contentY - halfPg)
+                        } else if (!root._detailIsImage && event.key === Qt.Key_G && (event.modifiers & Qt.ShiftModifier)) {
+                            fullscreenFlick.contentY = Math.max(0, fullscreenFlick.contentHeight - fullscreenFlick.height)
+                        } else if (!root._detailIsImage && event.key === Qt.Key_G) {
+                            fullscreenFlick.contentY = 0
+                        } else {
+                            return
+                        }
+                        event.accepted = true
+                        return
+                    }
+
                     // ── Detail focus ──────────────────────────────────────────
                     if (root.detailFocused) {
                         const lineH = cfg.fontSize + 6
                         const halfPg = Math.max(lineH, Math.floor(detailFlick.height / 2))
                         if (event.key === Qt.Key_H || event.key === Qt.Key_Escape) {
                             root.detailFocused = false
+                        } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                            root.openFullscreen()
                         } else if (event.text === "y") {
                             if (root.selectedEntry !== "") root.yank(root.selectedEntry)
                         } else if (!root._detailIsImage && (event.key === Qt.Key_J || event.key === Qt.Key_Down)) {
@@ -874,7 +925,7 @@ ShellRoot {
                         anchors.left: parent.left
                         anchors.verticalCenter: parent.verticalCenter
                         text: root.detailFocused
-                            ? "h / Esc  list  \u00b7  j/k  scroll  \u00b7  y  copy"
+                            ? "h / Esc  list  \u00b7  j/k  scroll  \u00b7  Enter  fullscreen  \u00b7  y  copy"
                             : root.mode === "normal"
                                 ? "j/k  navigate  \u00b7  y  copy  \u00b7  l  detail  \u00b7  /  search  \u00b7  ?  help  \u00b7  Esc  close"
                                 : "Esc  normal mode  \u00b7  ?  help"
@@ -891,6 +942,144 @@ ShellRoot {
                         color: cfg.color.base03
                         font.family: cfg.fontFamily
                         font.pixelSize: cfg.fontSize - 3
+                    }
+                }
+            }
+
+            // Fullscreen view ─────────────────────────────────────────────────
+            Rectangle {
+                anchors.fill: parent
+                visible: root.fullscreenShowing
+                z: 5
+                color: cfg.color.base00
+                clip: true
+
+                // Header
+                Item {
+                    id: fsHeader
+                    anchors.top: parent.top
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    height: 44
+
+                    Text {
+                        anchors.left: parent.left
+                        anchors.leftMargin: 16
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: root._detailIsImage ? "IMAGE" : "TEXT"
+                        color: cfg.color.base0D
+                        font.family: cfg.fontFamily
+                        font.pixelSize: cfg.fontSize - 3
+                        font.bold: true
+                        font.letterSpacing: 1
+                    }
+                    Text {
+                        anchors.left: parent.left
+                        anchors.leftMargin: 72
+                        anchors.right: parent.right
+                        anchors.rightMargin: 16
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: root.selectedEntry !== "" ? clipEntry.entryPreview(root.selectedEntry) : ""
+                        color: cfg.color.base03
+                        font.family: cfg.fontFamily
+                        font.pixelSize: cfg.fontSize - 3
+                        elide: Text.ElideRight
+                    }
+                    Rectangle {
+                        anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom
+                        height: 1; color: cfg.color.base02
+                    }
+                }
+
+                // Stats + hint bar
+                Item {
+                    id: fsStats
+                    anchors.bottom: parent.bottom
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    height: 36
+
+                    Rectangle {
+                        anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top
+                        height: 1; color: cfg.color.base02
+                    }
+                    Text {
+                        anchors.left: parent.left
+                        anchors.leftMargin: 16
+                        anchors.verticalCenter: parent.verticalCenter
+                        color: cfg.color.base03
+                        font.family: cfg.fontFamily
+                        font.pixelSize: cfg.fontSize - 3
+                        text: {
+                            if (root._detailLoading) return ""
+                            if (root._detailIsImage) {
+                                const dim = fsImg.status === Image.Ready
+                                    ? fsImg.implicitWidth + " \u00d7 " + fsImg.implicitHeight + " px"
+                                    : ""
+                                return dim + (dim && root._detailImgSize ? "  \u00b7  " : "") + root._detailImgSize
+                            }
+                            const t = root._detailText
+                            const chars = t.length
+                            const words = t.trim() ? t.trim().split(/\s+/).length : 0
+                            const lines = t ? t.split("\n").length : 0
+                            return chars + " chars  \u00b7  " + words + " words  \u00b7  " + lines + " lines"
+                        }
+                    }
+                    Text {
+                        anchors.right: parent.right
+                        anchors.rightMargin: 16
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: "Esc  back  \u00b7  y  copy"
+                        color: cfg.color.base03
+                        font.family: cfg.fontFamily
+                        font.pixelSize: cfg.fontSize - 3
+                    }
+                }
+
+                // Content
+                Item {
+                    anchors.top: fsHeader.bottom
+                    anchors.bottom: fsStats.top
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+
+                    Text {
+                        anchors.centerIn: parent
+                        visible: root._detailLoading
+                        text: "Loading..."
+                        color: cfg.color.base03
+                        font.family: cfg.fontFamily
+                        font.pixelSize: cfg.fontSize
+                    }
+
+                    Flickable {
+                        id: fullscreenFlick
+                        anchors.fill: parent
+                        visible: !root._detailIsImage && !root._detailLoading
+                        contentHeight: fsTextContent.implicitHeight
+                        contentWidth: width
+                        clip: true
+
+                        Text {
+                            id: fsTextContent
+                            width: parent.width
+                            leftPadding: 16; rightPadding: 16; topPadding: 14; bottomPadding: 14
+                            text: root._detailText
+                            color: cfg.color.base05
+                            font.family: cfg.fontFamily
+                            font.pixelSize: cfg.fontSize
+                            wrapMode: Text.Wrap
+                        }
+                    }
+
+                    Image {
+                        id: fsImg
+                        anchors.fill: parent
+                        anchors.margins: 16
+                        visible: root._detailIsImage && !root._detailLoading
+                        fillMode: Image.PreserveAspectFit
+                        smooth: true; mipmap: true; asynchronous: true
+                        source: root._detailImgSource
                     }
                 }
             }
@@ -1031,8 +1220,9 @@ ShellRoot {
                                     ShortcutRow { keys: "G";      action: "jump to bottom" }
                                     ShortcutRow { keys: "Ctrl+D"; action: "half-page down" }
                                     ShortcutRow { keys: "Ctrl+U"; action: "half-page up" }
-                                    ShortcutRow { keys: "y";      action: "copy to clipboard" }
-                                    ShortcutRow { keys: "l";      action: "focus detail pane" }
+                                    ShortcutRow { keys: "y";       action: "copy to clipboard" }
+                                    ShortcutRow { keys: "l";       action: "focus detail pane" }
+                                    ShortcutRow { keys: "Enter";   action: "fullscreen detail" }
                                     ShortcutRow { keys: "h / Esc"; action: "focus list" }
                                     ShortcutRow { keys: "/";      action: "focus search" }
                                     ShortcutRow { keys: "Esc";    action: "close" }

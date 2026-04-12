@@ -29,7 +29,7 @@ list of clipboard entries from `cliphist`. SUPER+V toggles it via IPC.
 - ✅ `gg` top, `G` bottom, `Ctrl+D`/`Ctrl+U` half-page scroll
 - ✅ Emacs bindings in insert mode — `Ctrl+A`/`E` start/end, `Ctrl+F`/`B` forward/back char, `Ctrl+D` delete forward, `Ctrl+K` delete to end, `Ctrl+W` delete word, `Ctrl+U` delete to line start
 - ✅ Detail panel — always-visible side pane (40/60 split); auto-loads selected entry on navigation (120 ms debounce); text with char/word/line count; image with dimensions and file size
-- ⬜ Fullscreen view — `Enter` from detail; `Escape` back
+- ✅ Fullscreen view — `Enter` from detail (when focused); `Escape` back; full text/image view filling the panel; `y` copies, `j`/`k`/`gg`/`G`/`Ctrl+D`/`U` scroll text
 - ✅ Help overlay — `?` opens a context-specific popup (insert vs normal mode bindings) overlaid on the list; `/` filters rows inline; popup shrinks to fit matches
 - ✅ Fast search — haystacks pre-processed at load time; filter debounced at 80 ms; full-text cache updated via O(1) index lookup as decode streams in
 - ⬜ Timestamp on entries
