@@ -30,7 +30,7 @@ list of clipboard entries from `cliphist`. SUPER+V toggles it via IPC.
 - ✅ Emacs bindings in insert mode — `Ctrl+A`/`E` start/end, `Ctrl+F`/`B` forward/back char, `Ctrl+D` delete forward, `Ctrl+K` delete to end, `Ctrl+W` delete word, `Ctrl+U` delete to line start
 - ⬜ Detail panel — `l` to open, `h` to close; text preview with char/word/line count; image preview with dimensions and file size
 - ⬜ Fullscreen view — `Enter` from detail; `Escape` back
-- ✅ Help overlay — `?` toggles a searchable list of keybinds; `/` activates inline filtering
+- ✅ Help overlay — `?` opens a context-specific popup (insert vs normal mode bindings) overlaid on the list; `/` filters rows inline; popup shrinks to fit matches
 - ✅ Fast search — haystacks pre-processed at load time; filter debounced at 80 ms; full-text cache updated via O(1) index lookup as decode streams in
 - ⬜ Timestamp on entries
 - ⬜ Source app attribution — record active Hyprland window (`hyprctl activewindow`) at copy time, stored in a side-store alongside the cliphist entry (needs a storage solution that doesn't corrupt binary clipboard data)
