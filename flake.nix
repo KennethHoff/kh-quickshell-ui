@@ -131,16 +131,17 @@
           type = "app";
           program = toString (pkgs.writeShellScript "qs-screenshot" ''
             set -e
+            run=/tmp/qs-screenshots/$(date +%Y%m%d-%H%M%S)
+            if [[ "$1" == --run ]]; then run=$2; shift 2; fi
             app=$1; shift
             case "$app" in
               kh-launcher) config=${launcherConfig}; target=launcher ;;
               kh-cliphist) config=${cliphistConfig}; target=viewer   ;;
-              *) echo "usage: screenshot <app> <name> [<ipc-call>...] [-- <name> [<ipc-call>...]]..." >&2; exit 1 ;;
+              *) echo "usage: screenshot [--run <dir>] <app> <name> [<ipc-call>...] [-- <name> [<ipc-call>...]]..." >&2; exit 1 ;;
             esac
             qs=${lib.getExe' pkgs.quickshell "quickshell"}
             grim=${lib.getExe pkgs.grim}
             sway=${lib.getExe pkgs.sway}
-            run=/tmp/qs-screenshots/$(date +%Y%m%d-%H%M%S)
             mkdir -p "$run"
 
             xdg_runtime=$(mktemp -d)

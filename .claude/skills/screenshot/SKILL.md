@@ -9,11 +9,12 @@ Take screenshots using the headless screenshot app, then read and display the re
 ## Command
 
 ```bash
-nix run .#screenshot -- <app> <name> [<ipc-call>...] [-- <name> [<ipc-call>...]]...
+nix run .#screenshot -- [--run <dir>] <app> <name> [<ipc-call>...] [-- <name> [<ipc-call>...]]...
 ```
 
+- `--run <dir>` — reuse an existing run directory (useful for iterative queries where you want successive attempts grouped together)
 - `<app>` — a package name from `packages.x86_64-linux` in `flake.nix`; check the flake for the current list
-- `<name>` — output filename without extension; saved to `/tmp/qs-screenshots/<timestamp>/<name>.png`
+- `<name>` — output filename without extension; saved to `<run-dir>/<name>.png`
 - `<ipc-call>` — function name with optional argument, space-separated in a single string
 - `--` — separates multiple shots; all shots share one sway instance and one run directory
 
