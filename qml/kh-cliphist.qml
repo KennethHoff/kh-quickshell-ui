@@ -33,6 +33,7 @@ ShellRoot {
     property var    _processedIdx: ({})  // id → index in _processed for O(1) full-text updates
     property bool   _pendingG: false
 
+    property bool   detailFocused: false
     property bool   _detailIsImage: false
     property string _detailText: ""
     property var    _detailLines: []
@@ -129,6 +130,7 @@ ShellRoot {
         root._detailImgSize  = ""
         const eid = clipEntry.entryId(root.selectedEntry)
         root._detailImgPath  = "/tmp/kh-cliphist-" + eid
+        detailFlick.contentY = 0
         if (root._detailIsImage) {
             detailDecodeProcess.command = [
                 bin.bash, "-c",
@@ -302,10 +304,16 @@ ShellRoot {
             } else if (lk === "/" && root.helpShowing) {
                 root._helpFiltering = true
                 root.helpText = ""
+            } else if (lk === "l" && !root.helpShowing) {
+                root.detailFocused = true
+            } else if (lk === "h" && root.detailFocused) {
+                root.detailFocused = false
             } else if (lk === "escape" || lk === "esc") {
                 if (root.helpShowing) {
                     if (root.helpText) { root.helpText = ""; root._helpFiltering = false }
                     else root.closeHelp()
+                } else if (root.detailFocused) {
+                    root.detailFocused = false
                 } else if (root.mode === "insert") {
                     root.enterNormalMode()
                 } else {
@@ -349,6 +357,7 @@ ShellRoot {
                 root.helpShowing     = false
                 root._helpFiltering  = false
                 root.helpText        = ""
+                root.detailFocused   = false
                 root._detailText     = ""
                 root._detailLines    = []
                 root._detailLoading  = false
@@ -443,6 +452,37 @@ ShellRoot {
                         return
                     }
 
+                    // ── Detail focus ──────────────────────────────────────────
+                    if (root.detailFocused) {
+                        const lineH = cfg.fontSize + 6
+                        const halfPg = Math.max(lineH, Math.floor(detailFlick.height / 2))
+                        if (event.key === Qt.Key_H || event.key === Qt.Key_Escape) {
+                            root.detailFocused = false
+                        } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                            if (root.selectedEntry !== "") root.paste(root.selectedEntry)
+                        } else if (!root._detailIsImage && (event.key === Qt.Key_J || event.key === Qt.Key_Down)) {
+                            detailFlick.contentY = Math.min(
+                                Math.max(0, detailFlick.contentHeight - detailFlick.height),
+                                detailFlick.contentY + lineH)
+                        } else if (!root._detailIsImage && (event.key === Qt.Key_K || event.key === Qt.Key_Up)) {
+                            detailFlick.contentY = Math.max(0, detailFlick.contentY - lineH)
+                        } else if (!root._detailIsImage && event.key === Qt.Key_D && (event.modifiers & Qt.ControlModifier)) {
+                            detailFlick.contentY = Math.min(
+                                Math.max(0, detailFlick.contentHeight - detailFlick.height),
+                                detailFlick.contentY + halfPg)
+                        } else if (!root._detailIsImage && event.key === Qt.Key_U && (event.modifiers & Qt.ControlModifier)) {
+                            detailFlick.contentY = Math.max(0, detailFlick.contentY - halfPg)
+                        } else if (!root._detailIsImage && event.key === Qt.Key_G && (event.modifiers & Qt.ShiftModifier)) {
+                            detailFlick.contentY = Math.max(0, detailFlick.contentHeight - detailFlick.height)
+                        } else if (!root._detailIsImage && event.key === Qt.Key_G) {
+                            detailFlick.contentY = 0
+                        } else {
+                            return
+                        }
+                        event.accepted = true
+                        return
+                    }
+
                     // ── List ──────────────────────────────────────────────────
                     if (event.key === Qt.Key_Escape) {
                         root.showing = false
@@ -469,6 +509,8 @@ ShellRoot {
                         root.navHalfUp()
                     } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
                         if (root.selectedEntry !== "") root.paste(root.selectedEntry)
+                    } else if (event.key === Qt.Key_L) {
+                        root.detailFocused = true
                     } else if (event.key === Qt.Key_Slash) {
                         root.enterInsertMode()
                     } else {
@@ -673,12 +715,12 @@ ShellRoot {
                         }
                     }
 
-                    // Divider
+                    // Divider (highlights when detail is focused)
                     Rectangle {
                         x: resultList.width
                         width: 1
                         height: parent.height
-                        color: cfg.color.base02
+                        color: root.detailFocused ? cfg.color.base0D : cfg.color.base02
                     }
 
                     // Detail panel
@@ -778,6 +820,7 @@ ShellRoot {
                             }
 
                             Flickable {
+                                id: detailFlick
                                 anchors.fill: parent
                                 visible: !root._detailIsImage && !root._detailLoading
                                 contentHeight: detailTextContent.implicitHeight
@@ -819,9 +862,11 @@ ShellRoot {
                     Text {
                         anchors.left: parent.left
                         anchors.verticalCenter: parent.verticalCenter
-                        text: root.mode === "normal"
-                            ? "j/k  navigate  \u00b7  Enter  paste  \u00b7  /  search  \u00b7  ?  help  \u00b7  Esc  close"
-                            : "Esc  normal mode  \u00b7  ?  help"
+                        text: root.detailFocused
+                            ? "h / Esc  list  \u00b7  j/k  scroll  \u00b7  Enter  paste"
+                            : root.mode === "normal"
+                                ? "j/k  navigate  \u00b7  l  focus detail  \u00b7  Enter  paste  \u00b7  /  search  \u00b7  ?  help  \u00b7  Esc  close"
+                                : "Esc  normal mode  \u00b7  ?  help"
                         color: cfg.color.base03
                         font.family: cfg.fontFamily
                         font.pixelSize: cfg.fontSize - 3
@@ -976,7 +1021,8 @@ ShellRoot {
                                     ShortcutRow { keys: "Ctrl+D"; action: "half-page down" }
                                     ShortcutRow { keys: "Ctrl+U"; action: "half-page up" }
                                     ShortcutRow { keys: "Enter";  action: "paste entry" }
-                                    ShortcutRow { keys: "l";      action: "detail panel" }
+                                    ShortcutRow { keys: "l";      action: "focus detail pane" }
+                                    ShortcutRow { keys: "h / Esc"; action: "focus list" }
                                     ShortcutRow { keys: "/";      action: "focus search" }
                                     ShortcutRow { keys: "Esc";    action: "close" }
                                 }
