@@ -11,13 +11,16 @@ import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
+import "./lib"
 
 ShellRoot {
     id: root
 
-    // ── Config (injected by Nix) ─────────────────────────────────────────────
-    NixConfig     { id: cfg }
-    NixBins       { id: bin }
+    // ── Nix config ───────────────────────────────────────────────────────────
+    NixConfig { id: cfg }
+    NixBins   { id: bin }
+
+    // ── Lib ──────────────────────────────────────────────────────────────────
     FuzzyScore    { id: fuzzy }
     SearchParser  { id: searchParser }
     CliphistEntry { id: clipEntry }

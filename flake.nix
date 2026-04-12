@@ -48,8 +48,8 @@
       '';
 
       cliphistConfig = pkgs.runCommand "kh-cliphist-config" { } ''
-        mkdir $out
-        cp ${self}/lib/*.qml $out/
+        mkdir -p $out/lib
+        cp ${self}/lib/*.qml $out/lib/
         cp ${self}/qml/kh-cliphist.qml $out/shell.qml
         cp ${import ./config.nix {
           inherit pkgs;
