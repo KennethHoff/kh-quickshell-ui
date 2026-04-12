@@ -38,6 +38,8 @@
       '';
 
       cliphistDecodeAllScript  = import ./scripts/cliphist-decode-all.nix  { inherit pkgs lib; };
+      scanAppsScript           = import ./scripts/scan-apps.nix            { inherit pkgs lib; };
+      scanActionsScript        = import ./scripts/scan-actions.nix         { inherit pkgs lib; };
 
       viewConfig = pkgs.runCommand "kh-view-config" { } ''
         mkdir -p $out/lib
@@ -56,6 +58,31 @@
         }} $out/NixConfig.qml
         cp ${import ./ffi.nix {
           inherit pkgs lib;
+        }} $out/NixBins.qml
+      '';
+
+      launcherConfig = pkgs.runCommand "kh-launcher-config" { } ''
+        mkdir -p $out/lib
+        cp ${self}/lib/*.qml $out/lib/
+        cp ${self}/qml/kh-launcher.qml $out/shell.qml
+        cp ${self}/qml/AppList.qml $out/
+        cp ${import ./config.nix {
+          inherit pkgs;
+          colors = {
+            base00 = "1e1e2e"; base01 = "181825"; base02 = "313244"; base03 = "45475a";
+            base04 = "585b70"; base05 = "cdd6f4"; base06 = "f5c2e7"; base07 = "b4befe";
+            base08 = "f38ba8"; base09 = "fab387"; base0A = "f9e2af"; base0B = "a6e3a1";
+            base0C = "94e2d5"; base0D = "89b4fa"; base0E = "cba6f7"; base0F = "f2cdcd";
+          };
+          fontName = "monospace";
+          fontSize = 14;
+        }} $out/NixConfig.qml
+        cp ${import ./ffi.nix {
+          inherit pkgs lib;
+          extraBins = {
+            scanApps    = toString scanAppsScript;
+            scanActions = toString scanActionsScript;
+          };
         }} $out/NixBins.qml
       '';
 
@@ -117,6 +144,9 @@
         kh-cliphist = cliphistConfig;
         cliphistDecodeAll = cliphistDecodeAllScript;
         kh-view = viewConfig;
+        kh-launcher = launcherConfig;
+        scanApps = scanAppsScript;
+        scanActions = scanActionsScript;
       };
 
       apps.${system} = {
@@ -134,6 +164,7 @@
             app=$1; shift
             case "$app" in
               kh-cliphist) config=${cliphistConfig}; target=viewer   ;;
+              kh-launcher) config=${launcherConfig}; target=launcher ;;
               kh-view)     config=${viewConfig};     target=""
                 # Build the list file from KH_VIEW_FILE (or KH_VIEW_LIST if already set)
                 if [[ -z "''${KH_VIEW_LIST:-}" && -n "''${KH_VIEW_FILE:-}" ]]; then
@@ -201,6 +232,13 @@
 
             kill -9 "$SWAY_PID" 2>/dev/null
             rm -rf "$xdg_runtime"
+          '');
+        };
+        kh-launcher-daemon = {
+          type = "app";
+          program = toString (pkgs.writeShellScript "run-kh-launcher-daemon" ''
+            qs=${lib.getExe' pkgs.quickshell "quickshell"}
+            exec "$qs" -p ${launcherConfig}
           '');
         };
         kh-cliphist-daemon = {
