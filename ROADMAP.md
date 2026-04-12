@@ -32,6 +32,7 @@ list of clipboard entries from `cliphist`. SUPER+V toggles it via IPC.
 - ✅ Fullscreen view — `Enter` from detail (when focused); `Escape` back; full text/image view filling the panel; `y` copies, `j`/`k`/`gg`/`G`/`Ctrl+D`/`U` scroll text; `v`/`V`/`Ctrl+V` char/line/block visual select; `o`/`O` swap anchor corner; `y` copies selection
 - ✅ Help overlay — `?` opens a context-specific popup (insert vs normal mode bindings) overlaid on the list; `/` filters rows inline; popup shrinks to fit matches
 - ✅ Fast search — haystacks pre-processed at load time; filter debounced at 80 ms; full-text cache updated via O(1) index lookup as decode streams in
+- ⬜ Insert mode in preview/fullscreen — edit the text content of an entry inline before copying; vim operator bindings (`ciw`, `dw`, `cit`, etc.); `i`/`a`/`I`/`A`/`o`/`O` to enter insert; Escape back to normal; `y` copies the (modified) content
 - ⬜ Timestamp on entries
 - ⬜ Source app attribution — record active Hyprland window (`hyprctl activewindow`) at copy time, stored in a side-store alongside the cliphist entry (needs a storage solution that doesn't corrupt binary clipboard data)
 - ⬜ Auto-paste — close the window and simulate Ctrl+V into the previously focused app via `wtype`
