@@ -50,6 +50,16 @@ With the module imported, enabling both components is a single option:
 programs.kh-ui.enable = true;
 ```
 
+Individual components can be disabled while keeping the rest active:
+
+```nix
+programs.kh-ui = {
+  enable = true;
+  launcher.enable = false;          # disable kh-launcher
+  clipboard-history.enable = false; # disable kh-cliphist
+};
+```
+
 ### 4. Autostart and keybinds (Hyprland)
 
 Both daemons must be started at login and toggled via IPC:
