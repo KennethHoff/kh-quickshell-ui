@@ -94,6 +94,7 @@ ShellRoot {
         ]
         root.itemPasted(resultList.currentIndex)
         pasteProcess.running = true
+        closeTimer.restart()
     }
 
     function enterInsertMode() {
@@ -329,8 +330,6 @@ ShellRoot {
                 } else {
                     root.showing = false
                 }
-            } else if (lk === "enter" || lk === "return") {
-                if (root.selectedEntry !== "") root.paste(root.selectedEntry)
             } else if (lk === "y") {
                 if (root.selectedEntry !== "") root.yank(root.selectedEntry)
             }
@@ -470,8 +469,6 @@ ShellRoot {
                         const halfPg = Math.max(lineH, Math.floor(detailFlick.height / 2))
                         if (event.key === Qt.Key_H || event.key === Qt.Key_Escape) {
                             root.detailFocused = false
-                        } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                            if (root.selectedEntry !== "") root.paste(root.selectedEntry)
                         } else if (event.text === "y") {
                             if (root.selectedEntry !== "") root.yank(root.selectedEntry)
                         } else if (!root._detailIsImage && (event.key === Qt.Key_J || event.key === Qt.Key_Down)) {
@@ -521,8 +518,6 @@ ShellRoot {
                         root.navHalfDown()
                     } else if (event.key === Qt.Key_U && (event.modifiers & Qt.ControlModifier)) {
                         root.navHalfUp()
-                    } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                        if (root.selectedEntry !== "") root.paste(root.selectedEntry)
                     } else if (event.text === "y") {
                         if (root.selectedEntry !== "") root.yank(root.selectedEntry)
                     } else if (event.key === Qt.Key_L) {
@@ -879,9 +874,9 @@ ShellRoot {
                         anchors.left: parent.left
                         anchors.verticalCenter: parent.verticalCenter
                         text: root.detailFocused
-                            ? "h / Esc  list  \u00b7  j/k  scroll  \u00b7  y  copy  \u00b7  Enter  copy+close"
+                            ? "h / Esc  list  \u00b7  j/k  scroll  \u00b7  y  copy"
                             : root.mode === "normal"
-                                ? "j/k  navigate  \u00b7  y  copy  \u00b7  Enter  copy+close  \u00b7  l  detail  \u00b7  /  search  \u00b7  ?  help  \u00b7  Esc  close"
+                                ? "j/k  navigate  \u00b7  y  copy  \u00b7  l  detail  \u00b7  /  search  \u00b7  ?  help  \u00b7  Esc  close"
                                 : "Esc  normal mode  \u00b7  ?  help"
                         color: cfg.color.base03
                         font.family: cfg.fontFamily
@@ -1037,7 +1032,6 @@ ShellRoot {
                                     ShortcutRow { keys: "Ctrl+D"; action: "half-page down" }
                                     ShortcutRow { keys: "Ctrl+U"; action: "half-page up" }
                                     ShortcutRow { keys: "y";      action: "copy to clipboard" }
-                                    ShortcutRow { keys: "Enter";  action: "copy + close" }
                                     ShortcutRow { keys: "l";      action: "focus detail pane" }
                                     ShortcutRow { keys: "h / Esc"; action: "focus list" }
                                     ShortcutRow { keys: "/";      action: "focus search" }
