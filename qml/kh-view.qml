@@ -180,16 +180,22 @@ ShellRoot {
                 }
             }
 
-            // Carousel position indicator: "2 / 5"
-            Text {
+            // Fullscreen mode dot indicators
+            Row {
                 visible: root._fullscreen && root._paths.length > 1
                 anchors.bottom: parent.bottom
-                anchors.right: parent.right
-                anchors.margins: 12
-                text: (root._focusedPane + 1) + " / " + root._paths.length
-                color: cfg.color.base03
-                font.family: cfg.fontFamily
-                font.pixelSize: cfg.fontSize - 2
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.bottomMargin: 16
+                spacing: 8
+
+                Repeater {
+                    model: root._ready ? root._paths.length : 0
+                    delegate: Rectangle {
+                        required property int index
+                        width: 8; height: 8; radius: 4
+                        color: index === root._focusedPane ? cfg.color.base05 : cfg.color.base03
+                    }
+                }
             }
         }
     }
