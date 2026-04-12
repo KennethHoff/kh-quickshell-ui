@@ -1,0 +1,134 @@
+// Generic id→value metadata store for kh-cliphist.
+//
+// Manages one file under $XDG_DATA_HOME/kh-cliphist/meta/<storeKey>.
+// File format: id<TAB>value<LF> per line.
+//
+// Usage:
+//   MetaStore {
+//       id:       myStore
+//       bash:     bin.bash
+//       storeKey: "attribution"
+//       onLoaded: doSomethingWithMyStore.values
+//   }
+//   Component.onCompleted: myStore.load()
+//
+// API:
+//   load()                        — resolve path + read file; emits loaded() when done
+//   set(id, val)                  — add/update one entry, persist
+//   remove(id)                    — remove one entry, persist
+//   removeMany(idsSet)            — remove a Set of IDs, persist if changed
+//   prune(knownIdsObj)            — drop stale IDs (not in knownIdsObj), persist if changed
+//   pruneAndFill(knownIds, dflt)  — prune stale + add missing IDs with dflt value
+import QtQuick
+import Quickshell.Io
+
+Item {
+    id: store
+
+    property string bash:     ""   // path to bash binary; set before calling load()
+    property string storeKey: ""   // filename under meta/; set before calling load()
+    property var    values:   ({}) // live id → value map (reassign to notify bindings)
+
+    signal loaded()   // emitted once after the initial file read completes
+
+    // ── Public API ─────────────────────────────────────────────────────────────
+    function load() {
+        if (!bash || !storeKey) return
+        pathProcess.running = true
+    }
+
+    function set(id, val) {
+        values = Object.assign({}, values, { [id]: val })
+        _write()
+    }
+
+    function remove(id) {
+        if (!(id in values)) return
+        const v = Object.assign({}, values)
+        delete v[id]
+        values = v
+        _write()
+    }
+
+    function removeMany(idsSet) {
+        let changed = false
+        const v = Object.assign({}, values)
+        for (const id of idsSet) {
+            if (id in v) { delete v[id]; changed = true }
+        }
+        if (changed) { values = v; _write() }
+    }
+
+    function prune(knownIdsObj) {
+        let changed = false
+        const v = {}
+        for (const [id, val] of Object.entries(values)) {
+            if (id in knownIdsObj) v[id] = val
+            else changed = true
+        }
+        if (changed) { values = v; _write() }
+    }
+
+    // Prune stale IDs, and add knownIdsObj entries that have no value yet.
+    function pruneAndFill(knownIdsObj, defaultVal) {
+        let changed = false
+        const v = {}
+        for (const [id, val] of Object.entries(values)) {
+            if (id in knownIdsObj) v[id] = val
+            else changed = true
+        }
+        for (const id of Object.keys(knownIdsObj)) {
+            if (!(id in v)) { v[id] = defaultVal; changed = true }
+        }
+        if (changed) { values = v; _write() }
+    }
+
+    // ── Private ────────────────────────────────────────────────────────────────
+    property string _path: ""
+    property var    _buf:  []
+
+    function _write() {
+        if (!_path || !bash) return
+        const pairs = []
+        for (const [id, val] of Object.entries(values)) pairs.push(id, val)
+        writeProcess.command = [bash, "-c",
+            'f="$1"; shift; { while [[ $# -ge 2 ]]; do printf "%s\\t%s\\n" "$1" "$2"; shift 2; done; } > "$f"',
+            "--", _path].concat(pairs)
+        writeProcess.running = true
+    }
+
+    Process {
+        id: pathProcess
+        command: [store.bash, "-c",
+            'f="${XDG_DATA_HOME:-$HOME/.local/share}/kh-cliphist/meta/' + store.storeKey + '"' +
+            '; mkdir -p "$(dirname "$f")"' +
+            '; printf "%s\\n" "$f"']
+        stdout: SplitParser {
+            onRead: (line) => { if (line) store._path = line }
+        }
+        onExited: { if (store._path) readProcess.running = true }
+    }
+
+    Process {
+        id: readProcess
+        command: [store.bash, "-c", '[ -f "$1" ] && cat "$1" || true', "--", store._path]
+        stdout: SplitParser {
+            onRead: (line) => { if (line) store._buf.push(line) }
+        }
+        onExited: {
+            const v = {}
+            for (const line of store._buf) {
+                const tab = line.indexOf("\t")
+                if (tab > 0)
+                    v[line.substring(0, tab)] = line.substring(tab + 1)
+                else if (line.length > 0)
+                    v[line] = "1"  // legacy key-only format (old pins file)
+            }
+            store.values = v
+            store._buf   = []
+            store.loaded()
+        }
+    }
+
+    Process { id: writeProcess }
+}

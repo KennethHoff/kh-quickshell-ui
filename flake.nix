@@ -66,6 +66,7 @@
         cp ${self}/qml/kh-cliphist.qml $out/shell.qml
         cp ${self}/qml/ClipList.qml $out/
         cp ${self}/qml/ClipPreview.qml $out/
+        cp ${self}/qml/MetaStore.qml $out/
         cp ${import ./config.nix {
           inherit pkgs;
           colors = {

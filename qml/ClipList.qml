@@ -61,17 +61,7 @@ Item {
     property int    _pendingDeleteAnimHi:    -1
     property bool   _confirmingDelete:       false
 
-    property var    _pins:     ({})   // {[id: string]: true} — pinned entry IDs
-    property string _pinsFile: ""     // resolved once at startup
-    property var    _pinsBuf:  []     // scratch buffer while loading the pins file
-
-    property var    _timestamps:     ({})  // {[id: string]: unix seconds (first seen)}
-    property string _timestampsFile: ""
-    property var    _timestampsBuf:  []    // scratch buffer while loading the timestamps file
-
-    property var    _attribution:     ({})  // {[id: string]: app_class (Hyprland window class)}
-    property string _attributionFile: ""
-    property var    _attributionBuf:  []
+    property bool   _attrReady: false   // true once attrStore path is resolved
 
     // ── Properties out ────────────────────────────────────────────────────────
     readonly property string selectedEntry: {
@@ -205,43 +195,38 @@ Item {
         _pendingDeleteAnimHi    = -1
     }
 
-    // ── Pinning ───────────────────────────────────────────────────────────────
+    // ── Metadata stores ───────────────────────────────────────────────────────
+    MetaStore { id: pinStore;  bash: bin.bash; storeKey: "pins" }
+    MetaStore { id: tsStore;   bash: bin.bash; storeKey: "timestamps" }
+    MetaStore {
+        id: attrStore; bash: bin.bash; storeKey: "attribution"
+        onLoaded: { clipList._attrReady = true; attrWatchProcess.running = true }
+    }
+
     function _entryId(rawLine) {
         const t = rawLine.indexOf("\t")
         return t >= 0 ? rawLine.substring(0, t) : rawLine
     }
 
-    // Toggle pin on the currently selected entry. Cursor follows the entry.
+    // Toggle pin on the currently selected entry; cursor position stays stable.
     function _togglePin() {
         const rawLine = selectedEntry
         if (rawLine === "") return
         const id = _entryId(rawLine)
-        if (id in _pins) {
-            const p = Object.assign({}, _pins)
-            delete p[id]
-            _pins = p
-        } else {
-            _pins = Object.assign({}, _pins, { [id]: true })
-        }
-        _writePins()
+        if (id in pinStore.values)
+            pinStore.remove(id)
+        else
+            pinStore.set(id, "1")
         const savedIdx = list.currentIndex
         _runFilter()
         list.currentIndex = Math.min(savedIdx, filteredEntries.length - 1)
     }
 
-    // Persist the current pin set to disk.
-    function _writePins() {
-        if (!_pinsFile) return
-        const ids = Object.keys(_pins)
-        pinsWriteProcess.command = [bin.bash, "-c",
-            'f="$1"; shift; printf "%s\\n" "$@" > "$f"', "--", _pinsFile].concat(ids)
-        pinsWriteProcess.running = true
-    }
-
     // ── Timestamps ────────────────────────────────────────────────────────────
-    // Returns a human-readable relative time string for a unix timestamp.
-    // Returns "" for ts=0 (not yet loaded).
-    function _relTime(ts) {
+    // Returns a human-readable relative time string for a unix timestamp string.
+    // Returns "" for missing / zero.
+    function _relTime(tsVal) {
+        const ts = parseInt(tsVal) || 0
         if (!ts) return ""
         const diff = Math.floor(Date.now() / 1000) - ts
         if (diff < 60)     return "just now"
@@ -249,28 +234,6 @@ Item {
         if (diff < 86400)  return Math.floor(diff / 3600) + "h ago"
         if (diff < 604800) return Math.floor(diff / 86400) + "d ago"
         return Math.floor(diff / 604800) + "w ago"
-    }
-
-    // Persist the current timestamp map to disk (id<TAB>unix_seconds per line).
-    function _writeTimestamps() {
-        if (!_timestampsFile) return
-        const pairs = []
-        for (const [id, ts] of Object.entries(_timestamps)) pairs.push(id, String(ts))
-        tsWriteProcess.command = [bin.bash, "-c",
-            'f="$1"; shift; { while [[ $# -ge 2 ]]; do printf "%s\\t%s\\n" "$1" "$2"; shift 2; done; } > "$f"',
-            "--", _timestampsFile].concat(pairs)
-        tsWriteProcess.running = true
-    }
-
-    // Persist the current attribution map to disk (id<TAB>app_class per line).
-    function _writeAttribution() {
-        if (!_attributionFile) return
-        const pairs = []
-        for (const [id, app] of Object.entries(_attribution)) pairs.push(id, app)
-        attrWriteProcess.command = [bin.bash, "-c",
-            'f="$1"; shift; { while [[ $# -ge 2 ]]; do printf "%s\\t%s\\n" "$1" "$2"; shift 2; done; } > "$f"',
-            "--", _attributionFile].concat(pairs)
-        attrWriteProcess.running = true
     }
 
     // Phase 2: called by deleteAnimTimer after the fade-out completes.
@@ -307,21 +270,8 @@ Item {
         }
         _processedIdx = newIdx
 
-        // Remove deleted entries from pins if any were pinned
-        let pinsChanged = false
-        const newPins = Object.assign({}, _pins)
-        for (const id of idsToDelete) {
-            if (id in newPins) { delete newPins[id]; pinsChanged = true }
-        }
-        if (pinsChanged) { _pins = newPins; _writePins() }
-
-        // Remove deleted entries from attribution
-        let attrChanged = false
-        const newAttr = Object.assign({}, _attribution)
-        for (const id of idsToDelete) {
-            if (id in newAttr) { delete newAttr[id]; attrChanged = true }
-        }
-        if (attrChanged) { _attribution = newAttr; _writeAttribution() }
+        pinStore.removeMany(idsToDelete)
+        attrStore.removeMany(idsToDelete)
 
         _runFilter()
 
@@ -490,7 +440,8 @@ Item {
     // ── Filtering ─────────────────────────────────────────────────────────────
     function _runFilter() {
         const parsed  = searchParser.parseSearch(searchField.text)
-        const hasPins = Object.keys(_pins).length > 0
+        const pins    = pinStore.values
+        const hasPins = Object.keys(pins).length > 0
 
         if (parsed.type === "all" && !parsed.needle) {
             if (!hasPins) {
@@ -498,7 +449,7 @@ Item {
             } else {
                 const pinned = [], rest = []
                 for (const e of allEntries)
-                    (_entryId(e) in _pins ? pinned : rest).push(e)
+                    (_entryId(e) in pins ? pinned : rest).push(e)
                 filteredEntries = pinned.concat(rest)
             }
             return
@@ -518,8 +469,8 @@ Item {
         }
         scored.sort((a, b) => {
             if (hasPins) {
-                const pa = _entryId(a.line) in _pins
-                const pb = _entryId(b.line) in _pins
+                const pa = _entryId(a.line) in pins
+                const pb = _entryId(b.line) in pins
                 if (pa !== pb) return pa ? -1 : 1
             }
             return b.score - a.score
@@ -552,31 +503,11 @@ Item {
             clipList._processedIdx = idx
             clipList._runFilter()
 
-            // Record first-seen timestamp for new entries; prune stale IDs.
-            if (clipList._timestampsFile) {
-                const now     = Math.floor(Date.now() / 1000)
-                const updated = {}
-                let changed   = false
-                for (const [id, ts] of Object.entries(clipList._timestamps)) {
-                    if (id in idx) updated[id] = ts
-                    else changed = true   // stale entry pruned
-                }
-                for (const id of Object.keys(idx)) {
-                    if (!(id in updated)) { updated[id] = now; changed = true }
-                }
-                if (changed) { clipList._timestamps = updated; clipList._writeTimestamps() }
-            }
-
-            // Prune stale attribution IDs
-            if (clipList._attributionFile) {
-                let attrChanged = false
-                const newAttr = {}
-                for (const [id, app] of Object.entries(clipList._attribution)) {
-                    if (id in idx) newAttr[id] = app
-                    else attrChanged = true
-                }
-                if (attrChanged) { clipList._attribution = newAttr; clipList._writeAttribution() }
-            }
+            // Prune stale entries + first-seen timestamps for new ones.
+            tsStore.pruneAndFill(idx, String(Math.floor(Date.now() / 1000)))
+            // Prune pins and attribution that no longer exist in cliphist.
+            pinStore.prune(idx)
+            attrStore.prune(idx)
 
             fullTextDecodeProcess.exec([bin.cliphistDecodeAll])
         }
@@ -623,117 +554,19 @@ Item {
 
     Process { id: deleteProcess }
 
-    // ── Pin persistence ───────────────────────────────────────────────────────
+    // ── Metadata store startup ────────────────────────────────────────────────
     Component.onCompleted: {
-        pinsPathProcess.running = true
-        tsPathProcess.running   = true
-        attrPathProcess.running = true
+        pinStore.load()
+        tsStore.load()
+        attrStore.load()   // attrStore.onLoaded starts attrWatchProcess
     }
 
-    // Step 1: resolve $XDG_DATA_HOME/kh-cliphist/meta/pins and create the directory.
-    Process {
-        id: pinsPathProcess
-        command: [bin.bash, "-c",
-            'f="${XDG_DATA_HOME:-$HOME/.local/share}/kh-cliphist/meta/pins"' +
-            '; mkdir -p "$(dirname "$f")"' +
-            '; printf "%s\\n" "$f"']
-        stdout: SplitParser {
-            onRead: (line) => { if (line) clipList._pinsFile = line }
-        }
-        onExited: { if (clipList._pinsFile) pinsReadProcess.running = true }
-    }
-
-    // Step 2: read existing pins (one ID per line); silently skip if file absent.
-    Process {
-        id: pinsReadProcess
-        command: [bin.bash, "-c", '[ -f "$1" ] && cat "$1" || true', "--", clipList._pinsFile]
-        stdout: SplitParser {
-            onRead: (line) => { if (line) clipList._pinsBuf.push(line) }
-        }
-        onExited: {
-            const p = {}
-            for (const id of clipList._pinsBuf) p[id] = true
-            clipList._pins    = p
-            clipList._pinsBuf = []
-        }
-    }
-
-    // Step 3: write pins on demand (command is set dynamically in _writePins).
-    Process { id: pinsWriteProcess }
-
-    // ── Timestamp persistence ─────────────────────────────────────────────────
-    Process {
-        id: tsPathProcess
-        command: [bin.bash, "-c",
-            'f="${XDG_DATA_HOME:-$HOME/.local/share}/kh-cliphist/meta/timestamps"' +
-            '; mkdir -p "$(dirname "$f")"' +
-            '; printf "%s\\n" "$f"']
-        stdout: SplitParser {
-            onRead: (line) => { if (line) clipList._timestampsFile = line }
-        }
-        onExited: { if (clipList._timestampsFile) tsReadProcess.running = true }
-    }
-
-    Process {
-        id: tsReadProcess
-        command: [bin.bash, "-c", '[ -f "$1" ] && cat "$1" || true', "--", clipList._timestampsFile]
-        stdout: SplitParser {
-            onRead: (line) => { if (line) clipList._timestampsBuf.push(line) }
-        }
-        onExited: {
-            const t = {}
-            for (const line of clipList._timestampsBuf) {
-                const tab = line.indexOf("\t")
-                if (tab > 0) t[line.substring(0, tab)] = parseInt(line.substring(tab + 1))
-            }
-            clipList._timestamps    = t
-            clipList._timestampsBuf = []
-        }
-    }
-
-    Process { id: tsWriteProcess }
-
-    // ── Attribution persistence & watching ──────────────────────────────────
-    Process {
-        id: attrPathProcess
-        command: [bin.bash, "-c",
-            'f="${XDG_DATA_HOME:-$HOME/.local/share}/kh-cliphist/meta/attribution"' +
-            '; mkdir -p "$(dirname "$f")"' +
-            '; printf "%s\\n" "$f"']
-        stdout: SplitParser {
-            onRead: (line) => { if (line) clipList._attributionFile = line }
-        }
-        onExited: {
-            if (clipList._attributionFile) {
-                attrReadProcess.running  = true
-                attrWatchProcess.running = true
-            }
-        }
-    }
-
-    Process {
-        id: attrReadProcess
-        command: [bin.bash, "-c", '[ -f "$1" ] && cat "$1" || true', "--", clipList._attributionFile]
-        stdout: SplitParser {
-            onRead: (line) => { if (line) clipList._attributionBuf.push(line) }
-        }
-        onExited: {
-            const a = {}
-            for (const line of clipList._attributionBuf) {
-                const tab = line.indexOf("\t")
-                if (tab > 0) a[line.substring(0, tab)] = line.substring(tab + 1)
-            }
-            clipList._attribution    = a
-            clipList._attributionBuf = []
-        }
-    }
-
-    Process { id: attrWriteProcess }
-
-    // Persistent clipboard watcher — runs wl-paste --watch for the life of
-    // the daemon. For each clipboard change the inner script discards the raw
-    // content, waits for cliphist to record the entry, then emits
-    // id<TAB>app_class to stdout. Auto-restarts on unexpected exit.
+    // Persistent clipboard watcher — runs wl-paste --watch for the daemon's
+    // lifetime. Queries hyprctl immediately (at copy time), then waits for
+    // cliphist to write the entry before emitting id<TAB>app_class.
+    // Only records attribution for IDs not already attributed, so re-copying
+    // an entry from the cliphist overlay doesn't overwrite the original source.
+    // Auto-restarts on unexpected exit.
     Process {
         id: attrWatchProcess
         command: [bin.wlPaste, "--watch", bin.cliphistAttrWatch]
@@ -743,15 +576,13 @@ Item {
                 if (tab > 0) {
                     const id  = line.substring(0, tab)
                     const app = line.substring(tab + 1)
-                    if (id && app) {
-                        clipList._attribution = Object.assign({}, clipList._attribution, { [id]: app })
-                        clipList._writeAttribution()
-                    }
+                    if (id && app && !(id in attrStore.values))
+                        attrStore.set(id, app)
                 }
             }
         }
         onExited: Qt.callLater(function() {
-            if (clipList._attributionFile) attrWatchProcess.running = true
+            if (clipList._attrReady) attrWatchProcess.running = true
         })
     }
 
@@ -919,7 +750,7 @@ Item {
                         anchors.margins: 3
                         width: 3
                         radius: 1
-                        color: (clipList._pins, delegateRoot.entryId in clipList._pins)
+                        color: (pinStore.values, delegateRoot.entryId in pinStore.values)
                             ? cfg.color.base0A : "transparent"
                     }
 
@@ -938,9 +769,8 @@ Item {
                         anchors.rightMargin: 10
                         anchors.verticalCenter: parent.verticalCenter
                         text: {
-                            const ts  = (clipList._timestamps,  clipList._relTime(
-                                clipList._timestamps[delegateRoot.entryId] || 0))
-                            const app = (clipList._attribution, clipList._attribution[delegateRoot.entryId] || "")
+                            const ts  = (tsStore.values,   clipList._relTime(tsStore.values[delegateRoot.entryId]   || "0"))
+                            const app = (attrStore.values, attrStore.values[delegateRoot.entryId] || "")
                             if (app && ts) return app + "  \u00b7  " + ts
                             return app || ts
                         }
