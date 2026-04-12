@@ -19,21 +19,21 @@ Features to implement. Each entry becomes its own Quickshell component or launch
 Standalone Quickshell daemon (`quickshell -c kh-cliphist`) with a searchable
 list of clipboard entries from `cliphist`. SUPER+V toggles it via IPC.
 
-- ✅ Searchable list of clipboard entries; all text entries pre-decoded on open so search matches full content
+- ✅ Searchable list; all text entries pre-decoded on open so search matches full content
 - ✅ Text entries shown as-is; image entries shown as thumbnails
 - ✅ Enter copies the selected entry via `cliphist decode | wl-copy`; entry flashes on copy
-- ✅ Detail panel: full text preview with character/word/line count
-- ✅ Detail panel: full image preview with dimensions and file size
-- ✅ Tab switches focus between list and detail panels (to be replaced by `h`/`l`)
-- ✅ Enter on a focused image or text entry opens it fullscreen
 - ✅ Search filters: `img:` / `text:` type filter, `'` exact substring match
 - ✅ Entry counter in footer
-- ✅ `?` toggles a searchable help overlay listing all keybinds
-- ⬜ Asynchronous search — filtering is currently synchronous and blocks the UI while typing; move to a non-blocking model
+- ✅ Modal insert/normal mode — opens in insert mode (search focused); Escape → normal mode with `j`/`k` navigation, `G` bottom, `/` or printable → insert; Escape closes
+- ✅ Full IPC control (`toggle`, `setMode`, `nav`, `key`, `type`)
+- ⬜ `gg` to jump to top; `Ctrl+D`/`Ctrl+U` half-page scroll
+- ⬜ Detail panel — `l` to open, `h` to close; text preview with char/word/line count; image preview with dimensions and file size
+- ⬜ Fullscreen view — `Enter` from detail; `Escape` back
+- ⬜ Help overlay — `?` toggles a searchable list of keybinds
+- ⬜ Asynchronous search — filtering is currently synchronous and blocks the UI while typing
 - ⬜ Timestamp on entries
 - ⬜ Source app attribution — record active Hyprland window (`hyprctl activewindow`) at copy time, stored in a side-store alongside the cliphist entry (needs a storage solution that doesn't corrupt binary clipboard data)
-- ⬜ Normal mode — full vim navigation per UX principle above; replaces current Tab/arrow-key bindings
-- ⬜ Auto-paste — after selecting an entry, close the window and simulate Ctrl+V into the previously focused app via `wtype`, so the text lands without a manual paste
+- ⬜ Auto-paste — close the window and simulate Ctrl+V into the previously focused app via `wtype`
 - ⬜ Delete from UI — remove individual entries via Delete key, delegating to `cliphist delete`
 - ⬜ Pinned entries — star entries to keep them permanently at the top, surviving clipboard history rotation
 
