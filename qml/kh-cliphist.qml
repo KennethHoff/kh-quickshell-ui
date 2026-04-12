@@ -23,7 +23,7 @@ ShellRoot {
     // ── State ────────────────────────────────────────────────────────────────
     property bool   showing: false
     property string mode: "insert"      // "insert" | "normal"
-    property string view: "list"        // "list" | "help"
+    property bool   helpShowing: false
     property string helpText: ""        // help filter text
     property bool   _helpFiltering: false
     property var    allEntries: []
@@ -87,14 +87,15 @@ ShellRoot {
     }
 
     function openHelp() {
-        root.view = "help"
+        root.helpShowing = true
         root._helpFiltering = false
         root.helpText = ""
+        helpFlick.contentY = 0
         normalModeHandler.forceActiveFocus()
     }
 
     function closeHelp() {
-        root.view = "list"
+        root.helpShowing = false
         root._helpFiltering = false
         root.helpText = ""
         if (root.mode === "insert") root.enterInsertMode()
@@ -214,12 +215,12 @@ ShellRoot {
         function key(k: string) {
             const lk = k.toLowerCase()
             if (lk === "?") {
-                root.view === "help" ? root.closeHelp() : root.openHelp()
-            } else if (lk === "/" && root.view === "help") {
+                root.helpShowing ? root.closeHelp() : root.openHelp()
+            } else if (lk === "/" && root.helpShowing) {
                 root._helpFiltering = true
                 root.helpText = ""
             } else if (lk === "escape" || lk === "esc") {
-                if (root.view === "help") {
+                if (root.helpShowing) {
                     if (root.helpText) { root.helpText = ""; root._helpFiltering = false }
                     else root.closeHelp()
                 } else if (root.mode === "insert") {
@@ -228,12 +229,12 @@ ShellRoot {
                     root.showing = false
                 }
             } else if (lk === "enter" || lk === "return") {
-                if (root.view === "list" && root.selectedEntry !== "") root.paste(root.selectedEntry)
+                if (!root.helpShowing && root.selectedEntry !== "") root.paste(root.selectedEntry)
             }
         }
 
         function type(text: string) {
-            if (root.view === "help") {
+            if (root.helpShowing) {
                 root._helpFiltering = true
                 root.helpText += text
             } else {
@@ -263,7 +264,7 @@ ShellRoot {
                 root._buf            = []
                 root._processed      = []
                 root._processedIdx   = {}
-                root.view            = "list"
+                root.helpShowing     = false
                 root._helpFiltering  = false
                 root.helpText        = ""
                 searchDebounce.stop()
@@ -305,8 +306,8 @@ ShellRoot {
                     if (event.key === Qt.Key_Shift || event.key === Qt.Key_Control ||
                         event.key === Qt.Key_Alt   || event.key === Qt.Key_Meta) return
 
-                    // ── Help view ─────────────────────────────────────────────
-                    if (root.view === "help") {
+                    // ── Help popup ────────────────────────────────────────────
+                    if (root.helpShowing) {
                         if (root._helpFiltering) {
                             if (event.key === Qt.Key_Escape) {
                                 root.helpText = ""
@@ -324,11 +325,29 @@ ShellRoot {
                                 return
                             }
                         } else {
+                            const rowH = 30
+                            const halfPage = Math.max(rowH, Math.floor(helpFlick.height / 2))
                             if (event.key === Qt.Key_Escape || event.text === "?") {
                                 root.closeHelp()
                             } else if (event.key === Qt.Key_Slash) {
                                 root._helpFiltering = true
                                 root.helpText = ""
+                            } else if (event.key === Qt.Key_J || event.key === Qt.Key_Down) {
+                                helpFlick.contentY = Math.min(
+                                    Math.max(0, helpFlick.contentHeight - helpFlick.height),
+                                    helpFlick.contentY + rowH)
+                            } else if (event.key === Qt.Key_K || event.key === Qt.Key_Up) {
+                                helpFlick.contentY = Math.max(0, helpFlick.contentY - rowH)
+                            } else if (event.key === Qt.Key_D && (event.modifiers & Qt.ControlModifier)) {
+                                helpFlick.contentY = Math.min(
+                                    Math.max(0, helpFlick.contentHeight - helpFlick.height),
+                                    helpFlick.contentY + halfPage)
+                            } else if (event.key === Qt.Key_U && (event.modifiers & Qt.ControlModifier)) {
+                                helpFlick.contentY = Math.max(0, helpFlick.contentY - halfPage)
+                            } else if (event.key === Qt.Key_G && (event.modifiers & Qt.ShiftModifier)) {
+                                helpFlick.contentY = Math.max(0, helpFlick.contentHeight - helpFlick.height)
+                            } else if (event.key === Qt.Key_G) {
+                                helpFlick.contentY = 0
                             } else {
                                 return
                             }
@@ -337,7 +356,7 @@ ShellRoot {
                         return
                     }
 
-                    // ── List view ─────────────────────────────────────────────
+                    // ── List ──────────────────────────────────────────────────
                     if (event.key === Qt.Key_Escape) {
                         root.showing = false
                     } else if (event.text === "?") {
@@ -395,7 +414,7 @@ ShellRoot {
                         anchors.left: parent.left
                         anchors.leftMargin: 10
                         anchors.verticalCenter: parent.verticalCenter
-                        visible: root.mode === "normal" || root.view === "help"
+                        visible: root.mode === "normal"
                         width: modeLabel.implicitWidth + 12
                         height: 22
                         radius: 4
@@ -404,7 +423,7 @@ ShellRoot {
                         Text {
                             id: modeLabel
                             anchors.centerIn: parent
-                            text: root.view === "help" ? "HLP" : "NOR"
+                            text: "NOR"
                             color: cfg.color.base0D
                             font.family: cfg.fontFamily
                             font.pixelSize: cfg.fontSize - 3
@@ -415,39 +434,23 @@ ShellRoot {
                     TextInput {
                         id: searchField
                         anchors.fill: parent
-                        anchors.leftMargin: (root.mode === "normal" || root.view === "help")
-                                            ? modeTag.width + 18 : 14
+                        anchors.leftMargin: root.mode === "normal" ? modeTag.width + 18 : 14
                         anchors.rightMargin: 14
-                        color: root.view === "help" ? "transparent" : cfg.color.base05
+                        color: cfg.color.base05
                         font.family: cfg.fontFamily
                         font.pixelSize: cfg.fontSize
                         clip: true
                         verticalAlignment: TextInput.AlignVCenter
-                        readOnly: root.mode === "normal" || root.view === "help"
+                        readOnly: root.mode === "normal"
 
                         Text {
                             anchors.fill: parent
-                            visible: !searchField.text && root.view === "list"
+                            visible: !searchField.text
                             text: "Search clipboard..."
                             color: cfg.color.base03
                             font.family: cfg.fontFamily
                             font.pixelSize: cfg.fontSize
                             verticalAlignment: Text.AlignVCenter
-                        }
-
-                        // Help view: show filter text or prompt
-                        Text {
-                            anchors.fill: parent
-                            visible: root.view === "help"
-                            text: root._helpFiltering
-                                  ? (root.helpText || "")
-                                  : "/ to filter"
-                            color: (root._helpFiltering && root.helpText)
-                                   ? cfg.color.base05 : cfg.color.base03
-                            font.family: cfg.fontFamily
-                            font.pixelSize: cfg.fontSize
-                            verticalAlignment: Text.AlignVCenter
-                            clip: true
                         }
 
                         onTextChanged: { resultList.currentIndex = 0; searchDebounce.restart() }
@@ -493,7 +496,6 @@ ShellRoot {
                 // Entry list ──────────────────────────────────────────────────
                 ListView {
                     id: resultList
-                    visible: root.view === "list"
                     width: parent.width
                     height: panel.height - searchBox.height - footer.height
                             - column.spacing * 2 - 16
@@ -587,97 +589,6 @@ ShellRoot {
                     }
                 }
 
-                // Help overlay ────────────────────────────────────────────────
-                Flickable {
-                    id: helpContent
-                    visible: root.view === "help"
-                    width: parent.width
-                    height: panel.height - searchBox.height - footer.height
-                            - column.spacing * 2 - 16
-                    contentWidth: width
-                    contentHeight: helpCol.height
-                    clip: true
-
-                    Column {
-                        id: helpCol
-                        width: parent.width
-                        spacing: 0
-
-                        component SectionLabel: Text {
-                            required property string label
-                            width: helpCol.width
-                            leftPadding: 16
-                            topPadding: 14
-                            bottomPadding: 6
-                            text: label
-                            color: cfg.color.base03
-                            font.family: cfg.fontFamily
-                            font.pixelSize: cfg.fontSize - 3
-                            font.bold: true
-                        }
-
-                        component ShortcutRow: Item {
-                            id: shortcutRow
-                            required property string keys
-                            required property string action
-                            visible: helpFilter.rowMatches(root.helpText, keys, action)
-                            width: helpCol.width
-                            height: 32
-
-                            Text {
-                                x: 16; width: 130
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: shortcutRow.keys
-                                color: cfg.color.base0D
-                                font.family: cfg.fontFamily
-                                font.pixelSize: cfg.fontSize
-                            }
-                            Text {
-                                x: 154
-                                anchors.right: parent.right
-                                anchors.rightMargin: 16
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: shortcutRow.action
-                                color: cfg.color.base05
-                                font.family: cfg.fontFamily
-                                font.pixelSize: cfg.fontSize
-                                elide: Text.ElideRight
-                            }
-                        }
-
-                        SectionLabel { label: "INSERT MODE" }
-                        ShortcutRow  { keys: "Esc";    action: "normal mode" }
-                        ShortcutRow  { keys: "?";      action: "open help" }
-                        ShortcutRow  { keys: "Ctrl+A"; action: "cursor to start" }
-                        ShortcutRow  { keys: "Ctrl+E"; action: "cursor to end" }
-                        ShortcutRow  { keys: "Ctrl+F"; action: "cursor forward" }
-                        ShortcutRow  { keys: "Ctrl+B"; action: "cursor back" }
-                        ShortcutRow  { keys: "Ctrl+D"; action: "delete char forward" }
-                        ShortcutRow  { keys: "Ctrl+K"; action: "delete to end of line" }
-                        ShortcutRow  { keys: "Ctrl+W"; action: "delete word back" }
-                        ShortcutRow  { keys: "Ctrl+U"; action: "delete to line start" }
-
-                        SectionLabel { label: "NORMAL MODE" }
-                        ShortcutRow  { keys: "j / ↓";  action: "down" }
-                        ShortcutRow  { keys: "k / ↑";  action: "up" }
-                        ShortcutRow  { keys: "gg";     action: "jump to top" }
-                        ShortcutRow  { keys: "G";      action: "jump to bottom" }
-                        ShortcutRow  { keys: "Ctrl+D"; action: "half-page down" }
-                        ShortcutRow  { keys: "Ctrl+U"; action: "half-page up" }
-                        ShortcutRow  { keys: "Enter";  action: "paste entry" }
-                        ShortcutRow  { keys: "/";      action: "focus search" }
-                        ShortcutRow  { keys: "?";      action: "open help" }
-                        ShortcutRow  { keys: "Esc";    action: "close" }
-
-                        SectionLabel { label: "HELP" }
-                        ShortcutRow  { keys: "/";      action: "filter keybinds" }
-                        ShortcutRow  { keys: "Ctrl+W"; action: "delete word back" }
-                        ShortcutRow  { keys: "Ctrl+U"; action: "clear filter" }
-                        ShortcutRow  { keys: "Esc";    action: "stop filter / close help" }
-                        ShortcutRow  { keys: "? / Esc"; action: "close help" }
-                    }
-                }
-
                 // Footer ──────────────────────────────────────────────────────
                 Item {
                     id: footer
@@ -687,13 +598,9 @@ ShellRoot {
                     Text {
                         anchors.left: parent.left
                         anchors.verticalCenter: parent.verticalCenter
-                        text: root.view === "help"
-                            ? (root._helpFiltering
-                               ? "Esc  stop filter  \u00b7  Ctrl+W  delete word  \u00b7  Ctrl+U  clear"
-                               : "/  filter  \u00b7  ? / Esc  close")
-                            : root.mode === "normal"
-                                ? "j/k  navigate  \u00b7  Enter  paste  \u00b7  /  search  \u00b7  Esc  close"
-                                : "Esc  normal mode"
+                        text: root.mode === "normal"
+                            ? "j/k  navigate  \u00b7  Enter  paste  \u00b7  /  search  \u00b7  ?  help  \u00b7  Esc  close"
+                            : "Esc  normal mode  \u00b7  ?  help"
                         color: cfg.color.base03
                         font.family: cfg.fontFamily
                         font.pixelSize: cfg.fontSize - 3
@@ -702,11 +609,186 @@ ShellRoot {
                     Text {
                         anchors.right: parent.right
                         anchors.verticalCenter: parent.verticalCenter
-                        visible: root.view === "list" && root.filteredEntries.length > 0
+                        visible: root.filteredEntries.length > 0
                         text: (resultList.currentIndex + 1) + "/" + root.filteredEntries.length
                         color: cfg.color.base03
                         font.family: cfg.fontFamily
                         font.pixelSize: cfg.fontSize - 3
+                    }
+                }
+            }
+
+            // Help popup backdrop ─────────────────────────────────────────────
+            Rectangle {
+                anchors.fill: parent
+                visible: root.helpShowing
+                color: "#88000000"
+                z: 9
+                radius: panel.radius
+                MouseArea { anchors.fill: parent; onClicked: root.closeHelp() }
+            }
+
+            // Help popup ──────────────────────────────────────────────────────
+            Rectangle {
+                id: helpPopup
+                visible: root.helpShowing
+                z: 10
+                width: Math.min(panel.width - 80, 400)
+                anchors.centerIn: parent
+                color: cfg.color.base01
+                radius: 10
+                height: helpPopupCol.implicitHeight
+
+                Column {
+                    id: helpPopupCol
+                    width: parent.width
+
+                    // Title bar
+                    Rectangle {
+                        width: parent.width
+                        height: 38
+                        color: cfg.color.base02
+                        radius: helpPopup.radius
+                        // Square off bottom corners
+                        Rectangle {
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.bottom: parent.bottom
+                            height: helpPopup.radius
+                            color: parent.color
+                        }
+
+                        Text {
+                            anchors.left: parent.left
+                            anchors.leftMargin: 16
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: root.mode === "insert" ? "INSERT MODE" : "NORMAL MODE"
+                            color: cfg.color.base0D
+                            font.family: cfg.fontFamily
+                            font.pixelSize: cfg.fontSize - 3
+                            font.bold: true
+                            font.letterSpacing: 1
+                        }
+                    }
+
+                    // Keybind rows (scrollable)
+                    Flickable {
+                        id: helpFlick
+                        width: parent.width
+                        height: Math.min(helpRows.implicitHeight, panel.height * 0.55)
+                        contentWidth: width
+                        contentHeight: helpRows.implicitHeight
+                        clip: true
+
+                        Column {
+                            id: helpRows
+                            width: helpFlick.width
+
+                            component ShortcutRow: Item {
+                                id: srow
+                                required property string keys
+                                required property string action
+                                visible: helpFilter.rowMatches(root.helpText, keys, action)
+                                width: helpRows.width
+                                implicitHeight: visible ? 30 : 0
+                                height: implicitHeight
+
+                                Text {
+                                    x: 16; width: 130
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: srow.keys
+                                    color: cfg.color.base0D
+                                    font.family: cfg.fontFamily
+                                    font.pixelSize: cfg.fontSize
+                                }
+                                Text {
+                                    x: 154
+                                    anchors.right: parent.right
+                                    anchors.rightMargin: 16
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: srow.action
+                                    color: cfg.color.base05
+                                    font.family: cfg.fontFamily
+                                    font.pixelSize: cfg.fontSize
+                                    elide: Text.ElideRight
+                                }
+                            }
+
+                            // Insert-mode bindings
+                            Item {
+                                visible: root.mode === "insert"
+                                width: helpRows.width
+                                implicitHeight: visible ? insertCol.implicitHeight : 0
+                                height: implicitHeight
+                                Column {
+                                    id: insertCol
+                                    width: parent.width
+                                    topPadding: 6
+                                    bottomPadding: 6
+                                    ShortcutRow { keys: "Esc";    action: "normal mode" }
+                                    ShortcutRow { keys: "Ctrl+A"; action: "cursor to start" }
+                                    ShortcutRow { keys: "Ctrl+E"; action: "cursor to end" }
+                                    ShortcutRow { keys: "Ctrl+F"; action: "cursor forward" }
+                                    ShortcutRow { keys: "Ctrl+B"; action: "cursor back" }
+                                    ShortcutRow { keys: "Ctrl+D"; action: "delete char forward" }
+                                    ShortcutRow { keys: "Ctrl+K"; action: "delete to end of line" }
+                                    ShortcutRow { keys: "Ctrl+W"; action: "delete word back" }
+                                    ShortcutRow { keys: "Ctrl+U"; action: "delete to line start" }
+                                }
+                            }
+
+                            // Normal-mode bindings
+                            Item {
+                                visible: root.mode === "normal"
+                                width: helpRows.width
+                                implicitHeight: visible ? normalCol.implicitHeight : 0
+                                height: implicitHeight
+                                Column {
+                                    id: normalCol
+                                    width: parent.width
+                                    topPadding: 6
+                                    bottomPadding: 6
+                                    ShortcutRow { keys: "j / ↓";  action: "down" }
+                                    ShortcutRow { keys: "k / ↑";  action: "up" }
+                                    ShortcutRow { keys: "gg";     action: "jump to top" }
+                                    ShortcutRow { keys: "G";      action: "jump to bottom" }
+                                    ShortcutRow { keys: "Ctrl+D"; action: "half-page down" }
+                                    ShortcutRow { keys: "Ctrl+U"; action: "half-page up" }
+                                    ShortcutRow { keys: "Enter";  action: "paste entry" }
+                                    ShortcutRow { keys: "/";      action: "focus search" }
+                                    ShortcutRow { keys: "Esc";    action: "close" }
+                                }
+                            }
+                        }
+                    }
+
+                    // Filter bar
+                    Rectangle {
+                        width: parent.width
+                        height: 36
+                        color: cfg.color.base02
+                        radius: helpPopup.radius
+                        // Square off top corners
+                        Rectangle {
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.top: parent.top
+                            height: helpPopup.radius
+                            color: parent.color
+                        }
+
+                        Text {
+                            anchors.left: parent.left
+                            anchors.leftMargin: 16
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: root._helpFiltering
+                                  ? (root.helpText || "")
+                                  : "/  filter  \u00b7  ?  close"
+                            color: (root._helpFiltering && root.helpText)
+                                   ? cfg.color.base05 : cfg.color.base03
+                            font.family: cfg.fontFamily
+                            font.pixelSize: cfg.fontSize - 3
+                        }
                     }
                 }
             }
