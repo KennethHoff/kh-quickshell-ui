@@ -213,7 +213,7 @@ ShellRoot {
     }
 
     function _enterTextVisual(mode, edit, flick) {
-        const sp   = edit.positionAt(edit.leftPadding, flick.contentY + edit.topPadding)
+        const sp   = edit.cursorPosition   // start from current cursor, not viewport top
         const text = edit.text
         root._visualMode = mode
         if (mode === "char") {
@@ -240,11 +240,14 @@ ShellRoot {
 
         // ── Exit / mode-switch ───────────────────────────────────────────────
         if (event.key === Qt.Key_Escape) {
-            root._visualMode = ""; edit.select(0, 0); return true
+            const cp = edit.cursorPosition
+            root._visualMode = ""; edit.select(cp, cp); return true   // keep cursor, clear selection
         }
         if (event.text === "v") {
-            if (root._visualMode === "char") { root._visualMode = ""; edit.select(0, 0) }
-            else {
+            if (root._visualMode === "char") {
+                const cp = edit.cursorPosition
+                root._visualMode = ""; edit.select(cp, cp)
+            } else {
                 // Switch to char mode at the current cursor position
                 let cp = edit.cursorPosition
                 if (root._visualMode === "block") {
@@ -257,8 +260,10 @@ ShellRoot {
             return true
         }
         if (event.text === "V") {
-            if (root._visualMode === "line") { root._visualMode = ""; edit.select(0, 0) }
-            else {
+            if (root._visualMode === "line") {
+                const cp = edit.cursorPosition
+                root._visualMode = ""; edit.select(cp, cp)
+            } else {
                 const cp  = edit.cursorPosition
                 const cur = root._logicalLineAt(text, cp)
                 const anc = root._logicalLineAt(text, root._visualAnchorPos)
@@ -270,7 +275,7 @@ ShellRoot {
             return true
         }
         if (event.key === Qt.Key_V && (event.modifiers & Qt.ControlModifier)) {
-            if (root._visualMode === "block") { root._visualMode = ""; edit.select(0, 0) }
+            if (root._visualMode === "block") { root._visualMode = "" }
             else {
                 const cp   = edit.cursorPosition
                 const cur  = root._logicalLineAt(text, cp)
@@ -778,11 +783,19 @@ ShellRoot {
                         } else if (event.text === "y") {
                             if (root.selectedEntry !== "") root.yank(root.selectedEntry)
                         } else if (!root._detailIsImage && (event.key === Qt.Key_J || event.key === Qt.Key_Down)) {
-                            fullscreenFlick.contentY = Math.min(
-                                Math.max(0, fullscreenFlick.contentHeight - fullscreenFlick.height),
-                                fullscreenFlick.contentY + lineH)
+                            const r  = fsTextEdit.positionToRectangle(fsTextEdit.cursorPosition)
+                            const np = fsTextEdit.positionAt(fsTextEdit.leftPadding, r.y + r.height + 1)
+                            if (np !== fsTextEdit.cursorPosition) {
+                                fsTextEdit.select(np, np)
+                                root._scrollEditIntoView(fsTextEdit, fullscreenFlick, np)
+                            }
                         } else if (!root._detailIsImage && (event.key === Qt.Key_K || event.key === Qt.Key_Up)) {
-                            fullscreenFlick.contentY = Math.max(0, fullscreenFlick.contentY - lineH)
+                            const r  = fsTextEdit.positionToRectangle(fsTextEdit.cursorPosition)
+                            const np = fsTextEdit.positionAt(fsTextEdit.leftPadding, r.y - 1)
+                            if (np !== fsTextEdit.cursorPosition) {
+                                fsTextEdit.select(np, np)
+                                root._scrollEditIntoView(fsTextEdit, fullscreenFlick, np)
+                            }
                         } else if (!root._detailIsImage && event.key === Qt.Key_D && (event.modifiers & Qt.ControlModifier)) {
                             fullscreenFlick.contentY = Math.min(
                                 Math.max(0, fullscreenFlick.contentHeight - fullscreenFlick.height),
@@ -846,11 +859,19 @@ ShellRoot {
                         } else if (event.key === Qt.Key_V && (event.modifiers & Qt.ControlModifier) && !root._detailIsImage) {
                             root._enterTextVisual("block", detailTextEdit, detailFlick)
                         } else if (!root._detailIsImage && (event.key === Qt.Key_J || event.key === Qt.Key_Down)) {
-                            detailFlick.contentY = Math.min(
-                                Math.max(0, detailFlick.contentHeight - detailFlick.height),
-                                detailFlick.contentY + lineH)
+                            const r  = detailTextEdit.positionToRectangle(detailTextEdit.cursorPosition)
+                            const np = detailTextEdit.positionAt(detailTextEdit.leftPadding, r.y + r.height + 1)
+                            if (np !== detailTextEdit.cursorPosition) {
+                                detailTextEdit.select(np, np)
+                                root._scrollEditIntoView(detailTextEdit, detailFlick, np)
+                            }
                         } else if (!root._detailIsImage && (event.key === Qt.Key_K || event.key === Qt.Key_Up)) {
-                            detailFlick.contentY = Math.max(0, detailFlick.contentY - lineH)
+                            const r  = detailTextEdit.positionToRectangle(detailTextEdit.cursorPosition)
+                            const np = detailTextEdit.positionAt(detailTextEdit.leftPadding, r.y - 1)
+                            if (np !== detailTextEdit.cursorPosition) {
+                                detailTextEdit.select(np, np)
+                                root._scrollEditIntoView(detailTextEdit, detailFlick, np)
+                            }
                         } else if (!root._detailIsImage && event.key === Qt.Key_D && (event.modifiers & Qt.ControlModifier)) {
                             detailFlick.contentY = Math.min(
                                 Math.max(0, detailFlick.contentHeight - detailFlick.height),
@@ -1250,6 +1271,22 @@ ShellRoot {
                                     return rects
                                 }
 
+                                // Cursor position — visible whenever detail pane is focused on text
+                                property rect _cursorRect: {
+                                    if (!root.detailFocused || root._detailIsImage || root._detailLoading)
+                                        return Qt.rect(0, 0, 0, 0)
+                                    let pos
+                                    if (root._visualMode === "block") {
+                                        const text = root._detailText
+                                        const ls = root._lineStartAt(text, root._visualCurRow)
+                                        const le = root._lineEndAt(text, root._visualCurRow)
+                                        pos = Math.min(ls + root._visualCurCol, le)
+                                    } else {
+                                        pos = detailTextEdit.cursorPosition
+                                    }
+                                    return detailTextEdit.positionToRectangle(pos)
+                                }
+
                                 TextEdit {
                                     id: detailTextEdit
                                     width: parent.width
@@ -1262,7 +1299,7 @@ ShellRoot {
                                     readOnly: true
                                     selectByMouse: false
                                     selectByKeyboard: false
-                                    cursorVisible: root._detailVisual
+                                    cursorVisible: false
                                     selectedTextColor: cfg.color.base00
                                     selectionColor: cfg.color.base0D
                                 }
@@ -1275,6 +1312,18 @@ ShellRoot {
                                         width: modelData.w; height: modelData.h
                                         color: cfg.color.base0D; opacity: 0.4
                                     }
+                                }
+
+                                // Cursor bar — always visible when detail pane is focused on text
+                                Rectangle {
+                                    visible: root.detailFocused && !root._detailIsImage && !root._detailLoading
+                                             && detailFlick._cursorRect.height > 0
+                                    x: detailFlick._cursorRect.x
+                                    y: detailFlick._cursorRect.y
+                                    width: 2
+                                    height: detailFlick._cursorRect.height
+                                    color: cfg.color.base07
+                                    z: 10
                                 }
                             }
 
@@ -1308,7 +1357,7 @@ ShellRoot {
                                 ? "V/Esc exit  \u00b7  j/k extend  \u00b7  o swap  \u00b7  v char  \u00b7  Ctrl+V block  \u00b7  y copy"
                                : "Ctrl+V/Esc exit  \u00b7  j/k/h/l move  \u00b7  o diag  \u00b7  O col  \u00b7  v char  \u00b7  y copy")
                             : root.detailFocused
-                            ? "h/Esc list  \u00b7  j/k scroll  \u00b7  v/V/Ctrl+V visual  \u00b7  Enter fullscreen  \u00b7  y copy"
+                            ? "h/Esc list  \u00b7  j/k cursor  \u00b7  v/V/Ctrl+V visual  \u00b7  Enter fullscreen  \u00b7  y copy"
                             : root.mode === "visual"
                                 ? "j/k  select  \u00b7  v / Esc  normal mode"
                                 : root.mode === "normal"
@@ -1472,6 +1521,22 @@ ShellRoot {
                             return rects
                         }
 
+                        // Cursor position — visible whenever fullscreen is showing text
+                        property rect _cursorRect: {
+                            if (!root.fullscreenShowing || root._detailIsImage || root._detailLoading)
+                                return Qt.rect(0, 0, 0, 0)
+                            let pos
+                            if (root._visualMode === "block") {
+                                const text = root._detailText
+                                const ls = root._lineStartAt(text, root._visualCurRow)
+                                const le = root._lineEndAt(text, root._visualCurRow)
+                                pos = Math.min(ls + root._visualCurCol, le)
+                            } else {
+                                pos = fsTextEdit.cursorPosition
+                            }
+                            return fsTextEdit.positionToRectangle(pos)
+                        }
+
                         TextEdit {
                             id: fsTextEdit
                             width: parent.width
@@ -1484,7 +1549,7 @@ ShellRoot {
                             readOnly: true
                             selectByMouse: false
                             selectByKeyboard: false
-                            cursorVisible: root._fsVisual
+                            cursorVisible: false
                             selectedTextColor: cfg.color.base00
                             selectionColor: cfg.color.base0D
                         }
@@ -1497,6 +1562,18 @@ ShellRoot {
                                 width: modelData.w; height: modelData.h
                                 color: cfg.color.base0D; opacity: 0.4
                             }
+                        }
+
+                        // Cursor bar — always visible in fullscreen text view
+                        Rectangle {
+                            visible: root.fullscreenShowing && !root._detailIsImage && !root._detailLoading
+                                     && fullscreenFlick._cursorRect.height > 0
+                            x: fullscreenFlick._cursorRect.x
+                            y: fullscreenFlick._cursorRect.y
+                            width: 2
+                            height: fullscreenFlick._cursorRect.height
+                            color: cfg.color.base07
+                            z: 10
                         }
                     }
 
