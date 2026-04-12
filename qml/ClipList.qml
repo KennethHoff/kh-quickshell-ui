@@ -216,9 +216,9 @@ Item {
             _pins = Object.assign({}, _pins, { [id]: true })
         }
         _writePins()
+        const savedIdx = list.currentIndex
         _runFilter()
-        const newIdx = filteredEntries.indexOf(rawLine)
-        if (newIdx >= 0) list.currentIndex = newIdx
+        list.currentIndex = Math.min(savedIdx, filteredEntries.length - 1)
     }
 
     // Persist the current pin set to disk.
