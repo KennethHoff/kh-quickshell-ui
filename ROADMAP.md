@@ -26,6 +26,7 @@ list of clipboard entries from `cliphist`. SUPER+V toggles it via IPC.
 - ✅ Search filters: `img:` / `text:` type filter, `'` exact substring match
 - ✅ Entry counter in footer
 - ✅ `?` toggles a searchable help overlay listing all keybinds
+- ⬜ Asynchronous search — filtering is currently synchronous and blocks the UI while typing; move to a non-blocking model
 - ⬜ Timestamp on entries
 - ⬜ Source app attribution — record active Hyprland window (`hyprctl activewindow`) at copy time, stored in a side-store alongside the cliphist entry (needs a storage solution that doesn't corrupt binary clipboard data)
 - ⬜ Normal mode — full vim navigation per UX principle above; replaces current Tab/arrow-key bindings
