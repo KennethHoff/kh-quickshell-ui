@@ -31,19 +31,13 @@ The window is **opened automatically** (toggle is implicit) for each shot.
 
 ## Step 2 — Display
 
-**If the change being tested does NOT touch `kh-view`:** open the screenshots with kh-view — pass all paths as arguments and they open side-by-side.
-
-```bash
-nix run .#kh-view -- <path1> [<path2> ...]
-```
-
-**If the change being tested touches `kh-view` itself:** kh-view may be broken, so use the pinned known-good commit instead:
+Open the screenshots using the pinned known-good kh-view commit. Pass all paths as arguments — they open side-by-side.
 
 ```bash
 nix run "git+file://$PWD?rev=9859d176d4db#kh-view" -- <path1> [<path2> ...]
 ```
 
-Update this commit hash whenever kh-view reaches a new stable state.
+Update the pinned commit hash whenever kh-view reaches a new stable state.
 
 ## Example (two comparison shots)
 
@@ -54,5 +48,5 @@ nix run .#screenshot -- kh-launcher shot-a 'type chrm' -- shot-b "type 'chrm"
 # → /tmp/qs-screenshots/20260412-140000/shot-b.png
 
 # Display side-by-side
-nix run .#kh-view -- /tmp/qs-screenshots/20260412-140000/shot-a.png /tmp/qs-screenshots/20260412-140000/shot-b.png
+nix run "git+file://$PWD?rev=9859d176d4db#kh-view" -- /tmp/qs-screenshots/20260412-140000/shot-a.png /tmp/qs-screenshots/20260412-140000/shot-b.png
 ```
