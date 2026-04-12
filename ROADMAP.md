@@ -26,7 +26,7 @@ list of clipboard entries from `cliphist`. SUPER+V toggles it via IPC.
 - ✅ Entry counter in footer
 - ✅ Modal insert/normal mode — opens in insert mode (search focused); Escape → normal mode with `j`/`k` navigation, `G` bottom, `/` or printable → insert; Escape closes
 - ✅ Full IPC control (`toggle`, `setMode`, `nav`, `key`, `type`)
-- ⬜ `gg` to jump to top; `Ctrl+D`/`Ctrl+U` half-page scroll
+- ✅ `gg` top, `G` bottom, `Ctrl+D`/`Ctrl+U` half-page scroll
 - ⬜ Detail panel — `l` to open, `h` to close; text preview with char/word/line count; image preview with dimensions and file size
 - ⬜ Fullscreen view — `Enter` from detail; `Escape` back
 - ⬜ Help overlay — `?` toggles a searchable list of keybinds

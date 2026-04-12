@@ -26,6 +26,7 @@ ShellRoot {
     property var    _buf: []
     property var    _fullTextCache: ({})
     property int    _cacheVersion: 0
+    property bool   _pendingG: false
 
     signal itemPasted(int idx)
 
@@ -86,10 +87,18 @@ ShellRoot {
         normalModeHandler.forceActiveFocus()
     }
 
-    function navUp()     { if (resultList.currentIndex > 0) resultList.currentIndex-- }
-    function navDown()   { if (resultList.currentIndex < resultList.count - 1) resultList.currentIndex++ }
-    function navTop()    { resultList.currentIndex = 0 }
-    function navBottom() { resultList.currentIndex = Math.max(0, resultList.count - 1) }
+    function navUp()       { if (resultList.currentIndex > 0) resultList.currentIndex-- }
+    function navDown()     { if (resultList.currentIndex < resultList.count - 1) resultList.currentIndex++ }
+    function navTop()      { resultList.currentIndex = 0 }
+    function navBottom()   { resultList.currentIndex = Math.max(0, resultList.count - 1) }
+    function navHalfDown() {
+        const step = Math.max(1, Math.floor(resultList.height / 40 / 2))
+        resultList.currentIndex = Math.min(resultList.count - 1, resultList.currentIndex + step)
+    }
+    function navHalfUp() {
+        const step = Math.max(1, Math.floor(resultList.height / 40 / 2))
+        resultList.currentIndex = Math.max(0, resultList.currentIndex - step)
+    }
 
     // ── Processes ────────────────────────────────────────────────────────────
     Process {
@@ -131,6 +140,13 @@ ShellRoot {
         onTriggered: root.showing = false
     }
 
+    Timer {
+        id: gTimer
+        interval: 300
+        repeat: false
+        onTriggered: { root._pendingG = false }
+    }
+
     // ── IPC ──────────────────────────────────────────────────────────────────
     IpcHandler {
         target: "viewer"
@@ -145,10 +161,12 @@ ShellRoot {
         }
 
         function nav(dir: string) {
-            if      (dir === "up")     root.navUp()
-            else if (dir === "down")   root.navDown()
-            else if (dir === "top")    root.navTop()
-            else if (dir === "bottom") root.navBottom()
+            if      (dir === "up")        root.navUp()
+            else if (dir === "down")      root.navDown()
+            else if (dir === "top")       root.navTop()
+            else if (dir === "bottom")    root.navBottom()
+            else if (dir === "half-down") root.navHalfDown()
+            else if (dir === "half-up")   root.navHalfUp()
         }
 
         function key(k: string) {
@@ -228,8 +246,21 @@ ShellRoot {
                         root.navDown()
                     } else if (event.key === Qt.Key_K || event.key === Qt.Key_Up) {
                         root.navUp()
-                    } else if (event.key === Qt.Key_G) {
+                    } else if (event.key === Qt.Key_G && (event.modifiers & Qt.ShiftModifier)) {
                         root.navBottom()
+                    } else if (event.key === Qt.Key_G) {
+                        if (root._pendingG) {
+                            gTimer.stop()
+                            root.navTop()
+                            root._pendingG = false
+                        } else {
+                            root._pendingG = true
+                            gTimer.restart()
+                        }
+                    } else if (event.key === Qt.Key_D && (event.modifiers & Qt.ControlModifier)) {
+                        root.navHalfDown()
+                    } else if (event.key === Qt.Key_U && (event.modifiers & Qt.ControlModifier)) {
+                        root.navHalfUp()
                     } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
                         if (root.selectedEntry !== "") root.paste(root.selectedEntry)
                     } else if (event.key === Qt.Key_Slash) {
