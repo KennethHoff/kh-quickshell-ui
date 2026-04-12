@@ -69,6 +69,10 @@ Item {
     property string _timestampsFile: ""
     property var    _timestampsBuf:  []    // scratch buffer while loading the timestamps file
 
+    property var    _attribution:     ({})  // {[id: string]: app_class (Hyprland window class)}
+    property string _attributionFile: ""
+    property var    _attributionBuf:  []
+
     // ── Properties out ────────────────────────────────────────────────────────
     readonly property string selectedEntry: {
         const idx = list.currentIndex
@@ -258,6 +262,17 @@ Item {
         tsWriteProcess.running = true
     }
 
+    // Persist the current attribution map to disk (id<TAB>app_class per line).
+    function _writeAttribution() {
+        if (!_attributionFile) return
+        const pairs = []
+        for (const [id, app] of Object.entries(_attribution)) pairs.push(id, app)
+        attrWriteProcess.command = [bin.bash, "-c",
+            'f="$1"; shift; { while [[ $# -ge 2 ]]; do printf "%s\\t%s\\n" "$1" "$2"; shift 2; done; } > "$f"',
+            "--", _attributionFile].concat(pairs)
+        attrWriteProcess.running = true
+    }
+
     // Phase 2: called by deleteAnimTimer after the fade-out completes.
     function _executePendingDelete() {
         const lines = _pendingDeleteLines
@@ -299,6 +314,14 @@ Item {
             if (id in newPins) { delete newPins[id]; pinsChanged = true }
         }
         if (pinsChanged) { _pins = newPins; _writePins() }
+
+        // Remove deleted entries from attribution
+        let attrChanged = false
+        const newAttr = Object.assign({}, _attribution)
+        for (const id of idsToDelete) {
+            if (id in newAttr) { delete newAttr[id]; attrChanged = true }
+        }
+        if (attrChanged) { _attribution = newAttr; _writeAttribution() }
 
         _runFilter()
 
@@ -544,6 +567,17 @@ Item {
                 if (changed) { clipList._timestamps = updated; clipList._writeTimestamps() }
             }
 
+            // Prune stale attribution IDs
+            if (clipList._attributionFile) {
+                let attrChanged = false
+                const newAttr = {}
+                for (const [id, app] of Object.entries(clipList._attribution)) {
+                    if (id in idx) newAttr[id] = app
+                    else attrChanged = true
+                }
+                if (attrChanged) { clipList._attribution = newAttr; clipList._writeAttribution() }
+            }
+
             fullTextDecodeProcess.exec([bin.cliphistDecodeAll])
         }
     }
@@ -593,6 +627,7 @@ Item {
     Component.onCompleted: {
         pinsPathProcess.running = true
         tsPathProcess.running   = true
+        attrPathProcess.running = true
     }
 
     // Step 1: resolve $XDG_DATA_HOME/kh-cliphist/meta/pins and create the directory.
@@ -657,6 +692,68 @@ Item {
     }
 
     Process { id: tsWriteProcess }
+
+    // ── Attribution persistence & watching ──────────────────────────────────
+    Process {
+        id: attrPathProcess
+        command: [bin.bash, "-c",
+            'f="${XDG_DATA_HOME:-$HOME/.local/share}/kh-cliphist/meta/attribution"' +
+            '; mkdir -p "$(dirname "$f")"' +
+            '; printf "%s\\n" "$f"']
+        stdout: SplitParser {
+            onRead: (line) => { if (line) clipList._attributionFile = line }
+        }
+        onExited: {
+            if (clipList._attributionFile) {
+                attrReadProcess.running  = true
+                attrWatchProcess.running = true
+            }
+        }
+    }
+
+    Process {
+        id: attrReadProcess
+        command: [bin.bash, "-c", '[ -f "$1" ] && cat "$1" || true', "--", clipList._attributionFile]
+        stdout: SplitParser {
+            onRead: (line) => { if (line) clipList._attributionBuf.push(line) }
+        }
+        onExited: {
+            const a = {}
+            for (const line of clipList._attributionBuf) {
+                const tab = line.indexOf("\t")
+                if (tab > 0) a[line.substring(0, tab)] = line.substring(tab + 1)
+            }
+            clipList._attribution    = a
+            clipList._attributionBuf = []
+        }
+    }
+
+    Process { id: attrWriteProcess }
+
+    // Persistent clipboard watcher — runs wl-paste --watch for the life of
+    // the daemon. For each clipboard change the inner script discards the raw
+    // content, waits for cliphist to record the entry, then emits
+    // id<TAB>app_class to stdout. Auto-restarts on unexpected exit.
+    Process {
+        id: attrWatchProcess
+        command: [bin.wlPaste, "--watch", bin.cliphistAttrWatch]
+        stdout: SplitParser {
+            onRead: (line) => {
+                const tab = line.indexOf("\t")
+                if (tab > 0) {
+                    const id  = line.substring(0, tab)
+                    const app = line.substring(tab + 1)
+                    if (id && app) {
+                        clipList._attribution = Object.assign({}, clipList._attribution, { [id]: app })
+                        clipList._writeAttribution()
+                    }
+                }
+            }
+        }
+        onExited: Qt.callLater(function() {
+            if (clipList._attributionFile) attrWatchProcess.running = true
+        })
+    }
 
     // ── UI ────────────────────────────────────────────────────────────────────
     Column {
@@ -840,8 +937,13 @@ Item {
                         anchors.right: parent.right
                         anchors.rightMargin: 10
                         anchors.verticalCenter: parent.verticalCenter
-                        text: (clipList._timestamps, clipList._relTime(
-                            clipList._timestamps[delegateRoot.entryId] || 0))
+                        text: {
+                            const ts  = (clipList._timestamps,  clipList._relTime(
+                                clipList._timestamps[delegateRoot.entryId] || 0))
+                            const app = (clipList._attribution, clipList._attribution[delegateRoot.entryId] || "")
+                            if (app && ts) return app + "  \u00b7  " + ts
+                            return app || ts
+                        }
                         color: cfg.color.base03
                         font.family: cfg.fontFamily
                         font.pixelSize: cfg.fontSize - 4
