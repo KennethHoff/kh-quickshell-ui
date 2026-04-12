@@ -120,6 +120,7 @@ or stdin; shows all files side-by-side with Tab to cycle focus between panes.
 - ✅ `q`/`Esc` quits
 - ✅ Fullscreen mode — `f` toggles single fullscreen pane; `h`/`l` steps through all loaded files; dot indicators at bottom center show position
 - ✅ IPC support — `target: "viewer"`; `next()`/`prev()`/`seek(n)`/`quit()`/`setFullscreen(bool)`/`key(k)`; readable props `currentIndex`, `count`, `fullscreen`, `hasPrev`, `hasNext`; enables scripted slideshows and library review workflows
+- ⬜ Monitor selection — `--monitor <name|index>` flag to open the window on a specific monitor; defaults to the monitor containing the active window
 
 ---
 
