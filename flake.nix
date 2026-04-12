@@ -126,8 +126,9 @@
           type = "app";
           program = toString (pkgs.writeShellScript "qs-screenshots" ''
             set -e
-            out=/tmp/qs-screenshots
+            out=/tmp/qs-screenshots/$(date +%Y%m%d-%H%M%S)
             mkdir -p "$out"
+            ln -sfn "$out" /tmp/qs-screenshots/latest
             qs=${lib.getExe' pkgs.quickshell "quickshell"}
             grim=${lib.getExe pkgs.grim}
 
