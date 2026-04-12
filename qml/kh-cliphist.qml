@@ -33,6 +33,15 @@ ShellRoot {
     property var    _processedIdx: ({})  // id → index in _processed for O(1) full-text updates
     property bool   _pendingG: false
 
+    property bool   detailShowing: false
+    property bool   _detailIsImage: false
+    property string _detailText: ""
+    property var    _detailLines: []
+    property bool   _detailLoading: false
+    property string _detailImgPath: ""
+    property string _detailImgSource: ""
+    property string _detailImgSize: ""
+
     signal itemPasted(int idx)
 
     readonly property string selectedEntry: {
@@ -102,6 +111,40 @@ ShellRoot {
         else normalModeHandler.forceActiveFocus()
     }
 
+    function openDetail() {
+        if (root.selectedEntry === "") return
+        const preview = clipEntry.entryPreview(root.selectedEntry)
+        root._detailIsImage  = preview.startsWith("[[")
+        root._detailText     = ""
+        root._detailLines    = []
+        root._detailLoading  = true
+        root._detailImgSource = ""
+        root._detailImgSize  = ""
+        const eid = clipEntry.entryId(root.selectedEntry)
+        root._detailImgPath  = "/tmp/kh-cliphist-" + eid
+        root.detailShowing   = true
+        normalModeHandler.forceActiveFocus()
+        if (root._detailIsImage) {
+            detailDecodeProcess.command = [
+                bin.bash, "-c",
+                "[ -f \"$1\" ] || printf '%s\\n' \"$2\" | " + bin.cliphist + " decode > \"$1\"",
+                "--", root._detailImgPath, root.selectedEntry
+            ]
+        } else {
+            detailDecodeProcess.command = [
+                bin.bash, "-c",
+                "printf '%s\\n' \"$1\" | " + bin.cliphist + " decode",
+                "--", root.selectedEntry
+            ]
+        }
+        detailDecodeProcess.running = true
+    }
+
+    function closeDetail() {
+        root.detailShowing = false
+        normalModeHandler.forceActiveFocus()
+    }
+
     function navUp()       { if (resultList.currentIndex > 0) resultList.currentIndex-- }
     function navDown()     { if (resultList.currentIndex < resultList.count - 1) resultList.currentIndex++ }
     function navTop()      { resultList.currentIndex = 0 }
@@ -164,6 +207,39 @@ ShellRoot {
 
     Process { id: pasteProcess }
 
+    Process {
+        id: detailDecodeProcess
+        stdout: SplitParser {
+            onRead: (line) => { if (!root._detailIsImage) root._detailLines.push(line) }
+        }
+        onExited: {
+            if (root._detailIsImage) {
+                root._detailImgSource = "file://" + root._detailImgPath
+                detailSizeProcess.command = [
+                    bin.bash, "-c", "wc -c < \"$1\"", "--", root._detailImgPath
+                ]
+                detailSizeProcess.running = true
+            } else {
+                root._detailText  = root._detailLines.join("\n")
+                root._detailLines = []
+                root._detailLoading = false
+            }
+        }
+    }
+
+    Process {
+        id: detailSizeProcess
+        stdout: SplitParser {
+            onRead: (line) => {
+                const bytes = parseInt(line.trim())
+                if (isNaN(bytes)) return
+                if (bytes < 1024)    root._detailImgSize = bytes + " B"
+                else if (bytes < 1048576) root._detailImgSize = (bytes / 1024).toFixed(1) + " KB"
+                else                 root._detailImgSize = (bytes / 1048576).toFixed(1) + " MB"
+            }
+        }
+    }
+
     Timer {
         id: closeTimer
         interval: 200
@@ -219,17 +295,23 @@ ShellRoot {
             } else if (lk === "/" && root.helpShowing) {
                 root._helpFiltering = true
                 root.helpText = ""
+            } else if (lk === "l") {
+                root.openDetail()
+            } else if (lk === "h" && root.detailShowing) {
+                root.closeDetail()
             } else if (lk === "escape" || lk === "esc") {
                 if (root.helpShowing) {
                     if (root.helpText) { root.helpText = ""; root._helpFiltering = false }
                     else root.closeHelp()
+                } else if (root.detailShowing) {
+                    root.closeDetail()
                 } else if (root.mode === "insert") {
                     root.enterNormalMode()
                 } else {
                     root.showing = false
                 }
             } else if (lk === "enter" || lk === "return") {
-                if (!root.helpShowing && root.selectedEntry !== "") root.paste(root.selectedEntry)
+                if (root.selectedEntry !== "") root.paste(root.selectedEntry)
             }
         }
 
@@ -267,6 +349,11 @@ ShellRoot {
                 root.helpShowing     = false
                 root._helpFiltering  = false
                 root.helpText        = ""
+                root.detailShowing   = false
+                root._detailText     = ""
+                root._detailLines    = []
+                root._detailLoading  = false
+                root._detailImgSource = ""
                 searchDebounce.stop()
                 fullTextDecodeProcess.running = false
                 searchField.text = ""
@@ -305,6 +392,19 @@ ShellRoot {
                 Keys.onPressed: (event) => {
                     if (event.key === Qt.Key_Shift || event.key === Qt.Key_Control ||
                         event.key === Qt.Key_Alt   || event.key === Qt.Key_Meta) return
+
+                    // ── Detail panel ─────────────────────────────────────────
+                    if (root.detailShowing) {
+                        if (event.key === Qt.Key_H || event.key === Qt.Key_Escape) {
+                            root.closeDetail()
+                        } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                            if (root.selectedEntry !== "") root.paste(root.selectedEntry)
+                        } else {
+                            return
+                        }
+                        event.accepted = true
+                        return
+                    }
 
                     // ── Help popup ────────────────────────────────────────────
                     if (root.helpShowing) {
@@ -382,6 +482,8 @@ ShellRoot {
                         root.navHalfUp()
                     } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
                         if (root.selectedEntry !== "") root.paste(root.selectedEntry)
+                    } else if (event.key === Qt.Key_L) {
+                        root.openDetail()
                     } else if (event.key === Qt.Key_Slash) {
                         root.enterInsertMode()
                     } else if (event.text && event.text.length === 1 &&
@@ -593,9 +695,11 @@ ShellRoot {
                     Text {
                         anchors.left: parent.left
                         anchors.verticalCenter: parent.verticalCenter
-                        text: root.mode === "normal"
-                            ? "j/k  navigate  \u00b7  Enter  paste  \u00b7  /  search  \u00b7  ?  help  \u00b7  Esc  close"
-                            : "Esc  normal mode  \u00b7  ?  help"
+                        text: root.detailShowing
+                            ? "h / Esc  back  \u00b7  Enter  paste"
+                            : root.mode === "normal"
+                                ? "j/k  navigate  \u00b7  l  detail  \u00b7  Enter  paste  \u00b7  /  search  \u00b7  ?  help  \u00b7  Esc  close"
+                                : "Esc  normal mode  \u00b7  ?  help"
                         color: cfg.color.base03
                         font.family: cfg.fontFamily
                         font.pixelSize: cfg.fontSize - 3
@@ -609,6 +713,142 @@ ShellRoot {
                         color: cfg.color.base03
                         font.family: cfg.fontFamily
                         font.pixelSize: cfg.fontSize - 3
+                    }
+                }
+            }
+
+            // Detail popup backdrop ───────────────────────────────────────────
+            Rectangle {
+                anchors.fill: parent
+                visible: root.detailShowing
+                color: "#88000000"
+                z: 9
+                radius: panel.radius
+                MouseArea { anchors.fill: parent; onClicked: root.closeDetail() }
+            }
+
+            // Detail popup ────────────────────────────────────────────────────
+            Rectangle {
+                id: detailPopup
+                visible: root.detailShowing
+                z: 10
+                width: panel.width - 48
+                height: panel.height - 48
+                anchors.centerIn: parent
+                color: cfg.color.base01
+                radius: 10
+
+                // Title bar
+                Rectangle {
+                    id: detailTitleBar
+                    anchors.top: parent.top
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    height: 38
+                    color: cfg.color.base02
+                    radius: detailPopup.radius
+                    Rectangle {
+                        anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom
+                        height: detailPopup.radius; color: parent.color
+                    }
+                    Text {
+                        anchors.left: parent.left; anchors.leftMargin: 16
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: root._detailIsImage ? "IMAGE" : "TEXT"
+                        color: cfg.color.base0D
+                        font.family: cfg.fontFamily; font.pixelSize: cfg.fontSize - 3
+                        font.bold: true; font.letterSpacing: 1
+                    }
+                    Text {
+                        anchors.left: parent.left; anchors.leftMargin: 64
+                        anchors.right: parent.right; anchors.rightMargin: 16
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: root.selectedEntry !== "" ? clipEntry.entryPreview(root.selectedEntry) : ""
+                        color: cfg.color.base03
+                        font.family: cfg.fontFamily; font.pixelSize: cfg.fontSize - 3
+                        elide: Text.ElideRight
+                    }
+                }
+
+                // Stats bar
+                Rectangle {
+                    id: detailStatsBar
+                    anchors.bottom: parent.bottom
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    height: 36
+                    color: cfg.color.base02
+                    radius: detailPopup.radius
+                    Rectangle {
+                        anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top
+                        height: detailPopup.radius; color: parent.color
+                    }
+                    Text {
+                        anchors.left: parent.left; anchors.leftMargin: 16
+                        anchors.verticalCenter: parent.verticalCenter
+                        color: cfg.color.base03
+                        font.family: cfg.fontFamily; font.pixelSize: cfg.fontSize - 3
+                        text: {
+                            if (root._detailLoading) return ""
+                            if (root._detailIsImage) {
+                                const dim = detailImg.status === Image.Ready
+                                    ? detailImg.implicitWidth + " \u00d7 " + detailImg.implicitHeight + " px"
+                                    : ""
+                                return dim + (dim && root._detailImgSize ? "  \u00b7  " : "") + root._detailImgSize
+                            }
+                            const t = root._detailText
+                            const chars = t.length
+                            const words = t.trim() ? t.trim().split(/\s+/).length : 0
+                            const lines = t ? t.split("\n").length : 0
+                            return chars + " chars  \u00b7  " + words + " words  \u00b7  " + lines + " lines"
+                        }
+                    }
+                }
+
+                // Content area
+                Item {
+                    anchors.top: detailTitleBar.bottom
+                    anchors.bottom: detailStatsBar.top
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+
+                    Text {
+                        anchors.centerIn: parent
+                        visible: root._detailLoading
+                        text: "Loading..."
+                        color: cfg.color.base03
+                        font.family: cfg.fontFamily; font.pixelSize: cfg.fontSize
+                    }
+
+                    // Text content
+                    Flickable {
+                        anchors.fill: parent
+                        visible: !root._detailIsImage && !root._detailLoading
+                        contentHeight: detailTextContent.implicitHeight
+                        contentWidth: width
+                        clip: true
+
+                        Text {
+                            id: detailTextContent
+                            width: parent.width
+                            leftPadding: 16; rightPadding: 16; topPadding: 12; bottomPadding: 12
+                            text: root._detailText
+                            color: cfg.color.base05
+                            font.family: cfg.fontFamily; font.pixelSize: cfg.fontSize
+                            wrapMode: Text.Wrap
+                        }
+                    }
+
+                    // Image content
+                    Image {
+                        id: detailImg
+                        anchors.fill: parent
+                        anchors.margins: 12
+                        visible: root._detailIsImage && !root._detailLoading
+                        fillMode: Image.PreserveAspectFit
+                        smooth: true; mipmap: true; asynchronous: true
+                        source: root._detailImgSource
+                        onStatusChanged: if (status === Image.Ready) root._detailLoading = false
                     }
                 }
             }
@@ -750,6 +990,7 @@ ShellRoot {
                                     ShortcutRow { keys: "Ctrl+D"; action: "half-page down" }
                                     ShortcutRow { keys: "Ctrl+U"; action: "half-page up" }
                                     ShortcutRow { keys: "Enter";  action: "paste entry" }
+                                    ShortcutRow { keys: "l";      action: "detail panel" }
                                     ShortcutRow { keys: "/";      action: "focus search" }
                                     ShortcutRow { keys: "Esc";    action: "close" }
                                 }
