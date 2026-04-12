@@ -305,7 +305,7 @@ ShellRoot {
             }
             if (event.key === Qt.Key_J || event.key === Qt.Key_Down) {
                 const r  = edit.positionToRectangle(edit.cursorPosition)
-                const np = edit.positionAt(edit.leftPadding, r.y + r.height + 1)
+                const np = edit.positionAt(r.x, r.y + r.height + 1)
                 if (np !== edit.cursorPosition) {
                     edit.moveCursorSelection(np, TextEdit.SelectCharacters)
                     root._scrollEditIntoView(edit, flick, np)
@@ -314,7 +314,7 @@ ShellRoot {
             }
             if (event.key === Qt.Key_K || event.key === Qt.Key_Up) {
                 const r  = edit.positionToRectangle(edit.cursorPosition)
-                const np = edit.positionAt(edit.leftPadding, r.y - 1)
+                const np = edit.positionAt(r.x, r.y - 1)
                 if (np !== edit.cursorPosition) {
                     edit.moveCursorSelection(np, TextEdit.SelectCharacters)
                     root._scrollEditIntoView(edit, flick, np)
@@ -800,14 +800,14 @@ ShellRoot {
                             if (root.selectedEntry !== "") root.yank(root.selectedEntry)
                         } else if (!root._detailIsImage && (event.key === Qt.Key_J || event.key === Qt.Key_Down)) {
                             const r  = fsTextEdit.positionToRectangle(fsTextEdit.cursorPosition)
-                            const np = fsTextEdit.positionAt(fsTextEdit.leftPadding, r.y + r.height + 1)
+                            const np = fsTextEdit.positionAt(r.x, r.y + r.height + 1)
                             if (np !== fsTextEdit.cursorPosition) {
                                 fsTextEdit.select(np, np)
                                 root._scrollEditIntoView(fsTextEdit, fullscreenFlick, np)
                             }
                         } else if (!root._detailIsImage && (event.key === Qt.Key_K || event.key === Qt.Key_Up)) {
                             const r  = fsTextEdit.positionToRectangle(fsTextEdit.cursorPosition)
-                            const np = fsTextEdit.positionAt(fsTextEdit.leftPadding, r.y - 1)
+                            const np = fsTextEdit.positionAt(r.x, r.y - 1)
                             if (np !== fsTextEdit.cursorPosition) {
                                 fsTextEdit.select(np, np)
                                 root._scrollEditIntoView(fsTextEdit, fullscreenFlick, np)
@@ -888,14 +888,14 @@ ShellRoot {
                             root._enterTextVisual("block", detailTextEdit, detailFlick)
                         } else if (!root._detailIsImage && (event.key === Qt.Key_J || event.key === Qt.Key_Down)) {
                             const r  = detailTextEdit.positionToRectangle(detailTextEdit.cursorPosition)
-                            const np = detailTextEdit.positionAt(detailTextEdit.leftPadding, r.y + r.height + 1)
+                            const np = detailTextEdit.positionAt(r.x, r.y + r.height + 1)
                             if (np !== detailTextEdit.cursorPosition) {
                                 detailTextEdit.select(np, np)
                                 root._scrollEditIntoView(detailTextEdit, detailFlick, np)
                             }
                         } else if (!root._detailIsImage && (event.key === Qt.Key_K || event.key === Qt.Key_Up)) {
                             const r  = detailTextEdit.positionToRectangle(detailTextEdit.cursorPosition)
-                            const np = detailTextEdit.positionAt(detailTextEdit.leftPadding, r.y - 1)
+                            const np = detailTextEdit.positionAt(r.x, r.y - 1)
                             if (np !== detailTextEdit.cursorPosition) {
                                 detailTextEdit.select(np, np)
                                 root._scrollEditIntoView(detailTextEdit, detailFlick, np)
