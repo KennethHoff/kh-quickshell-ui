@@ -35,11 +35,12 @@ After capturing, open a new tmux pane and render the images there using `kitty +
 
 ```bash
 tmux split-window -h
-tmux send-keys "tmux set-option -p allow-passthrough on && kitty +kitten icat <paths...>" Enter
+tmux send-keys "tmux set-option -p allow-passthrough on && for f in <paths...>; do echo \"\$(basename \$f .png)\"; kitty +kitten icat \"\$f\"; done" Enter
 ```
 
 - Open the pane first with no command so the shell stays alive after rendering
 - `allow-passthrough` is set on the new pane so kitty graphics sequences reach the terminal
+- Each image is preceded by its name (filename without extension) as a label
 - The pane remains open for the user to inspect
 
 ## Example (two comparison shots)
@@ -52,5 +53,5 @@ nix run .#screenshot -- kh-launcher shot-a 'type chrm' -- shot-b "type 'chrm"
 
 # Display
 tmux split-window -h
-tmux send-keys "tmux set-option -p allow-passthrough on && kitty +kitten icat /tmp/qs-screenshots/20260412-140000/shot-a.png /tmp/qs-screenshots/20260412-140000/shot-b.png" Enter
+tmux send-keys "tmux set-option -p allow-passthrough on && for f in /tmp/qs-screenshots/20260412-140000/shot-a.png /tmp/qs-screenshots/20260412-140000/shot-b.png; do echo \"\$(basename \$f .png)\"; kitty +kitten icat \"\$f\"; done" Enter
 ```
