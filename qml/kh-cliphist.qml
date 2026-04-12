@@ -86,6 +86,16 @@ ShellRoot {
         closeTimer.restart()
     }
 
+    function yank(rawLine) {
+        pasteProcess.command = [
+            bin.bash, "-c",
+            "printf '%s\\n' \"$1\" | " + bin.cliphist + " decode | " + bin.wlCopy,
+            "--", rawLine
+        ]
+        root.itemPasted(resultList.currentIndex)
+        pasteProcess.running = true
+    }
+
     function enterInsertMode() {
         root.mode = "insert"
         searchField.forceActiveFocus()
@@ -321,6 +331,8 @@ ShellRoot {
                 }
             } else if (lk === "enter" || lk === "return") {
                 if (root.selectedEntry !== "") root.paste(root.selectedEntry)
+            } else if (lk === "y") {
+                if (root.selectedEntry !== "") root.yank(root.selectedEntry)
             }
         }
 
@@ -460,6 +472,8 @@ ShellRoot {
                             root.detailFocused = false
                         } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
                             if (root.selectedEntry !== "") root.paste(root.selectedEntry)
+                        } else if (event.text === "y") {
+                            if (root.selectedEntry !== "") root.yank(root.selectedEntry)
                         } else if (!root._detailIsImage && (event.key === Qt.Key_J || event.key === Qt.Key_Down)) {
                             detailFlick.contentY = Math.min(
                                 Math.max(0, detailFlick.contentHeight - detailFlick.height),
@@ -509,6 +523,8 @@ ShellRoot {
                         root.navHalfUp()
                     } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
                         if (root.selectedEntry !== "") root.paste(root.selectedEntry)
+                    } else if (event.text === "y") {
+                        if (root.selectedEntry !== "") root.yank(root.selectedEntry)
                     } else if (event.key === Qt.Key_L) {
                         root.detailFocused = true
                     } else if (event.key === Qt.Key_Slash) {
@@ -863,9 +879,9 @@ ShellRoot {
                         anchors.left: parent.left
                         anchors.verticalCenter: parent.verticalCenter
                         text: root.detailFocused
-                            ? "h / Esc  list  \u00b7  j/k  scroll  \u00b7  Enter  paste"
+                            ? "h / Esc  list  \u00b7  j/k  scroll  \u00b7  y  copy  \u00b7  Enter  copy+close"
                             : root.mode === "normal"
-                                ? "j/k  navigate  \u00b7  l  focus detail  \u00b7  Enter  paste  \u00b7  /  search  \u00b7  ?  help  \u00b7  Esc  close"
+                                ? "j/k  navigate  \u00b7  y  copy  \u00b7  Enter  copy+close  \u00b7  l  detail  \u00b7  /  search  \u00b7  ?  help  \u00b7  Esc  close"
                                 : "Esc  normal mode  \u00b7  ?  help"
                         color: cfg.color.base03
                         font.family: cfg.fontFamily
@@ -1020,7 +1036,8 @@ ShellRoot {
                                     ShortcutRow { keys: "G";      action: "jump to bottom" }
                                     ShortcutRow { keys: "Ctrl+D"; action: "half-page down" }
                                     ShortcutRow { keys: "Ctrl+U"; action: "half-page up" }
-                                    ShortcutRow { keys: "Enter";  action: "paste entry" }
+                                    ShortcutRow { keys: "y";      action: "copy to clipboard" }
+                                    ShortcutRow { keys: "Enter";  action: "copy + close" }
                                     ShortcutRow { keys: "l";      action: "focus detail pane" }
                                     ShortcutRow { keys: "h / Esc"; action: "focus list" }
                                     ShortcutRow { keys: "/";      action: "focus search" }
