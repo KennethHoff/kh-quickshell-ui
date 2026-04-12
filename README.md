@@ -24,8 +24,8 @@ nix run .#kh-cliphist
 
 ```nix
 # flake.nix
-inputs.quickshell-ui = {
-  url = "github:kennethhoff/quickshell-ui";
+inputs.kh-quickshell-ui = {
+  url = "github:KennethHoff/kh-quickshell-ui";
   inputs.nixpkgs.follows = "nixpkgs";
 };
 ```
@@ -37,7 +37,7 @@ The flake exports a home-manager module at `homeManagerModules.default` that han
 Import it alongside your other home-manager modules (e.g. in `sharedModules` or a home-manager aspect):
 
 ```nix
-imports = [ inputs.quickshell-ui.homeManagerModules.default ];
+imports = [ inputs.kh-quickshell-ui.homeModules.default ];
 ```
 
 The module requires [Stylix](https://github.com/nix-community/stylix) — colors and fonts are read from `config.lib.stylix` at build time.

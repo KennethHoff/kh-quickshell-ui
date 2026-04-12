@@ -83,7 +83,7 @@
       '';
     in
     {
-      homeManagerModules.default = import ./hm-module.nix self;
+      homeModules.default = import ./hm-module.nix self;
 
       checks.${system}.tests = pkgs.runCommand "qml-tests" {
         src = self;
