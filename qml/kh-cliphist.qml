@@ -337,6 +337,35 @@ ShellRoot {
                         onTextChanged: resultList.currentIndex = 0
 
                         Keys.onEscapePressed: root.enterNormalMode()
+
+                        Keys.onPressed: (event) => {
+                            if (!(event.modifiers & Qt.ControlModifier)) return
+                            const pos = searchField.cursorPosition
+                            const len = searchField.text.length
+                            if (event.key === Qt.Key_A) {
+                                searchField.cursorPosition = 0
+                            } else if (event.key === Qt.Key_E) {
+                                searchField.cursorPosition = len
+                            } else if (event.key === Qt.Key_F) {
+                                searchField.cursorPosition = Math.min(len, pos + 1)
+                            } else if (event.key === Qt.Key_B) {
+                                searchField.cursorPosition = Math.max(0, pos - 1)
+                            } else if (event.key === Qt.Key_D) {
+                                if (pos < len) searchField.remove(pos, pos + 1)
+                            } else if (event.key === Qt.Key_K) {
+                                if (pos < len) searchField.remove(pos, len)
+                            } else if (event.key === Qt.Key_W) {
+                                let i = pos
+                                while (i > 0 && searchField.text[i - 1] === " ") i--
+                                while (i > 0 && searchField.text[i - 1] !== " ") i--
+                                if (i !== pos) searchField.remove(i, pos)
+                            } else if (event.key === Qt.Key_U) {
+                                if (pos > 0) searchField.remove(0, pos)
+                            } else {
+                                return
+                            }
+                            event.accepted = true
+                        }
                     }
                 }
 

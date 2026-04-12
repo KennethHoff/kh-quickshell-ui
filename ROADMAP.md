@@ -27,6 +27,7 @@ list of clipboard entries from `cliphist`. SUPER+V toggles it via IPC.
 - ✅ Modal insert/normal mode — opens in insert mode (search focused); Escape → normal mode with `j`/`k` navigation, `G` bottom, `/` or printable → insert; Escape closes
 - ✅ Full IPC control (`toggle`, `setMode`, `nav`, `key`, `type`)
 - ✅ `gg` top, `G` bottom, `Ctrl+D`/`Ctrl+U` half-page scroll
+- ✅ Emacs bindings in insert mode — `Ctrl+A`/`E` start/end, `Ctrl+F`/`B` forward/back char, `Ctrl+D` delete forward, `Ctrl+K` delete to end, `Ctrl+W` delete word, `Ctrl+U` delete to line start
 - ⬜ Detail panel — `l` to open, `h` to close; text preview with char/word/line count; image preview with dimensions and file size
 - ⬜ Fullscreen view — `Enter` from detail; `Escape` back
 - ⬜ Help overlay — `?` toggles a searchable list of keybinds
