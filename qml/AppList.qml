@@ -1,0 +1,661 @@
+// Application list for kh-launcher.
+//
+// Owns: app loading, search field, filtering, normal/insert/actions mode.
+//
+// The orchestrator holds keyboard focus on a dedicated handler and calls
+// appList.handleKey(event) in the "list active" branch of its dispatch chain.
+// For insert mode, the orchestrator calls appList.enterInsertMode(), which
+// transfers focus to the internal search field.
+//
+// Properties out:
+//   selectedApp     — { _filePath, name, exec, comment, terminal, icon } or null
+//   mode            — "insert" | "normal" | "actions"
+//   hintText        — footer hint for the current state
+//   filteredCount   — number of visible apps
+//
+// Signals:
+//   launchRequested(string exec, bool terminal, int workspace)
+//   closeRequested()
+//   searchEscapePressed()   — Esc in insert mode; orchestrator reclaims focus
+//
+// handleKey(event) → bool
+//   Processes normal / actions mode key events. Returns false for '?' so it
+//   propagates to the orchestrator's help handler.
+//
+// handleIpcKey(k) → bool
+//   IPC entry point.
+import QtQuick
+import Quickshell.Io
+import "./lib"
+
+Item {
+    id: appList
+
+    NixConfig  { id: cfg }
+    NixBins    { id: bin }
+    FuzzyScore { id: fuzzy }
+
+    // ── Private state ─────────────────────────────────────────────────────────
+    property var    _allApps:       []
+    property var    _filteredApps:  []
+    property string _mode:          "insert"  // "insert" | "normal" | "actions"
+    property bool   _pendingG:      false
+    property var    _actions:       []        // [{ name, exec }]
+    property var    _appBuf:        []        // scratch buffer for listProcess
+
+    // ── Properties out ────────────────────────────────────────────────────────
+    readonly property var selectedApp: {
+        const idx = list.currentIndex
+        const apps = _filteredApps
+        return (idx >= 0 && idx < apps.length) ? apps[idx] : null
+    }
+    readonly property string mode: _mode
+    readonly property string modeText: _mode === "normal" ? "NOR" : _mode === "actions" ? "ACT" : ""
+    readonly property string hintText: {
+        if (_mode === "actions")
+            return "j/k navigate  \u00b7  Enter launch action  \u00b7  h / Esc back  \u00b7  ? help"
+        if (_mode === "normal")
+            return "j/k navigate  \u00b7  Enter launch  \u00b7  l / Tab actions  \u00b7  Ctrl+1\u20139 workspace  \u00b7  / search  \u00b7  ? help  \u00b7  Esc close"
+        return "Esc  normal mode  \u00b7  ? help"
+    }
+    readonly property int filteredCount: _filteredApps.length
+
+    // ── Signals ───────────────────────────────────────────────────────────────
+    signal launchRequested(string exec, bool terminal, int workspace)
+    signal closeRequested()
+    signal searchEscapePressed()
+    signal flashRequested(int idx)
+
+    // ── Public API ────────────────────────────────────────────────────────────
+    function reset() {
+        _mode     = "insert"
+        _pendingG = false
+        _actions  = []
+        _appBuf   = []
+        searchField.text = ""
+        list.currentIndex = 0
+        actionList.currentIndex = 0
+        searchDebounce.stop()
+        gTimer.stop()
+    }
+
+    function load() {
+        _allApps      = []
+        _filteredApps = []
+        listProcess.running = true
+    }
+
+    function enterInsertMode() {
+        _mode = "insert"
+        searchField.forceActiveFocus()
+    }
+
+    function enterNormalMode() {
+        _mode = "normal"
+        _pendingG = false
+    }
+
+    // Returns false if no actions; orchestrator does nothing extra.
+    function typeText(text) {
+        if (_mode !== "insert") enterInsertMode()
+        searchField.text += text
+        searchDebounce.stop()
+        _runFilter()
+    }
+
+    function enterActionsMode() {
+        const app = selectedApp
+        if (!app) return false
+        _actions = []
+        actionsProcess.command = [bin.scanActions, app._filePath]
+        actionsProcess.running = true
+        return true
+    }
+
+    function flash(idx) { flashRequested(idx) }
+
+    // ── Navigation ────────────────────────────────────────────────────────────
+    function navUp() {
+        if (_mode === "actions") { if (actionList.currentIndex > 0) actionList.currentIndex-- }
+        else if (list.currentIndex > 0) list.currentIndex--
+    }
+    function navDown() {
+        if (_mode === "actions") { if (actionList.currentIndex < actionList.count - 1) actionList.currentIndex++ }
+        else if (list.currentIndex < list.count - 1) list.currentIndex++
+    }
+    function navTop() {
+        if (_mode === "actions") actionList.currentIndex = 0
+        else list.currentIndex = 0
+    }
+    function navBottom() {
+        if (_mode === "actions") actionList.currentIndex = Math.max(0, actionList.count - 1)
+        else list.currentIndex = Math.max(0, list.count - 1)
+    }
+    function navHalfDown() {
+        const step = Math.max(1, Math.floor(list.height / 48 / 2))
+        if (_mode === "actions") actionList.currentIndex = Math.min(actionList.count - 1, actionList.currentIndex + step)
+        else list.currentIndex = Math.min(list.count - 1, list.currentIndex + step)
+    }
+    function navHalfUp() {
+        const step = Math.max(1, Math.floor(list.height / 48 / 2))
+        if (_mode === "actions") actionList.currentIndex = Math.max(0, actionList.currentIndex - step)
+        else list.currentIndex = Math.max(0, list.currentIndex - step)
+    }
+
+    // ── Launch helpers ────────────────────────────────────────────────────────
+    function _launchApp(workspace) {
+        const app = selectedApp
+        if (!app) return
+        const terminal = (app.terminal === "true" || app.terminal === "True")
+        flash(list.currentIndex)
+        launchRequested(app.exec.trim(), terminal, workspace)
+    }
+
+    function _launchAction(workspace) {
+        const idx = actionList.currentIndex
+        if (idx < 0 || idx >= _actions.length) return
+        const action = _actions[idx]
+        flash(actionList.currentIndex)
+        launchRequested(action.exec.trim(), false, workspace)
+    }
+
+    // ── Key handlers ──────────────────────────────────────────────────────────
+    function handleKey(event) {
+        if (event.key === Qt.Key_Shift || event.key === Qt.Key_Control ||
+            event.key === Qt.Key_Alt   || event.key === Qt.Key_Meta) return false
+        if (_mode === "actions") return _handleActionsKey(event)
+        if (_mode === "normal")  return _handleNormalKey(event)
+        return false
+    }
+
+    function handleIpcKey(k) {
+        const lk = k.toLowerCase()
+        if (lk === "escape" || lk === "esc") {
+            if (_mode === "actions") { enterNormalMode(); return true }
+            if (_mode !== "normal")  { enterNormalMode(); return true }
+            closeRequested(); return true
+        }
+        if (lk === "enter" || lk === "return") {
+            if (_mode === "actions") { _launchAction(0); return true }
+            _launchApp(0); return true
+        }
+        return false
+    }
+
+    function _handleNormalKey(event) {
+        if (event.text === "?") return false   // propagate → orchestrator opens help
+        if (event.key === Qt.Key_Escape || event.text === "q") {
+            closeRequested(); return true
+        }
+        if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+            _launchApp(0); return true
+        }
+        if (event.key === Qt.Key_J || event.key === Qt.Key_Down) {
+            navDown(); return true
+        }
+        if (event.key === Qt.Key_K || event.key === Qt.Key_Up) {
+            navUp(); return true
+        }
+        if (event.key === Qt.Key_G && (event.modifiers & Qt.ShiftModifier)) {
+            navBottom(); return true
+        }
+        if (event.key === Qt.Key_G) {
+            if (_pendingG) { gTimer.stop(); navTop(); _pendingG = false }
+            else           { _pendingG = true; gTimer.restart() }
+            return true
+        }
+        if (event.key === Qt.Key_D && (event.modifiers & Qt.ControlModifier)) {
+            navHalfDown(); return true
+        }
+        if (event.key === Qt.Key_U && (event.modifiers & Qt.ControlModifier)) {
+            navHalfUp(); return true
+        }
+        if (event.key === Qt.Key_Tab || event.text === "l") {
+            enterActionsMode(); return true
+        }
+        if (event.key === Qt.Key_Slash) {
+            enterInsertMode(); return true
+        }
+        // Ctrl+1–9: launch on workspace N
+        if (event.modifiers & Qt.ControlModifier) {
+            const n = event.key - Qt.Key_1 + 1
+            if (n >= 1 && n <= 9) { _launchApp(n); return true }
+        }
+        return false
+    }
+
+    function _handleActionsKey(event) {
+        if (event.text === "?") return false
+        if (event.key === Qt.Key_Escape || event.text === "h" || event.text === "q") {
+            enterNormalMode(); return true
+        }
+        if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+            _launchAction(0); return true
+        }
+        if (event.key === Qt.Key_J || event.key === Qt.Key_Down) {
+            navDown(); return true
+        }
+        if (event.key === Qt.Key_K || event.key === Qt.Key_Up) {
+            navUp(); return true
+        }
+        if (event.key === Qt.Key_G && (event.modifiers & Qt.ShiftModifier)) {
+            navBottom(); return true
+        }
+        if (event.key === Qt.Key_G) {
+            if (_pendingG) { gTimer.stop(); navTop(); _pendingG = false }
+            else           { _pendingG = true; gTimer.restart() }
+            return true
+        }
+        if (event.key === Qt.Key_D && (event.modifiers & Qt.ControlModifier)) {
+            navHalfDown(); return true
+        }
+        if (event.key === Qt.Key_U && (event.modifiers & Qt.ControlModifier)) {
+            navHalfUp(); return true
+        }
+        // Ctrl+1–9: launch action on workspace N
+        if (event.modifiers & Qt.ControlModifier) {
+            const n = event.key - Qt.Key_1 + 1
+            if (n >= 1 && n <= 9) { _launchAction(n); return true }
+        }
+        return false
+    }
+
+    // ── Filtering ─────────────────────────────────────────────────────────────
+    // Supports: fuzzy (default), ' exact, ^ prefix, $ suffix, ! negation.
+    // Space-separated tokens combine with AND.
+    function _runFilter() {
+        const q = searchField.text.trim().toLowerCase()
+        if (!q) {
+            _filteredApps = _allApps.slice()
+            list.currentIndex = 0
+            return
+        }
+
+        const tokens = q.split(/\s+/).filter(t => t.length > 0)
+        const scored = []
+
+        for (const app of _allApps) {
+            const nameLow = app.name.toLowerCase()
+            const haystack = nameLow + " " + app.comment.toLowerCase()
+            let totalScore = 0
+            let matched = true
+
+            for (const token of tokens) {
+                if (token.startsWith("!")) {
+                    const neg = token.slice(1)
+                    if (!neg) continue
+                    const negScore = token.startsWith("!'")
+                        ? haystack.includes(neg.slice(1))
+                        : fuzzy.fuzzyScore(neg, haystack) >= 0
+                    if (negScore) { matched = false; break }
+                } else if (token.startsWith("'")) {
+                    const needle = token.slice(1)
+                    if (!needle) continue
+                    if (!haystack.includes(needle)) { matched = false; break }
+                } else if (token.startsWith("^")) {
+                    const needle = token.slice(1)
+                    if (!needle) continue
+                    if (!nameLow.startsWith(needle)) { matched = false; break }
+                } else if (token.startsWith("$")) {
+                    const needle = token.slice(1)
+                    if (!needle) continue
+                    if (!nameLow.endsWith(needle)) { matched = false; break }
+                } else {
+                    const score = fuzzy.fuzzyScore(token, haystack)
+                    if (score < 0) { matched = false; break }
+                    totalScore += score
+                }
+            }
+
+            if (matched) scored.push({ app, score: totalScore })
+        }
+
+        scored.sort((a, b) => b.score - a.score)
+        _filteredApps = scored.map(s => s.app)
+        list.currentIndex = 0
+    }
+
+    // ── Processes ─────────────────────────────────────────────────────────────
+    Process {
+        id: listProcess
+        command: [bin.scanApps]
+        stdout: SplitParser {
+            onRead: (line) => { if (line !== "") appList._appBuf.push(line) }
+        }
+        onExited: {
+            const apps = []
+            for (const line of appList._appBuf) {
+                const parts = line.split("\t")
+                if (parts.length < 2) continue
+                apps.push({
+                    _filePath: parts[0] || "",
+                    name:      parts[1] || "",
+                    exec:      parts[2] || "",
+                    comment:   parts[3] || "",
+                    terminal:  parts[4] || "false",
+                    icon:      parts[5] || ""
+                })
+            }
+            appList._allApps = apps
+            appList._appBuf  = []
+            appList._runFilter()
+            if (appList._mode === "insert") searchField.forceActiveFocus()
+        }
+    }
+
+    property var _actionsBuf: []
+
+    Process {
+        id: actionsProcess
+        stdout: SplitParser {
+            onRead: (line) => {
+                if (line === "") return
+                const tab = line.indexOf("\t")
+                if (tab < 0) return
+                appList._actionsBuf.push({ name: line.substring(0, tab), exec: line.substring(tab + 1) })
+            }
+        }
+        onExited: {
+            appList._actions = appList._actionsBuf.slice()
+            appList._actionsBuf = []
+            if (appList._actions.length > 0) {
+                appList._mode = "actions"
+                actionList.currentIndex = 0
+            }
+        }
+    }
+
+    Timer {
+        id: searchDebounce
+        interval: 80
+        repeat: false
+        onTriggered: appList._runFilter()
+    }
+
+    Timer {
+        id: gTimer
+        interval: 300
+        repeat: false
+        onTriggered: appList._pendingG = false
+    }
+
+    // ── UI ────────────────────────────────────────────────────────────────────
+    Column {
+        anchors.fill: parent
+        anchors.margins: 8
+        spacing: 4
+
+        // Search bar ──────────────────────────────────────────────────────────
+        Rectangle {
+            id: searchBox
+            width: parent.width
+            height: 44
+            color: cfg.color.base01
+            radius: 8
+
+            Rectangle {
+                id: modeTag
+                anchors.left: parent.left
+                anchors.leftMargin: 10
+                anchors.verticalCenter: parent.verticalCenter
+                visible: appList._mode !== "insert"
+                width: modeLabel.implicitWidth + 12
+                height: 22
+                radius: 4
+                color: appList._mode === "actions" ? cfg.color.base0B + "33" : cfg.color.base02
+
+                Text {
+                    id: modeLabel
+                    anchors.centerIn: parent
+                    text: appList.modeText
+                    color: appList._mode === "actions" ? cfg.color.base0B : cfg.color.base0D
+                    font.family: cfg.fontFamily
+                    font.pixelSize: cfg.fontSize - 3
+                    font.bold: true
+                }
+            }
+
+            TextInput {
+                id: searchField
+                anchors.fill: parent
+                anchors.leftMargin: appList._mode !== "insert" ? modeTag.width + 18 : 14
+                anchors.rightMargin: 14
+                color: cfg.color.base05
+                font.family: cfg.fontFamily
+                font.pixelSize: cfg.fontSize
+                clip: true
+                verticalAlignment: TextInput.AlignVCenter
+                readOnly: appList._mode !== "insert"
+
+                Text {
+                    anchors.fill: parent
+                    visible: !searchField.text && appList._mode === "insert"
+                    text: "Search applications..."
+                    color: cfg.color.base03
+                    font.family: cfg.fontFamily
+                    font.pixelSize: cfg.fontSize
+                    verticalAlignment: Text.AlignVCenter
+                }
+
+                // Actions mode: show selected app name in the bar
+                Text {
+                    anchors.fill: parent
+                    anchors.leftMargin: 0
+                    visible: appList._mode === "actions" && appList.selectedApp !== null
+                    text: appList.selectedApp ? "Actions \u2014 " + appList.selectedApp.name : ""
+                    color: cfg.color.base04
+                    font.family: cfg.fontFamily
+                    font.pixelSize: cfg.fontSize
+                    verticalAlignment: Text.AlignVCenter
+                    elide: Text.ElideRight
+                }
+
+                onTextChanged: { list.currentIndex = 0; searchDebounce.restart() }
+
+                Keys.onEscapePressed: {
+                    appList._mode = "normal"
+                    appList.searchEscapePressed()
+                }
+
+                Keys.onReturnPressed: {
+                    appList._mode = "normal"
+                    appList.searchEscapePressed()
+                }
+
+                Keys.onPressed: (event) => {
+                    if (!(event.modifiers & Qt.ControlModifier)) return
+                    const pos = searchField.cursorPosition
+                    const len = searchField.text.length
+                    if (event.key === Qt.Key_A) {
+                        searchField.cursorPosition = 0
+                    } else if (event.key === Qt.Key_E) {
+                        searchField.cursorPosition = len
+                    } else if (event.key === Qt.Key_F) {
+                        searchField.cursorPosition = Math.min(len, pos + 1)
+                    } else if (event.key === Qt.Key_B) {
+                        searchField.cursorPosition = Math.max(0, pos - 1)
+                    } else if (event.key === Qt.Key_D) {
+                        if (pos < len) searchField.remove(pos, pos + 1)
+                    } else if (event.key === Qt.Key_K) {
+                        if (pos < len) searchField.remove(pos, len)
+                    } else if (event.key === Qt.Key_W) {
+                        let i = pos
+                        while (i > 0 && searchField.text[i - 1] === " ") i--
+                        while (i > 0 && searchField.text[i - 1] !== " ") i--
+                        if (i !== pos) searchField.remove(i, pos)
+                    } else if (event.key === Qt.Key_U) {
+                        if (pos > 0) searchField.remove(0, pos)
+                    } else {
+                        return
+                    }
+                    event.accepted = true
+                }
+            }
+        }
+
+        // App list ────────────────────────────────────────────────────────────
+        ListView {
+            id: list
+            width: parent.width
+            height: parent.height - searchBox.height - parent.spacing
+            clip: true
+            currentIndex: 0
+            model: appList._filteredApps
+            visible: appList._mode !== "actions"
+            highlightMoveDuration: 0
+
+            onCountChanged: if (count > 0 && currentIndex < 0) currentIndex = 0
+
+            Text {
+                anchors.centerIn: parent
+                visible: list.count === 0 && appList._mode !== "actions"
+                text: appList._allApps.length === 0 ? "Loading..." : "No results"
+                color: cfg.color.base03
+                font.family: cfg.fontFamily
+                font.pixelSize: cfg.fontSize
+            }
+
+            delegate: Item {
+                id: appDelegate
+                required property var modelData
+                required property int index
+                width: list.width
+                height: modelData.comment !== "" ? 52 : 40
+
+                readonly property bool isCurrent: list.currentIndex === index
+
+                Rectangle {
+                    anchors.fill: parent
+                    anchors.margins: 2
+                    color: appDelegate.isCurrent ? cfg.color.base02 : "transparent"
+                    radius: 6
+
+                    Column {
+                        anchors.verticalCenter: parent.verticalCenter
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.leftMargin: 14
+                        anchors.rightMargin: 12
+                        spacing: 1
+
+                        Text {
+                            text: modelData.name
+                            color: cfg.color.base05
+                            font.family: cfg.fontFamily
+                            font.pixelSize: cfg.fontSize
+                            elide: Text.ElideRight
+                            width: parent.width
+                        }
+
+                        Text {
+                            visible: modelData.comment !== ""
+                            text: modelData.comment
+                            color: cfg.color.base03
+                            font.family: cfg.fontFamily
+                            font.pixelSize: cfg.fontSize - 2
+                            elide: Text.ElideRight
+                            width: parent.width
+                        }
+                    }
+
+                    Rectangle {
+                        id: flashOverlay
+                        anchors.fill: parent
+                        radius: 6
+                        color: cfg.color.base0B
+                        opacity: 0
+                        SequentialAnimation {
+                            id: blinkAnim
+                            NumberAnimation {
+                                target: flashOverlay; property: "opacity"
+                                to: 0.55; duration: 60; easing.type: Easing.OutQuad
+                            }
+                            NumberAnimation {
+                                target: flashOverlay; property: "opacity"
+                                to: 0; duration: 140; easing.type: Easing.InQuad
+                            }
+                        }
+                    }
+
+                    Connections {
+                        target: appList
+                        function onFlashRequested(idx) {
+                            if (appList._mode !== "actions" && idx === appDelegate.index)
+                                blinkAnim.restart()
+                        }
+                    }
+                }
+            }
+        }
+
+        // Actions list ────────────────────────────────────────────────────────
+        ListView {
+            id: actionList
+            width: parent.width
+            height: parent.height - searchBox.height - parent.spacing
+            clip: true
+            currentIndex: 0
+            model: appList._actions
+            visible: appList._mode === "actions"
+            highlightMoveDuration: 0
+
+            onCountChanged: if (count > 0 && currentIndex < 0) currentIndex = 0
+
+            delegate: Item {
+                id: actionDelegate
+                required property var modelData
+                required property int index
+                width: actionList.width
+                height: 40
+
+                readonly property bool isCurrent: actionList.currentIndex === index
+
+                Rectangle {
+                    anchors.fill: parent
+                    anchors.margins: 2
+                    color: actionDelegate.isCurrent ? cfg.color.base02 : "transparent"
+                    radius: 6
+
+                    Text {
+                        anchors.fill: parent
+                        anchors.leftMargin: 14
+                        anchors.rightMargin: 12
+                        text: modelData.name
+                        color: cfg.color.base05
+                        font.family: cfg.fontFamily
+                        font.pixelSize: cfg.fontSize
+                        verticalAlignment: Text.AlignVCenter
+                        elide: Text.ElideRight
+                    }
+
+                    Rectangle {
+                        id: actionFlash
+                        anchors.fill: parent
+                        radius: 6
+                        color: cfg.color.base0B
+                        opacity: 0
+                        SequentialAnimation {
+                            id: actionBlinkAnim
+                            NumberAnimation {
+                                target: actionFlash; property: "opacity"
+                                to: 0.55; duration: 60; easing.type: Easing.OutQuad
+                            }
+                            NumberAnimation {
+                                target: actionFlash; property: "opacity"
+                                to: 0; duration: 140; easing.type: Easing.InQuad
+                            }
+                        }
+                    }
+
+                    Connections {
+                        target: appList
+                        function onFlashRequested(idx) {
+                            if (appList._mode === "actions" && idx === actionDelegate.index)
+                                actionBlinkAnim.restart()
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
