@@ -69,7 +69,7 @@ Item {
         if (_mode === "visual")
             return "j/k  select  \u00b7  v / Esc  normal mode"
         if (_mode === "normal")
-            return "j/k navigate  \u00b7  v visual  \u00b7  y copy  \u00b7  Tab detail  \u00b7  / search  \u00b7  ? help  \u00b7  Esc close"
+            return "j/k navigate  \u00b7  v visual  \u00b7  y copy  \u00b7  d delete  \u00b7  Tab detail  \u00b7  / search  \u00b7  ? help  \u00b7  Esc close"
         return "Esc  normal mode  \u00b7  ?  help"
     }
 
@@ -127,6 +127,45 @@ Item {
     // Trigger the blink animation on the delegate at `idx`.
     function flash(idx) { flashRequested(idx) }
 
+    // Delete the currently selected entry from cliphist and local state.
+    function _deleteSelected() {
+        const rawLine = selectedEntry
+        if (rawLine === "") return
+        const curIdx = list.currentIndex
+
+        deleteProcess.command = [
+            bin.bash, "-c",
+            "printf '%s\\n' \"$1\" | " + bin.cliphist + " delete",
+            "--", rawLine
+        ]
+        deleteProcess.running = true
+
+        const tab = rawLine.indexOf("\t")
+        const id  = tab >= 0 ? rawLine.substring(0, tab) : rawLine
+        const pi  = _processedIdx[id]
+        if (pi !== undefined) {
+            const newAll  = allEntries.slice()
+            const newProc = _processed.slice()
+            newAll.splice(pi, 1)
+            newProc.splice(pi, 1)
+            allEntries  = newAll
+            _processed  = newProc
+            const newIdx = {}
+            for (let i = 0; i < newProc.length; i++) {
+                const l   = newProc[i].line
+                const t   = l.indexOf("\t")
+                const eid = t >= 0 ? l.substring(0, t) : l
+                newIdx[eid] = i
+            }
+            _processedIdx = newIdx
+        }
+
+        _runFilter()
+
+        const newLen = filteredEntries.length
+        if (curIdx >= newLen && newLen > 0) list.currentIndex = newLen - 1
+    }
+
     // Append `text` to the search field (IPC use only — not for key events).
     function typeText(text) {
         if (_mode === "insert") {
@@ -173,6 +212,7 @@ Item {
             if (selectedEntry !== "") { flash(selectedIndex); yankEntryRequested(selectedEntry) }
             return true
         }
+        if (lk === "d") { _deleteSelected(); return true }
         if (lk === "tab") { openDetail(); return true }
         return false
     }
@@ -213,6 +253,9 @@ Item {
         }
         if (event.key === Qt.Key_D && (event.modifiers & Qt.ControlModifier)) {
             navHalfDown(); return true
+        }
+        if (event.key === Qt.Key_D) {
+            _deleteSelected(); return true
         }
         if (event.key === Qt.Key_U && (event.modifiers & Qt.ControlModifier)) {
             navHalfUp(); return true
@@ -342,6 +385,8 @@ Item {
         repeat: false
         onTriggered: clipList._pendingG = false
     }
+
+    Process { id: deleteProcess }
 
     // ── UI ────────────────────────────────────────────────────────────────────
     Column {

@@ -319,6 +319,7 @@ ShellRoot {
                         { key: "Ctrl+D",     desc: "half-page down" },
                         { key: "Ctrl+U",     desc: "half-page up" },
                         { key: "y",          desc: "copy to clipboard" },
+                        { key: "d",          desc: "delete entry" },
                         { key: "v",          desc: "visual select mode" },
                         { key: "Tab",        desc: "focus detail pane" },
                         { key: "Enter",      desc: "fullscreen detail" },

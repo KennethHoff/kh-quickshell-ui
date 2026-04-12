@@ -36,7 +36,7 @@ list of clipboard entries from `cliphist`. SUPER+V toggles it via IPC.
 - ⬜ Timestamp on entries
 - ⬜ Source app attribution — record active Hyprland window (`hyprctl activewindow`) at copy time, stored in a side-store alongside the cliphist entry (needs a storage solution that doesn't corrupt binary clipboard data)
 - ⬜ Auto-paste — close the window and simulate Ctrl+V into the previously focused app via `wtype`
-- ⬜ Delete from UI — remove individual entries via Delete key, delegating to `cliphist delete`
+- ✅ Delete from UI — `d` in normal mode removes the selected entry via `cliphist delete` and splices it from local state immediately
 - ⬜ Pinned entries — star entries to keep them permanently at the top, surviving clipboard history rotation
 
 ---
