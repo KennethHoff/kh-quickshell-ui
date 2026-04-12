@@ -131,7 +131,13 @@
             app=$1; shift
             case "$app" in
               kh-cliphist) config=${cliphistConfig}; target=viewer   ;;
-              kh-view)     config=${viewConfig};     target=""        ;;
+              kh-view)     config=${viewConfig};     target=""
+                # Build the list file from KH_VIEW_FILE (or KH_VIEW_LIST if already set)
+                if [[ -z "''${KH_VIEW_LIST:-}" && -n "''${KH_VIEW_FILE:-}" ]]; then
+                  _kv_list=$(mktemp); printf '%s\n' "$KH_VIEW_FILE" > "$_kv_list"
+                  export KH_VIEW_LIST="$_kv_list"
+                fi
+                ;;
               *) echo "usage: screenshot [--run <dir>] <app> <name> [<ipc-call>...] [-- <name> [<ipc-call>...]]..." >&2; exit 1 ;;
             esac
             qs=${lib.getExe' pkgs.quickshell "quickshell"}
@@ -213,20 +219,23 @@
         };
         kh-view = {
           type = "app";
-          # Usage: nix run .#kh-view -- <file> [<file2>]
+          # Usage: nix run .#kh-view -- <file> [<file2> ...]
           #        <cmd> | nix run .#kh-view
           program = toString (pkgs.writeShellScript "run-kh-view" ''
             set -e
             qs=${lib.getExe' pkgs.quickshell "quickshell"}
+            list=$(mktemp)
+            trap 'rm -f "$list"' EXIT
             if [[ $# -ge 1 ]]; then
-              export KH_VIEW_FILE="$1"
-              [[ $# -ge 2 ]] && export KH_VIEW_FILE2="$2"
+              for f in "$@"; do printf '%s\n' "$f" >> "$list"; done
+              export KH_VIEW_LIST="$list"
               exec "$qs" -p ${viewConfig}
             else
               tmp=$(mktemp)
               trap 'rm -f "$tmp"' EXIT
               cat > "$tmp"
-              export KH_VIEW_FILE="$tmp"
+              printf '%s\n' "$tmp" >> "$list"
+              export KH_VIEW_LIST="$list"
               "$qs" -p ${viewConfig}
             fi
           '');
