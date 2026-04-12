@@ -121,8 +121,6 @@ Item {
                 const tab = line.indexOf("\t")
                 if (tab > 0)
                     v[line.substring(0, tab)] = line.substring(tab + 1)
-                else if (line.length > 0)
-                    v[line] = "1"  // legacy key-only format (old pins file)
             }
             store.values = v
             store._buf   = []
