@@ -18,10 +18,14 @@ ShellRoot {
     FuzzyScore    { id: fuzzy }
     SearchParser  { id: searchParser }
     CliphistEntry { id: clipEntry }
+    HelpFilter    { id: helpFilter }
 
     // ── State ────────────────────────────────────────────────────────────────
     property bool   showing: false
-    property string mode: "insert"   // "insert" | "normal"
+    property string mode: "insert"      // "insert" | "normal"
+    property string view: "list"        // "list" | "help"
+    property string helpText: ""        // help filter text
+    property bool   _helpFiltering: false
     property var    allEntries: []
     property var    filteredEntries: []
     property var    _buf: []
@@ -80,6 +84,21 @@ ShellRoot {
     function enterNormalMode() {
         root.mode = "normal"
         normalModeHandler.forceActiveFocus()
+    }
+
+    function openHelp() {
+        root.view = "help"
+        root._helpFiltering = false
+        root.helpText = ""
+        normalModeHandler.forceActiveFocus()
+    }
+
+    function closeHelp() {
+        root.view = "list"
+        root._helpFiltering = false
+        root.helpText = ""
+        if (root.mode === "insert") root.enterInsertMode()
+        else normalModeHandler.forceActiveFocus()
     }
 
     function navUp()       { if (resultList.currentIndex > 0) resultList.currentIndex-- }
@@ -178,6 +197,11 @@ ShellRoot {
             else if (m === "normal") root.enterNormalMode()
         }
 
+        function setView(v: string) {
+            if (v === "help") root.openHelp()
+            else if (v === "list") root.closeHelp()
+        }
+
         function nav(dir: string) {
             if      (dir === "up")        root.navUp()
             else if (dir === "down")      root.navDown()
@@ -189,19 +213,35 @@ ShellRoot {
 
         function key(k: string) {
             const lk = k.toLowerCase()
-            if (lk === "escape" || lk === "esc") {
-                if (root.mode === "insert") root.enterNormalMode()
-                else root.showing = false
+            if (lk === "?") {
+                root.view === "help" ? root.closeHelp() : root.openHelp()
+            } else if (lk === "/" && root.view === "help") {
+                root._helpFiltering = true
+                root.helpText = ""
+            } else if (lk === "escape" || lk === "esc") {
+                if (root.view === "help") {
+                    if (root.helpText) { root.helpText = ""; root._helpFiltering = false }
+                    else root.closeHelp()
+                } else if (root.mode === "insert") {
+                    root.enterNormalMode()
+                } else {
+                    root.showing = false
+                }
             } else if (lk === "enter" || lk === "return") {
-                if (root.selectedEntry !== "") root.paste(root.selectedEntry)
+                if (root.view === "list" && root.selectedEntry !== "") root.paste(root.selectedEntry)
             }
         }
 
         function type(text: string) {
-            if (root.mode !== "insert") root.enterInsertMode()
-            searchField.text += text
-            searchDebounce.stop()
-            root._runFilter()
+            if (root.view === "help") {
+                root._helpFiltering = true
+                root.helpText += text
+            } else {
+                if (root.mode !== "insert") root.enterInsertMode()
+                searchField.text += text
+                searchDebounce.stop()
+                root._runFilter()
+            }
         }
     }
 
@@ -218,11 +258,14 @@ ShellRoot {
 
         onVisibleChanged: {
             if (visible) {
-                root.allEntries     = []
+                root.allEntries      = []
                 root.filteredEntries = []
-                root._buf           = []
-                root._processed     = []
-                root._processedIdx  = {}
+                root._buf            = []
+                root._processed      = []
+                root._processedIdx   = {}
+                root.view            = "list"
+                root._helpFiltering  = false
+                root.helpText        = ""
                 searchDebounce.stop()
                 fullTextDecodeProcess.running = false
                 searchField.text = ""
@@ -262,8 +305,43 @@ ShellRoot {
                     if (event.key === Qt.Key_Shift || event.key === Qt.Key_Control ||
                         event.key === Qt.Key_Alt   || event.key === Qt.Key_Meta) return
 
+                    // ── Help view ─────────────────────────────────────────────
+                    if (root.view === "help") {
+                        if (root._helpFiltering) {
+                            if (event.key === Qt.Key_Escape) {
+                                root.helpText = ""
+                                root._helpFiltering = false
+                            } else if (event.key === Qt.Key_Backspace) {
+                                root.helpText = helpFilter.applyBackspace(root.helpText)
+                            } else if (event.key === Qt.Key_W && (event.modifiers & Qt.ControlModifier)) {
+                                root.helpText = helpFilter.applyCtrlW(root.helpText)
+                            } else if (event.key === Qt.Key_U && (event.modifiers & Qt.ControlModifier)) {
+                                root.helpText = ""
+                            } else if (event.text && event.text.length === 1 &&
+                                       event.text.charCodeAt(0) >= 32) {
+                                root.helpText += event.text
+                            } else {
+                                return
+                            }
+                        } else {
+                            if (event.key === Qt.Key_Escape || event.text === "?") {
+                                root.closeHelp()
+                            } else if (event.key === Qt.Key_Slash) {
+                                root._helpFiltering = true
+                                root.helpText = ""
+                            } else {
+                                return
+                            }
+                        }
+                        event.accepted = true
+                        return
+                    }
+
+                    // ── List view ─────────────────────────────────────────────
                     if (event.key === Qt.Key_Escape) {
                         root.showing = false
+                    } else if (event.text === "?") {
+                        root.openHelp()
                     } else if (event.key === Qt.Key_J || event.key === Qt.Key_Down) {
                         root.navDown()
                     } else if (event.key === Qt.Key_K || event.key === Qt.Key_Up) {
@@ -317,7 +395,7 @@ ShellRoot {
                         anchors.left: parent.left
                         anchors.leftMargin: 10
                         anchors.verticalCenter: parent.verticalCenter
-                        visible: root.mode === "normal"
+                        visible: root.mode === "normal" || root.view === "help"
                         width: modeLabel.implicitWidth + 12
                         height: 22
                         radius: 4
@@ -326,7 +404,7 @@ ShellRoot {
                         Text {
                             id: modeLabel
                             anchors.centerIn: parent
-                            text: "NOR"
+                            text: root.view === "help" ? "HLP" : "NOR"
                             color: cfg.color.base0D
                             font.family: cfg.fontFamily
                             font.pixelSize: cfg.fontSize - 3
@@ -337,18 +415,19 @@ ShellRoot {
                     TextInput {
                         id: searchField
                         anchors.fill: parent
-                        anchors.leftMargin: root.mode === "normal" ? modeTag.width + 18 : 14
+                        anchors.leftMargin: (root.mode === "normal" || root.view === "help")
+                                            ? modeTag.width + 18 : 14
                         anchors.rightMargin: 14
-                        color: cfg.color.base05
+                        color: root.view === "help" ? "transparent" : cfg.color.base05
                         font.family: cfg.fontFamily
                         font.pixelSize: cfg.fontSize
                         clip: true
                         verticalAlignment: TextInput.AlignVCenter
-                        readOnly: root.mode === "normal"
+                        readOnly: root.mode === "normal" || root.view === "help"
 
                         Text {
                             anchors.fill: parent
-                            visible: !searchField.text
+                            visible: !searchField.text && root.view === "list"
                             text: "Search clipboard..."
                             color: cfg.color.base03
                             font.family: cfg.fontFamily
@@ -356,11 +435,31 @@ ShellRoot {
                             verticalAlignment: Text.AlignVCenter
                         }
 
+                        // Help view: show filter text or prompt
+                        Text {
+                            anchors.fill: parent
+                            visible: root.view === "help"
+                            text: root._helpFiltering
+                                  ? (root.helpText || "")
+                                  : "/ to filter"
+                            color: (root._helpFiltering && root.helpText)
+                                   ? cfg.color.base05 : cfg.color.base03
+                            font.family: cfg.fontFamily
+                            font.pixelSize: cfg.fontSize
+                            verticalAlignment: Text.AlignVCenter
+                            clip: true
+                        }
+
                         onTextChanged: { resultList.currentIndex = 0; searchDebounce.restart() }
 
                         Keys.onEscapePressed: root.enterNormalMode()
 
                         Keys.onPressed: (event) => {
+                            if (event.text === "?") {
+                                root.openHelp()
+                                event.accepted = true
+                                return
+                            }
                             if (!(event.modifiers & Qt.ControlModifier)) return
                             const pos = searchField.cursorPosition
                             const len = searchField.text.length
@@ -394,6 +493,7 @@ ShellRoot {
                 // Entry list ──────────────────────────────────────────────────
                 ListView {
                     id: resultList
+                    visible: root.view === "list"
                     width: parent.width
                     height: panel.height - searchBox.height - footer.height
                             - column.spacing * 2 - 16
@@ -487,6 +587,97 @@ ShellRoot {
                     }
                 }
 
+                // Help overlay ────────────────────────────────────────────────
+                Flickable {
+                    id: helpContent
+                    visible: root.view === "help"
+                    width: parent.width
+                    height: panel.height - searchBox.height - footer.height
+                            - column.spacing * 2 - 16
+                    contentWidth: width
+                    contentHeight: helpCol.height
+                    clip: true
+
+                    Column {
+                        id: helpCol
+                        width: parent.width
+                        spacing: 0
+
+                        component SectionLabel: Text {
+                            required property string label
+                            width: helpCol.width
+                            leftPadding: 16
+                            topPadding: 14
+                            bottomPadding: 6
+                            text: label
+                            color: cfg.color.base03
+                            font.family: cfg.fontFamily
+                            font.pixelSize: cfg.fontSize - 3
+                            font.bold: true
+                        }
+
+                        component ShortcutRow: Item {
+                            id: shortcutRow
+                            required property string keys
+                            required property string action
+                            visible: helpFilter.rowMatches(root.helpText, keys, action)
+                            width: helpCol.width
+                            height: 32
+
+                            Text {
+                                x: 16; width: 130
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: shortcutRow.keys
+                                color: cfg.color.base0D
+                                font.family: cfg.fontFamily
+                                font.pixelSize: cfg.fontSize
+                            }
+                            Text {
+                                x: 154
+                                anchors.right: parent.right
+                                anchors.rightMargin: 16
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: shortcutRow.action
+                                color: cfg.color.base05
+                                font.family: cfg.fontFamily
+                                font.pixelSize: cfg.fontSize
+                                elide: Text.ElideRight
+                            }
+                        }
+
+                        SectionLabel { label: "INSERT MODE" }
+                        ShortcutRow  { keys: "Esc";    action: "normal mode" }
+                        ShortcutRow  { keys: "?";      action: "open help" }
+                        ShortcutRow  { keys: "Ctrl+A"; action: "cursor to start" }
+                        ShortcutRow  { keys: "Ctrl+E"; action: "cursor to end" }
+                        ShortcutRow  { keys: "Ctrl+F"; action: "cursor forward" }
+                        ShortcutRow  { keys: "Ctrl+B"; action: "cursor back" }
+                        ShortcutRow  { keys: "Ctrl+D"; action: "delete char forward" }
+                        ShortcutRow  { keys: "Ctrl+K"; action: "delete to end of line" }
+                        ShortcutRow  { keys: "Ctrl+W"; action: "delete word back" }
+                        ShortcutRow  { keys: "Ctrl+U"; action: "delete to line start" }
+
+                        SectionLabel { label: "NORMAL MODE" }
+                        ShortcutRow  { keys: "j / ↓";  action: "down" }
+                        ShortcutRow  { keys: "k / ↑";  action: "up" }
+                        ShortcutRow  { keys: "gg";     action: "jump to top" }
+                        ShortcutRow  { keys: "G";      action: "jump to bottom" }
+                        ShortcutRow  { keys: "Ctrl+D"; action: "half-page down" }
+                        ShortcutRow  { keys: "Ctrl+U"; action: "half-page up" }
+                        ShortcutRow  { keys: "Enter";  action: "paste entry" }
+                        ShortcutRow  { keys: "/";      action: "focus search" }
+                        ShortcutRow  { keys: "?";      action: "open help" }
+                        ShortcutRow  { keys: "Esc";    action: "close" }
+
+                        SectionLabel { label: "HELP" }
+                        ShortcutRow  { keys: "/";      action: "filter keybinds" }
+                        ShortcutRow  { keys: "Ctrl+W"; action: "delete word back" }
+                        ShortcutRow  { keys: "Ctrl+U"; action: "clear filter" }
+                        ShortcutRow  { keys: "Esc";    action: "stop filter / close help" }
+                        ShortcutRow  { keys: "? / Esc"; action: "close help" }
+                    }
+                }
+
                 // Footer ──────────────────────────────────────────────────────
                 Item {
                     id: footer
@@ -496,9 +687,13 @@ ShellRoot {
                     Text {
                         anchors.left: parent.left
                         anchors.verticalCenter: parent.verticalCenter
-                        text: root.mode === "normal"
-                            ? "j/k  navigate  \u00b7  Enter  paste  \u00b7  /  search  \u00b7  Esc  close"
-                            : "Esc  normal mode"
+                        text: root.view === "help"
+                            ? (root._helpFiltering
+                               ? "Esc  stop filter  \u00b7  Ctrl+W  delete word  \u00b7  Ctrl+U  clear"
+                               : "/  filter  \u00b7  ? / Esc  close")
+                            : root.mode === "normal"
+                                ? "j/k  navigate  \u00b7  Enter  paste  \u00b7  /  search  \u00b7  Esc  close"
+                                : "Esc  normal mode"
                         color: cfg.color.base03
                         font.family: cfg.fontFamily
                         font.pixelSize: cfg.fontSize - 3
@@ -507,7 +702,7 @@ ShellRoot {
                     Text {
                         anchors.right: parent.right
                         anchors.verticalCenter: parent.verticalCenter
-                        visible: root.filteredEntries.length > 0
+                        visible: root.view === "list" && root.filteredEntries.length > 0
                         text: (resultList.currentIndex + 1) + "/" + root.filteredEntries.length
                         color: cfg.color.base03
                         font.family: cfg.fontFamily
