@@ -198,9 +198,9 @@ ShellRoot {
         target: "viewer"
         readonly property bool   showing: root.showing
         readonly property string view:    root.view
-        function toggle()   { root.showing = !root.showing }
-        function setView(v) { root.view = v }
-        function nav(dir) {
+        function toggle()           { root.showing = !root.showing }
+        function setView(v: string) { root.view = v }
+        function nav(dir: string) {
             if (root.view === "detail") {
                 if (dir === "down")
                     detailFlickable.contentY = Math.min(
@@ -215,7 +215,7 @@ ShellRoot {
                     resultList.currentIndex--
             }
         }
-        function type(text) {
+        function type(text: string) {
             for (let i = 0; i < text.length; i++) {
                 const ch = text[i]
                 if (ch === "?") {
@@ -228,7 +228,7 @@ ShellRoot {
                 }
             }
         }
-        function key(k) {
+        function key(k: string) {
             const lk = k.toLowerCase()
             if (lk === "escape" || lk === "esc") {
                 if (root.view === "help") {
