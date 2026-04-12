@@ -55,7 +55,8 @@ Item {
     property string _mode:              "insert"   // "insert" | "normal" | "visual"
     property bool   _pendingG:          false
     property int    _visualAnchor:      0
-    property string _pendingDeleteLine: ""
+    property var    _pendingDeleteLines:     []
+    property int    _pendingDeleteCursorIdx: -1
 
     // ── Properties out ────────────────────────────────────────────────────────
     readonly property string selectedEntry: {
@@ -68,7 +69,7 @@ Item {
     readonly property string modeText: _mode === "visual" ? "VIS" : _mode === "normal" ? "NOR" : ""
     readonly property string hintText: {
         if (_mode === "visual")
-            return "j/k  select  \u00b7  v / Esc  normal mode"
+            return "j/k  select  \u00b7  d delete  \u00b7  v / Esc  normal mode"
         if (_mode === "normal")
             return "j/k navigate  \u00b7  v visual  \u00b7  y copy  \u00b7  d delete  \u00b7  Tab detail  \u00b7  / search  \u00b7  ? help  \u00b7  Esc close"
         return "Esc  normal mode  \u00b7  ?  help"
@@ -85,6 +86,8 @@ Item {
     signal flashRequested(int idx)
     // Internal: drives fade-out animation on the delegate being deleted.
     signal deleteAnimRequested(int idx)
+    // Internal: drives fade-out on a range of delegates (visual delete).
+    signal deleteRangeAnimRequested(int lo, int hi)
 
     // ── Public API ─────────────────────────────────────────────────────────────
     // Reset state — call when the window opens (before load).
@@ -95,9 +98,10 @@ Item {
         _processed      = []
         _processedIdx   = {}
         _mode           = "normal"   // per ROADMAP: opens in normal mode
-        _pendingG           = false
-        _pendingDeleteLine  = ""
-        _visualAnchor       = 0
+        _pendingG                = false
+        _pendingDeleteLines      = []
+        _pendingDeleteCursorIdx  = -1
+        _visualAnchor            = 0
         searchField.text = ""
         list.currentIndex = 0
         searchDebounce.stop()
@@ -132,53 +136,68 @@ Item {
     // Trigger the blink animation on the delegate at `idx`.
     function flash(idx) { flashRequested(idx) }
 
-    // Phase 1: trigger fade-out animation; actual removal happens after it finishes.
+    // Phase 1 (normal mode): trigger fade-out on the selected entry.
     function _deleteSelected() {
         const rawLine = selectedEntry
-        if (rawLine === "" || _pendingDeleteLine !== "") return
-        _pendingDeleteLine = rawLine
+        if (rawLine === "" || _pendingDeleteLines.length > 0) return
+        _pendingDeleteLines     = [rawLine]
+        _pendingDeleteCursorIdx = Math.max(0, list.currentIndex - 1)
         deleteAnimRequested(list.currentIndex)
         deleteAnimTimer.restart()
     }
 
+    // Phase 1 (visual mode): trigger fade-out on the entire selection range.
+    function _deleteVisualSelection() {
+        if (_pendingDeleteLines.length > 0) return
+        const lo    = Math.min(_visualAnchor, list.currentIndex)
+        const hi    = Math.max(_visualAnchor, list.currentIndex)
+        const lines = filteredEntries.slice(lo, hi + 1)
+        if (lines.length === 0) return
+        _pendingDeleteLines     = lines.slice()
+        _pendingDeleteCursorIdx = Math.max(0, lo - 1)
+        deleteRangeAnimRequested(lo, hi)
+        deleteAnimTimer.restart()
+        enterNormalMode()
+    }
+
     // Phase 2: called by deleteAnimTimer after the fade-out completes.
     function _executePendingDelete() {
-        const rawLine = _pendingDeleteLine
-        _pendingDeleteLine = ""
-        if (rawLine === "") return
-        const curIdx = list.currentIndex
+        const lines = _pendingDeleteLines
+        const targetIdx = _pendingDeleteCursorIdx
+        _pendingDeleteLines     = []
+        _pendingDeleteCursorIdx = -1
+        if (lines.length === 0) return
 
-        deleteProcess.command = [
-            bin.bash, "-c",
-            "printf '%s\\n' \"$1\" | " + bin.cliphist + " delete",
-            "--", rawLine
-        ]
+        // Run cliphist delete for each line
+        const args = [bin.bash, "-c",
+            "for i in \"$@\"; do printf '%s\\n' \"$i\" | " + bin.cliphist + " delete; done",
+            "--"]
+        for (const l of lines) args.push(l)
+        deleteProcess.command = args
         deleteProcess.running = true
 
-        const tab = rawLine.indexOf("\t")
-        const id  = tab >= 0 ? rawLine.substring(0, tab) : rawLine
-        const pi  = _processedIdx[id]
-        if (pi !== undefined) {
-            const newAll  = allEntries.slice()
-            const newProc = _processed.slice()
-            newAll.splice(pi, 1)
-            newProc.splice(pi, 1)
-            allEntries  = newAll
-            _processed  = newProc
-            const newIdx = {}
-            for (let i = 0; i < newProc.length; i++) {
-                const l   = newProc[i].line
-                const t   = l.indexOf("\t")
-                const eid = t >= 0 ? l.substring(0, t) : l
-                newIdx[eid] = i
-            }
-            _processedIdx = newIdx
+        // Remove from local state in one pass
+        const idsToDelete = new Set()
+        for (const rawLine of lines) {
+            const tab = rawLine.indexOf("\t")
+            idsToDelete.add(tab >= 0 ? rawLine.substring(0, tab) : rawLine)
         }
+        const newAll  = allEntries.filter(l => { const t = l.indexOf("\t"); return !idsToDelete.has(t >= 0 ? l.substring(0, t) : l) })
+        const newProc = _processed.filter(p => { const t = p.line.indexOf("\t"); return !idsToDelete.has(t >= 0 ? p.line.substring(0, t) : p.line) })
+        allEntries = newAll
+        _processed = newProc
+        const newIdx = {}
+        for (let i = 0; i < newProc.length; i++) {
+            const l   = newProc[i].line
+            const t   = l.indexOf("\t")
+            newIdx[t >= 0 ? l.substring(0, t) : l] = i
+        }
+        _processedIdx = newIdx
 
         _runFilter()
 
         const newLen = filteredEntries.length
-        if (newLen > 0) list.currentIndex = Math.min(Math.max(0, curIdx - 1), newLen - 1)
+        if (newLen > 0) list.currentIndex = Math.min(targetIdx, newLen - 1)
     }
 
     // Append `text` to the search field (IPC use only — not for key events).
@@ -227,7 +246,11 @@ Item {
             if (selectedEntry !== "") { flash(selectedIndex); yankEntryRequested(selectedEntry) }
             return true
         }
-        if (lk === "d") { _deleteSelected(); return true }
+        if (lk === "d") {
+            if (_mode === "visual") _deleteVisualSelection()
+            else _deleteSelected()
+            return true
+        }
         if (lk === "tab") { openDetail(); return true }
         return false
     }
@@ -311,6 +334,9 @@ Item {
         }
         if (event.key === Qt.Key_D && (event.modifiers & Qt.ControlModifier)) {
             navHalfDown(); return true
+        }
+        if (event.key === Qt.Key_D) {
+            _deleteVisualSelection(); return true
         }
         if (event.key === Qt.Key_U && (event.modifiers & Qt.ControlModifier)) {
             navHalfUp(); return true
@@ -614,6 +640,9 @@ Item {
                         }
                         function onDeleteAnimRequested(idx) {
                             if (idx === delegateRoot.index) fadeOutAnim.start()
+                        }
+                        function onDeleteRangeAnimRequested(lo, hi) {
+                            if (delegateRoot.index >= lo && delegateRoot.index <= hi) fadeOutAnim.start()
                         }
                     }
                 }
