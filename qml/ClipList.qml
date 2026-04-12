@@ -595,11 +595,11 @@ Item {
         tsPathProcess.running   = true
     }
 
-    // Step 1: resolve $XDG_DATA_HOME/kh-cliphist/pins and create the directory.
+    // Step 1: resolve $XDG_DATA_HOME/kh-cliphist/meta/pins and create the directory.
     Process {
         id: pinsPathProcess
         command: [bin.bash, "-c",
-            'f="${XDG_DATA_HOME:-$HOME/.local/share}/kh-cliphist/pins"' +
+            'f="${XDG_DATA_HOME:-$HOME/.local/share}/kh-cliphist/meta/pins"' +
             '; mkdir -p "$(dirname "$f")"' +
             '; printf "%s\\n" "$f"']
         stdout: SplitParser {
@@ -630,7 +630,7 @@ Item {
     Process {
         id: tsPathProcess
         command: [bin.bash, "-c",
-            'f="${XDG_DATA_HOME:-$HOME/.local/share}/kh-cliphist/timestamps"' +
+            'f="${XDG_DATA_HOME:-$HOME/.local/share}/kh-cliphist/meta/timestamps"' +
             '; mkdir -p "$(dirname "$f")"' +
             '; printf "%s\\n" "$f"']
         stdout: SplitParser {
