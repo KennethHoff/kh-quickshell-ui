@@ -133,6 +133,23 @@
       };
 
       apps.${system} = {
+        screenshots = {
+          type = "app";
+          program = toString (pkgs.writeShellScript "qs-screenshots" ''
+            set -e
+            out=/tmp/qs-screenshots
+            mkdir -p "$out"
+            qml=${pkgs.qt6.qtdeclarative}/bin/qml
+            src=${self}
+            imp=${pkgs.qt6.qtdeclarative}/lib/qt-6/qml
+            export QT_QPA_PLATFORM=offscreen
+            export HOME=$(mktemp -d)
+            "$qml" -I "$imp" -I "$src/lib" "$src/preview/kh-launcher.qml" -- "$out/kh-launcher.png"
+            "$qml" -I "$imp" -I "$src/lib" "$src/preview/kh-cliphist.qml" -- "$out/kh-cliphist.png"
+            echo "$out/kh-launcher.png"
+            echo "$out/kh-cliphist.png"
+          '');
+        };
         kh-launcher = {
           type = "app";
           program = toString (pkgs.writeShellScript "run-kh-launcher" ''
