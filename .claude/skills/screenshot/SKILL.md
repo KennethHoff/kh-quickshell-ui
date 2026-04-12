@@ -9,9 +9,10 @@ Take a screenshot using the headless screenshot app, then read and display the r
 ## Command
 
 ```bash
-nix run .#screenshot -- <kh-launcher|kh-cliphist> <name> [<ipc-call>...]
+nix run .#screenshot -- <app> <name> [<ipc-call>...]
 ```
 
+- `<app>` — a package name from `packages.x86_64-linux` in `flake.nix` (e.g. `kh-launcher`, `kh-cliphist`); check the flake for the current list
 - `<name>` — output filename without extension; saved to `/tmp/qs-screenshots/<timestamp>/<name>.png`
 - `<ipc-call>` — each argument is a function name with an optional argument, space-separated in a single string
 
@@ -21,8 +22,7 @@ The window is **opened automatically** (toggle is implicit). Only pass calls bey
 
 | Call | Effect |
 |---|---|
-| `setView help` | Switch to help panel |
-| `setView detail` | Switch to detail view (cliphist only) |
+| `setView <view>` | Switch to a named view (e.g. `help`, `detail`) |
 | `type <text>` | Type characters into the search box (one char at a time; `?` toggles help) |
 | `nav down` / `nav up` | Move selection |
 | `key escape` | Close / go back |
