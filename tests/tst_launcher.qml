@@ -50,37 +50,101 @@ TestCase {
         compare(filter.filterApps(apps, "zzzzz").length, 0)
     }
 
-    function test_whitespace_in_query_collapsed() {
+    function test_space_separated_terms_anded() {
+        // "fire" AND "fox" both fuzzy-match Firefox
         const result = filter.filterApps(apps, "fire fox")
         compare(result.length, 1)
         compare(result[0].name, "Firefox")
     }
 
-    function test_whitespace_in_haystack_collapsed() {
+    function test_space_separated_terms_no_match_if_any_fails() {
+        // "fire" matches Firefox, "zzz" matches nothing — AND fails
+        compare(filter.filterApps(apps, "fire zzz").length, 0)
+    }
+
+    function test_fuzzy_matches_across_word_boundary() {
+        // Single token spanning name + genericName boundary via fuzzy
         const result = filter.filterApps(apps, "termemu")
         compare(result.length, 1)
         compare(result[0].name, "Terminal")
     }
 
-    function test_exact_prefix_matches_substring() {
-        const names = filter.filterApps(apps, "'web browser").map(e => e.name).sort()
+    function test_exact_matches_substring() {
+        const result = filter.filterApps(apps, "'web")
+        const names = result.map(e => e.name).sort()
         compare(names, ["Chromium", "Firefox"])
     }
 
-    function test_exact_prefix_quote_only_returns_all_visible() {
+    function test_exact_quote_only_returns_all_visible() {
         compare(filter.filterApps(apps, "'").length, 4)
     }
 
-    function test_exact_prefix_no_match() {
+    function test_exact_no_match() {
         compare(filter.filterApps(apps, "'zzzzz").length, 0)
     }
 
-    function test_exact_prefix_case_insensitive() {
-        compare(filter.filterApps(apps, "'WEB BROWSER").length, 2)
+    function test_exact_case_insensitive() {
+        compare(filter.filterApps(apps, "'WEB").length, 2)
     }
 
     function test_exact_does_not_fuzzy_expand() {
         compare(filter.filterApps(apps, "'frfx").length, 0)
+    }
+
+    function test_prefix_match() {
+        const result = filter.filterApps(apps, "^firefox")
+        compare(result.length, 1)
+        compare(result[0].name, "Firefox")
+    }
+
+    function test_prefix_no_match_mid_string() {
+        // "fox" is not at the start of any entry
+        compare(filter.filterApps(apps, "^fox").length, 0)
+    }
+
+    function test_suffix_match() {
+        // Anchors to name, not genericName — "firefox" ends with "fox"... no, test name ending
+        compare(filter.filterApps(apps, "eovim$").length, 1)
+        compare(filter.filterApps(apps, "eovim$")[0].name, "Neovim")
+    }
+
+    function test_suffix_does_not_anchor_to_generic_name() {
+        // "Web Browser" is the genericName of Firefox/Chromium; browser$ should NOT match
+        // because the name fields are "firefox" and "chromium", neither ends with "browser"
+        compare(filter.filterApps(apps, "browser$").length, 0)
+    }
+
+    function test_suffix_no_match_mid_string() {
+        // "fire" is a prefix of "firefox", not a suffix
+        compare(filter.filterApps(apps, "fire$").length, 0)
+    }
+
+    function test_negate_fuzzy() {
+        const names = filter.filterApps(apps, "!firefox").map(e => e.name).sort()
+        compare(names, ["Chromium", "Neovim", "Terminal"])
+    }
+
+    function test_negate_exact() {
+        const names = filter.filterApps(apps, "!'web").map(e => e.name).sort()
+        compare(names, ["Neovim", "Terminal"])
+    }
+
+    function test_negate_prefix() {
+        const names = filter.filterApps(apps, "!^firefox").map(e => e.name).sort()
+        compare(names, ["Chromium", "Neovim", "Terminal"])
+    }
+
+    function test_negate_suffix() {
+        // Neovim ends with "vim"; negate excludes it
+        const names = filter.filterApps(apps, "!vim$").map(e => e.name).sort()
+        compare(names, ["Chromium", "Firefox", "Terminal"])
+    }
+
+    function test_combined_prefix_and_exact() {
+        // Must start with "firefox" AND contain "web"
+        const result = filter.filterApps(apps, "^firefox 'web")
+        compare(result.length, 1)
+        compare(result[0].name, "Firefox")
     }
 
     function test_nodisplay_excluded_even_when_query_matches() {

@@ -166,8 +166,13 @@
                 "$qs" ipc --pid "$pid" call "$target" toggle >/dev/null 2>&1 && break
               done
               for call in "$@"; do
-                read -ra words <<< "$call"
-                "$qs" ipc --pid "$pid" call "$target" "''${words[@]}" >/dev/null 2>&1 || true
+                local fn="''${call%% *}"
+                if [[ "$fn" == "$call" ]]; then
+                  "$qs" ipc --pid "$pid" call "$target" "$fn" >/dev/null 2>&1 || true
+                else
+                  local arg="''${call#* }"
+                  "$qs" ipc --pid "$pid" call "$target" "$fn" "$arg" >/dev/null 2>&1 || true
+                fi
               done
               sleep 0.4
               WAYLAND_DISPLAY=$WAYLAND_DISPLAY "$grim" "$outfile"
