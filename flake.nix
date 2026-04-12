@@ -205,6 +205,16 @@
             rm -rf "$xdg_runtime"
           '');
         };
+        kh-cliphist-daemon = {
+          type = "app";
+          # Runs the cliphist daemon without opening the overlay — useful during
+          # development to keep wl-paste --watch active while copying from other apps.
+          # Ctrl+C to stop. Open/close the overlay separately via IPC.
+          program = toString (pkgs.writeShellScript "run-kh-cliphist-daemon" ''
+            qs=${lib.getExe' pkgs.quickshell "quickshell"}
+            exec "$qs" -p ${cliphistConfig}
+          '');
+        };
         kh-cliphist = {
           type = "app";
           program = toString (pkgs.writeShellScript "run-kh-cliphist" ''
