@@ -123,18 +123,21 @@
 
       apps.${system} = {
         # Single headless screenshot.
-        # Usage: nix run .#screenshot -- <kh-launcher|kh-cliphist> <outfile.png> [<ipc-call>...]
+        # Usage: nix run .#screenshot -- <kh-launcher|kh-cliphist> <name> [<ipc-call>...]
+        # Output: /tmp/qs-screenshots/<name>.png
         # Each <ipc-call> is a function name with optional arg, e.g. "setView help" or "type Navigate".
         # The window is opened automatically via toggle before any calls are made.
         screenshot = {
           type = "app";
           program = toString (pkgs.writeShellScript "qs-screenshot" ''
             set -e
-            app=$1 outfile=$2; shift 2
+            app=$1 name=$2; shift 2
+            outfile=/tmp/qs-screenshots/$name.png
+            mkdir -p /tmp/qs-screenshots
             case "$app" in
               kh-launcher) config=${launcherConfig}; target=launcher ;;
               kh-cliphist) config=${cliphistConfig}; target=viewer   ;;
-              *) echo "usage: screenshot <kh-launcher|kh-cliphist> <outfile.png> [<ipc-call>...]" >&2; exit 1 ;;
+              *) echo "usage: screenshot <kh-launcher|kh-cliphist> <name> [<ipc-call>...]" >&2; exit 1 ;;
             esac
             qs=${lib.getExe' pkgs.quickshell "quickshell"}
             grim=${lib.getExe pkgs.grim}
