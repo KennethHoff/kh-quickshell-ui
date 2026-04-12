@@ -45,18 +45,18 @@ list of clipboard entries from `cliphist`. SUPER+V toggles it via IPC.
 
 Searchable application launcher (`quickshell -c kh-launcher`).
 
-- ✅ Fuzzy search over installed apps by name and description
-- ✅ Search filters: `'` exact match, `^` prefix, `$` suffix, `!` negation; space-separated tokens combine with AND
-- ✅ App icon and description shown in list
-- ✅ Up/Down to navigate; Enter to launch (to be replaced by `j`/`k`)
-- ✅ Ctrl+1–9 launches the selected app on workspace 1–9
-- ✅ Tab enters actions mode for the selected app (to be replaced by `l`; shown only when actions exist)
-- ✅ Up/Down to navigate actions; Enter to launch selected action (to be replaced by `j`/`k`)
-- ✅ Tab or Esc returns from actions mode to app list (to be replaced by `h`/Esc)
-- ✅ Apps with `Terminal=true` run wrapped in kitty
-- ✅ Window closes automatically after launching
-- ✅ Flash animation when an app or action is launched
-- ✅ `?` toggles a searchable help overlay listing all keybinds
+- ⬜ Fuzzy search over installed apps by name and description
+- ⬜ Search filters: `'` exact match, `^` prefix, `$` suffix, `!` negation; space-separated tokens combine with AND
+- ⬜ App icon and description shown in list
+- ⬜ Up/Down to navigate; Enter to launch (to be replaced by `j`/`k`)
+- ⬜ Ctrl+1–9 launches the selected app on workspace 1–9
+- ⬜ Tab enters actions mode for the selected app (to be replaced by `l`; shown only when actions exist)
+- ⬜ Up/Down to navigate actions; Enter to launch selected action (to be replaced by `j`/`k`)
+- ⬜ Tab or Esc returns from actions mode to app list (to be replaced by `h`/Esc)
+- ⬜ Apps with `Terminal=true` run wrapped in kitty
+- ⬜ Window closes automatically after launching
+- ⬜ Flash animation when an app or action is launched
+- ⬜ `?` toggles a searchable help overlay listing all keybinds
 - ⬜ Window switcher mode — fuzzy search over all open windows by app name or title, across all workspaces and monitors; Enter focuses the window and switches to its workspace
 - ⬜ Emoji picker mode — fuzzy search emoji by name; Enter copies to clipboard
 - ⬜ Snippets mode — text expansion triggered by abbreviation
