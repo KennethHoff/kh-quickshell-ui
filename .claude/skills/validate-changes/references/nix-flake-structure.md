@@ -19,8 +19,7 @@ checks.x86_64-linux
 apps.x86_64-linux
 ├── kh-launcher          — run kh-launcher directly (hardcoded Catppuccin colors)
 ├── kh-cliphist          — run kh-cliphist directly
-├── screenshot           — headless screenshot tool
-└── screenshots          — capture all standard shots at once
+└── screenshot           — headless screenshot tool
 ```
 
 ## Attribute path patterns

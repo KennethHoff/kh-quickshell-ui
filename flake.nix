@@ -190,58 +190,6 @@
             rm -rf "$xdg_runtime"
           '');
         };
-        screenshots = {
-          type = "app";
-          program = toString (pkgs.writeShellScript "qs-screenshots" ''
-            set -e
-            out=/tmp/qs-screenshots/$(date +%Y%m%d-%H%M%S)
-            mkdir -p "$out"
-            qs=${lib.getExe' pkgs.quickshell "quickshell"}
-            grim=${lib.getExe pkgs.grim}
-            sway=${lib.getExe pkgs.sway}
-
-            # Start a headless Wayland compositor so nothing appears on screen.
-            xdg_runtime=$(mktemp -d)
-            export XDG_RUNTIME_DIR=$xdg_runtime
-            export WLR_BACKENDS=headless
-            export WLR_RENDERER=pixman
-            export WLR_HEADLESS_OUTPUTS=1
-            "$sway" --config /dev/null &
-            SWAY_PID=$!
-            # Wait for the Wayland socket to appear.
-            for i in $(seq 40); do
-              sleep 0.1
-              socket=$(ls "$xdg_runtime"/wayland-* 2>/dev/null | grep -v lock | head -1)
-              [[ -n "$socket" ]] && break
-            done
-            export WAYLAND_DISPLAY=$(basename "$socket")
-
-            shoot() {
-              local name=$1 config=$2 ipc_target=$3 view=$4
-              local outfile="$out/$name.png"
-              WAYLAND_DISPLAY=$WAYLAND_DISPLAY "$qs" -p "$config" &
-              local pid=$!
-              for i in $(seq 30); do
-                sleep 0.1
-                "$qs" ipc --pid "$pid" call "$ipc_target" toggle 2>/dev/null && break
-              done
-              [[ -n "$view" ]] && "$qs" ipc --pid "$pid" call "$ipc_target" setView "$view" 2>/dev/null
-              sleep 0.4
-              WAYLAND_DISPLAY=$WAYLAND_DISPLAY "$grim" "$outfile"
-              echo "$outfile"
-              disown "$pid" 2>/dev/null; kill -9 "$pid" 2>/dev/null
-            }
-
-            shoot kh-launcher-list    ${launcherConfig}  launcher ""
-            shoot kh-launcher-help    ${launcherConfig}  launcher help
-            shoot kh-cliphist-list    ${cliphistConfig}  viewer   ""
-            shoot kh-cliphist-detail  ${cliphistConfig}  viewer   detail
-            shoot kh-cliphist-help    ${cliphistConfig}  viewer   help
-
-            kill -9 $SWAY_PID 2>/dev/null; wait $SWAY_PID 2>/dev/null
-            rm -rf "$xdg_runtime"
-          '');
-        };
         kh-launcher = {
           type = "app";
           program = toString (pkgs.writeShellScript "run-kh-launcher" ''

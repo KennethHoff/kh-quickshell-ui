@@ -1,10 +1,10 @@
 ---
-name: nix-verify
-description: Verify that the nix configurations evaluate and build correctly. ALWAYS run this after editing any .nix file — no change is too small to skip verification. Do not present changes as complete without running this first.
-allowed-tools: Bash(nix:*)
+name: validate-changes
+description: Validate that changes did what was expected — covers both Nix configuration and QML UI. ALWAYS run this after editing any .nix or .qml file. Do not present changes as complete without running this first.
+allowed-tools: Bash(nix:*), Bash(tmux:*), Bash(kitty:*)
 ---
 
-## Step 1 — Evaluate
+## Step 1 — Evaluate (Nix changes)
 
 Run `nix flake check` to verify all configurations evaluate correctly:
 
@@ -45,8 +45,19 @@ nix build \
 
 A passing run produces no output. On failure, see [references/nix-build.md](references/nix-build.md) for how to interpret errors.
 
+## Step 4 — Screenshot (QML changes)
+
+For any change that affects the UI (`.qml` files, or Nix changes that affect runtime behavior), take a screenshot to visually confirm the result matches expectations. Use the `screenshot` skill.
+
+- Target the specific app and view affected by the change
+- Compare against a before screenshot if one was taken prior to editing
+
+For QML error patterns to watch for, see [references/qml-common-errors.md](references/qml-common-errors.md).
+
 ## Troubleshooting
 
-For common error patterns and how to fix them, see [references/common-errors.md](references/common-errors.md).
+For common Nix error patterns and how to fix them, see [references/nix-common-errors.md](references/nix-common-errors.md).
 
-For how this flake is structured and where to find attribute paths, see [references/flake-structure.md](references/flake-structure.md).
+For how this flake is structured and where to find attribute paths, see [references/nix-flake-structure.md](references/nix-flake-structure.md).
+
+For how the QML files are organized and where views/styling live, see [references/qml-structure.md](references/qml-structure.md).
