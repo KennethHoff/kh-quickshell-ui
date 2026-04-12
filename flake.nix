@@ -37,7 +37,8 @@
         }} $out/NixBins/NixBins.qml
       '';
 
-      cliphistDecodeAllScript = import ./scripts/cliphist-decode-all.nix { inherit pkgs lib; };
+      cliphistDecodeAllScript  = import ./scripts/cliphist-decode-all.nix  { inherit pkgs lib; };
+      cliphistAttrWatchScript  = import ./scripts/cliphist-attr-watch.nix  { inherit pkgs lib; };
 
       viewConfig = pkgs.runCommand "kh-view-config" { } ''
         mkdir -p $out/lib
@@ -78,7 +79,10 @@
         }} $out/NixConfig.qml
         cp ${import ./ffi.nix {
           inherit pkgs lib;
-          extraBins.cliphistDecodeAll = toString cliphistDecodeAllScript;
+          extraBins = {
+            cliphistDecodeAll = toString cliphistDecodeAllScript;
+            cliphistAttrWatch = toString cliphistAttrWatchScript;
+          };
         }} $out/NixBins.qml
       '';
     in
