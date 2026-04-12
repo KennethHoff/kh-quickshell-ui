@@ -97,19 +97,14 @@ in
     })
 
     (lib.mkIf (config.programs.kh-ui.enable && config.wayland.windowManager.hyprland.enable) {
-      wayland.windowManager.hyprland.settings = {
-        exec-once =
-          lib.optionals config.programs.kh-ui.clipboard-history.enable [
-            "${lib.getExe pkgs.quickshell} -c kh-cliphist"
-            "${lib.getExe' pkgs.wl-clipboard "wl-paste"} --watch ${lib.getExe pkgs.cliphist} store"
-          ] ++
-          lib.optionals config.programs.kh-ui.launcher.enable [
-            "${lib.getExe pkgs.quickshell} -c kh-launcher"
-          ];
-        bind = lib.optionals config.programs.kh-ui.launcher.enable [
-          "$mainMod, SPACE, exec, ${lib.getExe pkgs.quickshell} ipc -c kh-launcher call launcher toggle"
+      wayland.windowManager.hyprland.settings.exec-once =
+        lib.optionals config.programs.kh-ui.clipboard-history.enable [
+          "${lib.getExe pkgs.quickshell} -c kh-cliphist"
+          "${lib.getExe' pkgs.wl-clipboard "wl-paste"} --watch ${lib.getExe pkgs.cliphist} store"
+        ] ++
+        lib.optionals config.programs.kh-ui.launcher.enable [
+          "${lib.getExe pkgs.quickshell} -c kh-launcher"
         ];
-      };
     })
   ];
 }
