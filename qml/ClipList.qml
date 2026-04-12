@@ -52,9 +52,10 @@ Item {
     property var    _buf:           []
     property var    _processed:     []
     property var    _processedIdx:  ({})
-    property string _mode:          "insert"   // "insert" | "normal" | "visual"
-    property bool   _pendingG:      false
-    property int    _visualAnchor:  0
+    property string _mode:              "insert"   // "insert" | "normal" | "visual"
+    property bool   _pendingG:          false
+    property int    _visualAnchor:      0
+    property string _pendingDeleteLine: ""
 
     // ── Properties out ────────────────────────────────────────────────────────
     readonly property string selectedEntry: {
@@ -82,6 +83,8 @@ Item {
     signal searchEscapePressed()
     // Internal: drives flash animation on list delegates.
     signal flashRequested(int idx)
+    // Internal: drives fade-out animation on the delegate being deleted.
+    signal deleteAnimRequested(int idx)
 
     // ── Public API ─────────────────────────────────────────────────────────────
     // Reset state — call when the window opens (before load).
@@ -92,13 +95,15 @@ Item {
         _processed      = []
         _processedIdx   = {}
         _mode           = "normal"   // per ROADMAP: opens in normal mode
-        _pendingG       = false
-        _visualAnchor   = 0
+        _pendingG           = false
+        _pendingDeleteLine  = ""
+        _visualAnchor       = 0
         searchField.text = ""
         list.currentIndex = 0
         searchDebounce.stop()
         fullTextDecodeProcess.running = false
         gTimer.stop()
+        deleteAnimTimer.stop()
     }
 
     // Load entries — starts listProcess.
@@ -127,9 +132,19 @@ Item {
     // Trigger the blink animation on the delegate at `idx`.
     function flash(idx) { flashRequested(idx) }
 
-    // Delete the currently selected entry from cliphist and local state.
+    // Phase 1: trigger fade-out animation; actual removal happens after it finishes.
     function _deleteSelected() {
         const rawLine = selectedEntry
+        if (rawLine === "" || _pendingDeleteLine !== "") return
+        _pendingDeleteLine = rawLine
+        deleteAnimRequested(list.currentIndex)
+        deleteAnimTimer.restart()
+    }
+
+    // Phase 2: called by deleteAnimTimer after the fade-out completes.
+    function _executePendingDelete() {
+        const rawLine = _pendingDeleteLine
+        _pendingDeleteLine = ""
         if (rawLine === "") return
         const curIdx = list.currentIndex
 
@@ -386,6 +401,13 @@ Item {
         onTriggered: clipList._pendingG = false
     }
 
+    Timer {
+        id: deleteAnimTimer
+        interval: 220
+        repeat: false
+        onTriggered: clipList._executePendingDelete()
+    }
+
     Process { id: deleteProcess }
 
     // ── UI ────────────────────────────────────────────────────────────────────
@@ -590,7 +612,19 @@ Item {
                         function onFlashRequested(idx) {
                             if (idx === delegateRoot.index) blinkAnim.restart()
                         }
+                        function onDeleteAnimRequested(idx) {
+                            if (idx === delegateRoot.index) fadeOutAnim.start()
+                        }
                     }
+                }
+
+                NumberAnimation {
+                    id: fadeOutAnim
+                    target: delegateRoot
+                    property: "opacity"
+                    to: 0
+                    duration: 200
+                    easing.type: Easing.InQuad
                 }
             }
         }
