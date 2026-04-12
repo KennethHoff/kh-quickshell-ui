@@ -61,6 +61,10 @@ Item {
     property int    _pendingDeleteAnimHi:    -1
     property bool   _confirmingDelete:       false
 
+    property var    _pins:     ({})   // {[id: string]: true} — pinned entry IDs
+    property string _pinsFile: ""     // resolved once at startup
+    property var    _pinsBuf:  []     // scratch buffer while loading the pins file
+
     // ── Properties out ────────────────────────────────────────────────────────
     readonly property string selectedEntry: {
         const idx = list.currentIndex
@@ -79,7 +83,7 @@ Item {
         if (_mode === "visual")
             return "j/k  select  \u00b7  d delete  \u00b7  v / Esc  normal mode"
         if (_mode === "normal")
-            return "j/k navigate  \u00b7  v visual  \u00b7  y copy  \u00b7  d delete  \u00b7  Tab detail  \u00b7  / search  \u00b7  ? help  \u00b7  Esc close"
+            return "j/k navigate  \u00b7  v visual  \u00b7  y copy  \u00b7  d delete  \u00b7  p pin  \u00b7  Tab detail  \u00b7  / search  \u00b7  ? help  \u00b7  Esc close"
         return "Esc  normal mode  \u00b7  ?  help"
     }
 
@@ -193,6 +197,39 @@ Item {
         _pendingDeleteAnimHi    = -1
     }
 
+    // ── Pinning ───────────────────────────────────────────────────────────────
+    function _entryId(rawLine) {
+        const t = rawLine.indexOf("\t")
+        return t >= 0 ? rawLine.substring(0, t) : rawLine
+    }
+
+    // Toggle pin on the currently selected entry. Cursor follows the entry.
+    function _togglePin() {
+        const rawLine = selectedEntry
+        if (rawLine === "") return
+        const id = _entryId(rawLine)
+        if (id in _pins) {
+            const p = Object.assign({}, _pins)
+            delete p[id]
+            _pins = p
+        } else {
+            _pins = Object.assign({}, _pins, { [id]: true })
+        }
+        _writePins()
+        _runFilter()
+        const newIdx = filteredEntries.indexOf(rawLine)
+        if (newIdx >= 0) list.currentIndex = newIdx
+    }
+
+    // Persist the current pin set to disk.
+    function _writePins() {
+        if (!_pinsFile) return
+        const ids = Object.keys(_pins)
+        pinsWriteProcess.command = [bin.bash, "-c",
+            'f="$1"; shift; printf "%s\\n" "$@" > "$f"', "--", _pinsFile].concat(ids)
+        pinsWriteProcess.running = true
+    }
+
     // Phase 2: called by deleteAnimTimer after the fade-out completes.
     function _executePendingDelete() {
         const lines = _pendingDeleteLines
@@ -226,6 +263,14 @@ Item {
             newIdx[t >= 0 ? l.substring(0, t) : l] = i
         }
         _processedIdx = newIdx
+
+        // Remove deleted entries from pins if any were pinned
+        let pinsChanged = false
+        const newPins = Object.assign({}, _pins)
+        for (const id of idsToDelete) {
+            if (id in newPins) { delete newPins[id]; pinsChanged = true }
+        }
+        if (pinsChanged) { _pins = newPins; _writePins() }
 
         _runFilter()
 
@@ -294,6 +339,7 @@ Item {
             else _deleteSelected()
             return true
         }
+        if (lk === "p") { _togglePin(); return true }
         if (lk === "tab") { openDetail(); return true }
         return false
     }
@@ -348,6 +394,9 @@ Item {
         if (event.text === "v") {
             enterVisualMode(); return true
         }
+        if (event.text === "p") {
+            _togglePin(); return true
+        }
         if (event.key === Qt.Key_Tab) {
             openDetail(); return true
         }
@@ -389,11 +438,21 @@ Item {
 
     // ── Filtering ─────────────────────────────────────────────────────────────
     function _runFilter() {
-        const parsed = searchParser.parseSearch(searchField.text)
+        const parsed  = searchParser.parseSearch(searchField.text)
+        const hasPins = Object.keys(_pins).length > 0
+
         if (parsed.type === "all" && !parsed.needle) {
-            filteredEntries = allEntries
+            if (!hasPins) {
+                filteredEntries = allEntries
+            } else {
+                const pinned = [], rest = []
+                for (const e of allEntries)
+                    (_entryId(e) in _pins ? pinned : rest).push(e)
+                filteredEntries = pinned.concat(rest)
+            }
             return
         }
+
         const scored = []
         for (const e of _processed) {
             if (parsed.type === "image" && !e.isImage) continue
@@ -406,7 +465,14 @@ Item {
                 if (score >= 0) scored.push({ line: e.line, score })
             }
         }
-        scored.sort((a, b) => b.score - a.score)
+        scored.sort((a, b) => {
+            if (hasPins) {
+                const pa = _entryId(a.line) in _pins
+                const pb = _entryId(b.line) in _pins
+                if (pa !== pb) return pa ? -1 : 1
+            }
+            return b.score - a.score
+        })
         filteredEntries = scored.map(s => s.line)
     }
 
@@ -478,6 +544,40 @@ Item {
     }
 
     Process { id: deleteProcess }
+
+    // ── Pin persistence ───────────────────────────────────────────────────────
+    Component.onCompleted: pinsPathProcess.running = true
+
+    // Step 1: resolve $XDG_DATA_HOME/kh-cliphist/pins and create the directory.
+    Process {
+        id: pinsPathProcess
+        command: [bin.bash, "-c",
+            'f="${XDG_DATA_HOME:-$HOME/.local/share}/kh-cliphist/pins"' +
+            '; mkdir -p "$(dirname "$f")"' +
+            '; printf "%s\\n" "$f"']
+        stdout: SplitParser {
+            onRead: (line) => { if (line) clipList._pinsFile = line }
+        }
+        onExited: { if (clipList._pinsFile) pinsReadProcess.running = true }
+    }
+
+    // Step 2: read existing pins (one ID per line); silently skip if file absent.
+    Process {
+        id: pinsReadProcess
+        command: [bin.bash, "-c", '[ -f "$1" ] && cat "$1" || true', "--", clipList._pinsFile]
+        stdout: SplitParser {
+            onRead: (line) => { if (line) clipList._pinsBuf.push(line) }
+        }
+        onExited: {
+            const p = {}
+            for (const id of clipList._pinsBuf) p[id] = true
+            clipList._pins    = p
+            clipList._pinsBuf = []
+        }
+    }
+
+    // Step 3: write pins on demand (command is set dynamically in _writePins).
+    Process { id: pinsWriteProcess }
 
     // ── UI ────────────────────────────────────────────────────────────────────
     Column {
@@ -635,6 +735,18 @@ Item {
                     }
                     radius: 6
 
+                    // Pin indicator — 3 px coloured bar on the left edge
+                    Rectangle {
+                        anchors.left: parent.left
+                        anchors.top: parent.top
+                        anchors.bottom: parent.bottom
+                        anchors.margins: 3
+                        width: 3
+                        radius: 1
+                        color: (clipList._pins, delegateRoot.entryId in clipList._pins)
+                            ? cfg.color.base0A : "transparent"
+                    }
+
                     Image {
                         id: imgThumb
                         visible: delegateRoot.isImage
@@ -647,7 +759,7 @@ Item {
                     Text {
                         visible: !delegateRoot.isImage
                         anchors.fill: parent
-                        anchors.leftMargin: 10
+                        anchors.leftMargin: 14
                         anchors.rightMargin: 10
                         text: delegateRoot.preview
                         color: cfg.color.base05

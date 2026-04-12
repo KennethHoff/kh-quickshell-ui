@@ -339,6 +339,7 @@ ShellRoot {
                         { key: "y",          desc: "copy to clipboard" },
                         { key: "d",          desc: "delete entry" },
                         { key: "v",          desc: "visual select mode" },
+                        { key: "p",          desc: "pin / unpin entry" },
                         { key: "Tab",        desc: "focus detail pane" },
                         { key: "Enter",      desc: "fullscreen detail" },
                         { key: "Tab / Esc",  desc: "focus list (from detail)" },

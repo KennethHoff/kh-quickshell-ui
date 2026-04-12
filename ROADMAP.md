@@ -38,7 +38,7 @@ list of clipboard entries from `cliphist`. SUPER+V toggles it via IPC.
 - ⬜ Source app attribution — record active Hyprland window (`hyprctl activewindow`) at copy time, stored in a side-store alongside the cliphist entry (needs a storage solution that doesn't corrupt binary clipboard data)
 - ⬜ Auto-paste — close the window and simulate Ctrl+V into the previously focused app via `wtype`
 - ✅ Delete from UI — `d` in normal mode deletes the selected entry; `d` in visual mode deletes the selected range; confirms via popup before executing; fade-out animation on deleted entries; cursor repositions to the entry above the deleted one; executed via `cliphist delete`
-- ⬜ Pinned entries — star entries to keep them permanently at the top, surviving clipboard history rotation
+- ✅ Pinned entries — `p` toggles pin on the selected entry; pinned entries sort to the top of the list (both unfiltered and search-filtered); persisted to `$XDG_DATA_HOME/kh-cliphist/pins` (one entry ID per line); deleting a pinned entry removes it from the pin set; 3 px coloured bar on the left edge of each pinned delegate row
 
 ---
 
