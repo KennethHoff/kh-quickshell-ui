@@ -3,9 +3,7 @@
 // Daemon mode: quickshell -p <config-dir>
 // Toggle:      quickshell ipc -c kh-cliphist call viewer toggle
 //
-// Keys (list):       Type to search · ↑↓ navigate · Enter paste · Tab → preview · Esc close
-// Keys (detail):     ↑↓ scroll · Enter fullscreen · Tab → list · Esc → list
-// Keys (fullscreen): ↑↓ scroll (text) · Esc / Enter / click → back to detail
+// Keys: not yet implemented (modal vim refactor in progress)
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
@@ -200,60 +198,6 @@ ShellRoot {
         readonly property string view:    root.view
         function toggle()           { root.showing = !root.showing }
         function setView(v: string) { root.view = v }
-        function nav(dir: string) {
-            if (root.view === "detail") {
-                if (dir === "down")
-                    detailFlickable.contentY = Math.min(
-                        detailFlickable.contentHeight - detailFlickable.height,
-                        detailFlickable.contentY + 30)
-                else
-                    detailFlickable.contentY = Math.max(0, detailFlickable.contentY - 30)
-            } else if (root.view === "list") {
-                if (dir === "down" && resultList.currentIndex < resultList.count - 1)
-                    resultList.currentIndex++
-                else if (dir === "up" && resultList.currentIndex > 0)
-                    resultList.currentIndex--
-            }
-        }
-        function type(text: string) {
-            for (let i = 0; i < text.length; i++) {
-                const ch = text[i]
-                if (ch === "?") {
-                    if (root.view === "help") { root.view = "list"; root.helpFilter = "" }
-                    else if (root.view === "list") { root.view = "help"; root.helpFilter = "" }
-                } else if (root.view === "help") {
-                    root.helpFilter += ch
-                } else if (root.view === "list") {
-                    searchField.text += ch
-                }
-            }
-        }
-        function key(k: string) {
-            const lk = k.toLowerCase()
-            if (lk === "escape" || lk === "esc") {
-                if (root.view === "help") {
-                    if (root.helpFilter) root.helpFilter = ""; else root.view = "list"
-                } else if (root.view === "fullscreen") root.view = "detail"
-                else if (root.view === "detail") root.view = "list"
-                else root.showing = false
-            } else if (lk === "enter" || lk === "return") {
-                if (root.view === "detail") root.view = "fullscreen"
-                else if (root.view === "fullscreen") root.view = "detail"
-                else if (root.view === "list") {
-                    const entries = root.filteredEntries
-                    if (resultList.currentIndex >= 0 && resultList.currentIndex < entries.length)
-                        root.paste(entries[resultList.currentIndex])
-                }
-            } else if (lk === "tab") {
-                root.view = root.view === "list" ? "detail" : "list"
-            } else if (lk === "backspace") {
-                if (root.view === "help") root.helpFilter = root.helpFilter.slice(0, -1)
-                else searchField.text = searchField.text.slice(0, -1)
-            } else if (lk === "ctrl+w") {
-                if (root.view === "help") root.helpFilter = root.helpFilter.replace(/\S+\s*$/, "")
-                else searchField.text = searchField.text.replace(/\S+\s*$/, "")
-            }
-        }
     }
 
     // ── Window ───────────────────────────────────────────────────────────────
@@ -407,82 +351,6 @@ ShellRoot {
 
                         onTextChanged: resultList.currentIndex = 0
 
-                        Keys.onEscapePressed: {
-                            if (root.view === "help") {
-                                if (root.helpFilter) root.helpFilter = ""
-                                else root.view = "list"
-                                return
-                            }
-                            if (root.view === "fullscreen") root.view = "detail"
-                            else if (root.view === "detail") root.view = "list"
-                            else root.showing = false
-                        }
-                        Keys.onReturnPressed: {
-                            if (root.view === "help") return
-                            if (root.view === "fullscreen") { root.view = "detail"; return }
-                            if (root.view === "detail")     { root.view = "fullscreen"; return }
-                            const entries = root.filteredEntries
-                            if (resultList.currentIndex >= 0 && resultList.currentIndex < entries.length)
-                                root.paste(entries[resultList.currentIndex])
-                        }
-                        Keys.onUpPressed: {
-                            if (root.view === "help") return
-                            if (root.view === "detail")
-                                detailFlickable.contentY = Math.max(0, detailFlickable.contentY - 30)
-                            else if (root.view === "list" && resultList.currentIndex > 0)
-                                resultList.currentIndex--
-                        }
-                        Keys.onDownPressed: {
-                            if (root.view === "help") return
-                            if (root.view === "detail")
-                                detailFlickable.contentY = Math.min(
-                                    detailFlickable.contentHeight - detailFlickable.height,
-                                    detailFlickable.contentY + 30)
-                            else if (root.view === "list" && resultList.currentIndex < resultList.count - 1)
-                                resultList.currentIndex++
-                        }
-                        Keys.onPressed: (event) => {
-                            if (event.key === Qt.Key_Shift || event.key === Qt.Key_Control ||
-                                event.key === Qt.Key_Alt  || event.key === Qt.Key_Meta) return
-                            if (root.view === "fullscreen") {
-                                if (event.key === Qt.Key_Escape) root.view = "detail"
-                                else if (event.key === Qt.Key_Up && !root.selectedIsImage)
-                                    fullscreenFlickable.contentY = Math.max(0, fullscreenFlickable.contentY - 30)
-                                else if (event.key === Qt.Key_Down && !root.selectedIsImage)
-                                    fullscreenFlickable.contentY = Math.min(
-                                        fullscreenFlickable.contentHeight - fullscreenFlickable.height,
-                                        fullscreenFlickable.contentY + 30)
-                                event.accepted = true
-                                return
-                            }
-                            if (event.text === "?") {
-                                if (root.view === "help") {
-                                    root.view = "list"; root.helpFilter = ""
-                                } else if (root.view === "list") {
-                                    root.view = "help"; root.helpFilter = ""
-                                }
-                                event.accepted = true
-                                return
-                            }
-                            if (root.view === "help") {
-                                if (event.key === Qt.Key_Backspace)
-                                    root.helpFilter = root.helpFilter.slice(0, -1)
-                                else if ((event.modifiers & Qt.ControlModifier) && event.key === Qt.Key_W)
-                                    root.helpFilter = root.helpFilter.replace(/\S+\s*$/, "")
-                                else if (event.text && event.text.length === 1 && event.text.charCodeAt(0) >= 32)
-                                    root.helpFilter += event.text
-                                if (event.key !== Qt.Key_Escape) event.accepted = true
-                                return
-                            }
-                            if ((event.modifiers & Qt.ControlModifier) && event.key === Qt.Key_W) {
-                                searchField.text = searchField.text.replace(/\S+\s*$/, "")
-                                event.accepted = true
-                            }
-                            if (event.key === Qt.Key_Tab) {
-                                root.view = root.view === "list" ? "detail" : "list"
-                                event.accepted = true
-                            }
-                        }
                     }
                 }
 
