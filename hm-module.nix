@@ -30,23 +30,22 @@ let
   };
 
   mkConfig =
-    { name, qml }:
+    {
+      name,
+      qml,
+      extraQml ? [ ],
+    }:
     pkgs.runCommandLocal "qs-${name}" { } ''
       mkdir -p $out/lib
       cp ${src}/lib/*.qml $out/lib/
       cp ${src}/qml/${qml} $out/shell.qml
-      cp ${nixConfig} $out/NixConfig.qml
+      ${lib.concatMapStrings (f: "cp ${src}/qml/${f} $out/\n") extraQml}cp ${nixConfig} $out/NixConfig.qml
       cp ${nixBins}   $out/NixBins.qml
     '';
 in
 {
   options.programs.kh-ui = {
     enable = lib.mkEnableOption "kh-ui shell UI";
-    launcher.enable = lib.mkOption {
-      type = lib.types.bool;
-      default = true;
-      description = "Enable the application launcher (kh-launcher).";
-    };
     clipboard-history.enable = lib.mkOption {
       type = lib.types.bool;
       default = true;
@@ -58,22 +57,19 @@ in
     (lib.mkIf config.programs.kh-ui.enable {
       programs.quickshell = {
         enable = lib.mkDefault true;
-        configs =
-          lib.optionalAttrs config.programs.kh-ui.launcher.enable {
-            kh-launcher = mkConfig { name = "kh-launcher"; qml = "kh-launcher.qml"; };
-          }
-          // lib.optionalAttrs config.programs.kh-ui.clipboard-history.enable {
-            kh-cliphist = mkConfig { name = "kh-cliphist"; qml = "kh-cliphist.qml"; };
+        configs = lib.optionalAttrs config.programs.kh-ui.clipboard-history.enable {
+          kh-cliphist = mkConfig {
+            name = "kh-cliphist";
+            qml = "kh-cliphist.qml";
+            extraQml = [ "ClipList.qml" "ClipPreview.qml" "MetaStore.qml" ];
           };
+        };
       };
     })
 
     (lib.mkIf (config.programs.kh-ui.enable && config.wayland.windowManager.hyprland.enable) {
       wayland.windowManager.hyprland.settings.exec-once =
-        lib.optionals config.programs.kh-ui.launcher.enable [
-          "${lib.getExe pkgs.quickshell} -c kh-launcher"
-        ]
-        ++ lib.optionals config.programs.kh-ui.clipboard-history.enable [
+        lib.optionals config.programs.kh-ui.clipboard-history.enable [
           "${lib.getExe pkgs.quickshell} -c kh-cliphist"
           "${lib.getExe' pkgs.wl-clipboard "wl-paste"} --watch ${lib.getExe pkgs.cliphist} store"
         ];
