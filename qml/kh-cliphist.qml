@@ -319,8 +319,7 @@ ShellRoot {
             if (root.helpShowing) {
                 root._helpFiltering = true
                 root.helpText += text
-            } else {
-                if (root.mode !== "insert") root.enterInsertMode()
+            } else if (root.mode === "insert") {
                 searchField.text += text
                 searchDebounce.stop()
                 root._runFilter()
@@ -486,10 +485,6 @@ ShellRoot {
                         root.openDetail()
                     } else if (event.key === Qt.Key_Slash) {
                         root.enterInsertMode()
-                    } else if (event.text && event.text.length === 1 &&
-                               event.text.charCodeAt(0) >= 32) {
-                        root.enterInsertMode()
-                        searchField.text += event.text
                     } else {
                         return
                     }

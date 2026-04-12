@@ -24,7 +24,7 @@ list of clipboard entries from `cliphist`. SUPER+V toggles it via IPC.
 - ✅ Enter copies the selected entry via `cliphist decode | wl-copy`; entry flashes on copy
 - ✅ Search filters: `img:` / `text:` type filter, `'` exact substring match
 - ✅ Entry counter in footer
-- ✅ Modal insert/normal mode — opens in normal mode; `j`/`k` navigate, `G` bottom, `/` or printable → insert (search focused); Escape → normal mode or closes
+- ✅ Modal insert/normal mode — opens in normal mode; `j`/`k` navigate, `G` bottom, `/` → insert (search focused); Escape → normal mode or closes
 - ✅ Full IPC control (`toggle`, `setMode`, `nav`, `key`, `type`)
 - ✅ `gg` top, `G` bottom, `Ctrl+D`/`Ctrl+U` half-page scroll
 - ✅ Emacs bindings in insert mode — `Ctrl+A`/`E` start/end, `Ctrl+F`/`B` forward/back char, `Ctrl+D` delete forward, `Ctrl+K` delete to end, `Ctrl+W` delete word, `Ctrl+U` delete to line start
