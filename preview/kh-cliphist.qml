@@ -42,7 +42,10 @@ Rectangle {
     TextStats     { id: textStats }
 
     // ── Mock data ────────────────────────────────────────────────────────────
-    property string view: "list"
+    property string view: {
+        const args = Qt.application.arguments
+        return args.length > 2 ? args[args.length - 1] : "list"
+    }
     property var allEntries: [
         "1\tHello, world! This is a clipboard entry.",
         "2\tfunction fuzzyScore(needle, haystack) {\n    let ni = 0, score = 0\n    for (let hi = 0; hi < haystack.length; hi++) {",
@@ -219,7 +222,7 @@ Rectangle {
         repeat: false
         onTriggered: win.grabToImage(result => {
             const args = Qt.application.arguments
-            const path = args.length > 1 ? args[args.length - 1] : "/tmp/kh-cliphist-preview.png"
+            const path = args.length > 1 ? args[args.indexOf("--") + 1] : "/tmp/kh-cliphist-preview.png"
             result.saveToFile(path)
             Qt.quit()
         })

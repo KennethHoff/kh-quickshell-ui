@@ -144,10 +144,17 @@
             imp=${pkgs.qt6.qtdeclarative}/lib/qt-6/qml
             export QT_QPA_PLATFORM=offscreen
             export HOME=$(mktemp -d)
-            "$qml" -I "$imp" -I "$src/lib" "$src/preview/kh-launcher.qml" -- "$out/kh-launcher.png"
-            "$qml" -I "$imp" -I "$src/lib" "$src/preview/kh-cliphist.qml" -- "$out/kh-cliphist.png"
-            echo "$out/kh-launcher.png"
-            echo "$out/kh-cliphist.png"
+            launcher() { "$qml" -I "$imp" -I "$src/lib" "$src/preview/kh-launcher.qml" -- "$out/kh-launcher-$1.png" "$1"; }
+            cliphist() { "$qml" -I "$imp" -I "$src/lib" "$src/preview/kh-cliphist.qml" -- "$out/kh-cliphist-$1.png" "$1"; }
+
+            launcher list
+            launcher help
+            launcher actions
+            cliphist list
+            cliphist detail
+            cliphist help
+
+            ls "$out/"
           '');
         };
         kh-launcher = {
