@@ -957,7 +957,7 @@ ShellRoot {
                         if (root.selectedEntry !== "") root.yank(root.selectedEntry)
                     } else if (event.text === "v") {
                         root.enterVisualMode()
-                    } else if (event.key === Qt.Key_L || event.key === Qt.Key_Tab) {
+                    } else if (event.key === Qt.Key_Tab) {
                         root.detailFocused = true
                     } else if (event.key === Qt.Key_Slash) {
                         root.enterInsertMode()
