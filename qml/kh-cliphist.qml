@@ -539,8 +539,6 @@ ShellRoot {
                             root.navHalfDown()
                         } else if (event.key === Qt.Key_U && (event.modifiers & Qt.ControlModifier)) {
                             root.navHalfUp()
-                        } else if (event.text === "y") {
-                            if (root.selectedEntry !== "") root.yank(root.selectedEntry)
                         } else {
                             return
                         }
@@ -974,7 +972,7 @@ ShellRoot {
                         text: root.detailFocused
                             ? "h / Esc  list  \u00b7  j/k  scroll  \u00b7  Enter  fullscreen  \u00b7  y  copy"
                             : root.mode === "visual"
-                                ? "j/k  select  \u00b7  y  copy  \u00b7  v / Esc  normal mode"
+                                ? "j/k  select  \u00b7  v / Esc  normal mode"
                                 : root.mode === "normal"
                                     ? "j/k  navigate  \u00b7  v  visual  \u00b7  y  copy  \u00b7  l  detail  \u00b7  /  search  \u00b7  ?  help  \u00b7  Esc  close"
                                     : "Esc  normal mode  \u00b7  ?  help"
