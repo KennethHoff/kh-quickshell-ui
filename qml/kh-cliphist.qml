@@ -271,7 +271,7 @@ ShellRoot {
                 fullTextDecodeProcess.running = false
                 searchField.text = ""
                 resultList.currentIndex = 0
-                root.enterInsertMode()
+                root.enterNormalMode()
                 if (!listProcess.running) listProcess.running = true
             }
         }
