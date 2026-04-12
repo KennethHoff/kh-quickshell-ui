@@ -83,7 +83,8 @@ ShellRoot {
                 else if (root.detailFocused)
                     { root.detailFocused = false; normalModeHandler.forceActiveFocus() }
             } else if (lk === "y") {
-                if (list.selectedEntry !== "")
+                if (list._confirmingDelete) { list.handleIpcKey(k) }
+                else if (list.selectedEntry !== "")
                     { list.flash(list.selectedIndex); pasteEntry(list.selectedEntry) }
             } else if (lk === "v") {
                 if (root.fullscreenShowing || root.detailFocused) preview.handleIpcKey(k)
@@ -287,6 +288,86 @@ ShellRoot {
                         fontSize:           cfg.fontSize
 
                         onYankTextRequested: (t) => root.yankText(t)
+                    }
+                }
+            }
+
+            // Confirm-delete overlay (backdrop + popup at z:9/10, fills panel)
+            Rectangle {
+                anchors.fill: parent
+                visible: list._confirmingDelete
+                color: "#88000000"
+                z: 9
+            }
+            Rectangle {
+                id: confirmPopup
+                visible: list._confirmingDelete
+                z: 10
+                width: Math.min(parent.width - 80, 320)
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.verticalCenter: parent.verticalCenter
+                color: cfg.color.base01
+                radius: 10
+                height: confirmCol.implicitHeight
+
+                Column {
+                    id: confirmCol
+                    width: parent.width
+
+                    Rectangle {
+                        width: parent.width
+                        height: 38
+                        color: cfg.color.base02
+                        radius: confirmPopup.radius
+                        Rectangle {
+                            anchors.left: parent.left; anchors.right: parent.right
+                            anchors.bottom: parent.bottom; height: confirmPopup.radius
+                            color: parent.color
+                        }
+                        Text {
+                            anchors.left: parent.left; anchors.leftMargin: 16
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: "CONFIRM DELETE"
+                            color: cfg.color.base08
+                            font.family: cfg.fontFamily
+                            font.pixelSize: cfg.fontSize - 3
+                            font.bold: true
+                            font.letterSpacing: 1
+                        }
+                    }
+
+                    Item {
+                        width: parent.width
+                        height: 52
+                        Text {
+                            anchors.centerIn: parent
+                            text: {
+                                const n = list._pendingDeleteLines.length
+                                return n === 1 ? "Delete this entry?" : "Delete " + n + " entries?"
+                            }
+                            color: cfg.color.base05
+                            font.family: cfg.fontFamily
+                            font.pixelSize: cfg.fontSize
+                        }
+                    }
+
+                    Rectangle {
+                        width: parent.width
+                        height: 36
+                        color: cfg.color.base02
+                        radius: confirmPopup.radius
+                        Rectangle {
+                            anchors.left: parent.left; anchors.right: parent.right
+                            anchors.top: parent.top; height: confirmPopup.radius
+                            color: parent.color
+                        }
+                        Text {
+                            anchors.centerIn: parent
+                            text: "y  confirm  \u00b7  Esc  cancel"
+                            color: cfg.color.base03
+                            font.family: cfg.fontFamily
+                            font.pixelSize: cfg.fontSize - 3
+                        }
                     }
                 }
             }
