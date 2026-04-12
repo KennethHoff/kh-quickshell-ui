@@ -93,7 +93,7 @@ nix develop
 qmltestrunner -input tests/
 ```
 
-Take headless screenshots (requires tmux + kitty terminal):
+Take headless screenshots (with optional tmux + kitty display integration):
 
 ```bash
 # Single shot

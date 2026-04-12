@@ -1,10 +1,10 @@
 ---
 name: screenshot
-description: Take one or more headless screenshots of a quickshell app, then display them in a new tmux pane using the kitty image protocol.
+description: Take one or more headless screenshots of a quickshell app, with optional tmux + kitty integration to display them inline.
 allowed-tools: Bash(nix run .#screenshot:*), Bash(tmux:*), Bash(kitty:*)
 ---
 
-Take screenshots using the headless screenshot app, then render them in a new tmux pane.
+Take screenshots using the headless screenshot app. If running inside tmux with a kitty terminal, display them inline; otherwise just report the file paths.
 
 ## Step 1 — Capture
 
@@ -29,9 +29,9 @@ The window is **opened automatically** (toggle is implicit) for each shot.
 | `nav down` / `nav up` | Move selection |
 | `key escape` | Close / go back |
 
-## Step 2 — Display
+## Step 2 — Display (optional, requires tmux + kitty)
 
-After capturing, open a new tmux pane and render the images there using `kitty +kitten icat`:
+If running inside tmux with a kitty-compatible terminal, open a new tmux pane and render the images there using `kitty +kitten icat`. Otherwise, skip this step and report the screenshot file paths to the user.
 
 ```bash
 tmux split-window -h
