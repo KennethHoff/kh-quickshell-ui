@@ -321,6 +321,22 @@ ShellRoot {
                 }
                 return true
             }
+            if (event.key === Qt.Key_H || event.key === Qt.Key_Left) {
+                const np = Math.max(0, edit.cursorPosition - 1)
+                if (np !== edit.cursorPosition) {
+                    edit.moveCursorSelection(np, TextEdit.SelectCharacters)
+                    root._scrollEditIntoView(edit, flick, np)
+                }
+                return true
+            }
+            if (event.key === Qt.Key_L || event.key === Qt.Key_Right) {
+                const np = Math.min(edit.text.length, edit.cursorPosition + 1)
+                if (np !== edit.cursorPosition) {
+                    edit.moveCursorSelection(np, TextEdit.SelectCharacters)
+                    root._scrollEditIntoView(edit, flick, np)
+                }
+                return true
+            }
             return false
         }
 
@@ -796,6 +812,18 @@ ShellRoot {
                                 fsTextEdit.select(np, np)
                                 root._scrollEditIntoView(fsTextEdit, fullscreenFlick, np)
                             }
+                        } else if (!root._detailIsImage && (event.key === Qt.Key_H || event.key === Qt.Key_Left)) {
+                            const cp = fsTextEdit.cursorPosition
+                            if (cp > 0) {
+                                fsTextEdit.select(cp - 1, cp - 1)
+                                root._scrollEditIntoView(fsTextEdit, fullscreenFlick, cp - 1)
+                            }
+                        } else if (!root._detailIsImage && (event.key === Qt.Key_L || event.key === Qt.Key_Right)) {
+                            const cp = fsTextEdit.cursorPosition
+                            if (cp < fsTextEdit.text.length) {
+                                fsTextEdit.select(cp + 1, cp + 1)
+                                root._scrollEditIntoView(fsTextEdit, fullscreenFlick, cp + 1)
+                            }
                         } else if (!root._detailIsImage && event.key === Qt.Key_D && (event.modifiers & Qt.ControlModifier)) {
                             fullscreenFlick.contentY = Math.min(
                                 Math.max(0, fullscreenFlick.contentHeight - fullscreenFlick.height),
@@ -846,7 +874,7 @@ ShellRoot {
                         }
                         const lineH = cfg.fontSize + 6
                         const halfPg = Math.max(lineH, Math.floor(detailFlick.height / 2))
-                        if (event.key === Qt.Key_H || event.key === Qt.Key_Escape) {
+                        if (event.key === Qt.Key_Escape || event.key === Qt.Key_Tab) {
                             root.detailFocused = false
                         } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
                             root.openFullscreen()
@@ -871,6 +899,18 @@ ShellRoot {
                             if (np !== detailTextEdit.cursorPosition) {
                                 detailTextEdit.select(np, np)
                                 root._scrollEditIntoView(detailTextEdit, detailFlick, np)
+                            }
+                        } else if (!root._detailIsImage && (event.key === Qt.Key_H || event.key === Qt.Key_Left)) {
+                            const cp = detailTextEdit.cursorPosition
+                            if (cp > 0) {
+                                detailTextEdit.select(cp - 1, cp - 1)
+                                root._scrollEditIntoView(detailTextEdit, detailFlick, cp - 1)
+                            }
+                        } else if (!root._detailIsImage && (event.key === Qt.Key_L || event.key === Qt.Key_Right)) {
+                            const cp = detailTextEdit.cursorPosition
+                            if (cp < detailTextEdit.text.length) {
+                                detailTextEdit.select(cp + 1, cp + 1)
+                                root._scrollEditIntoView(detailTextEdit, detailFlick, cp + 1)
                             }
                         } else if (!root._detailIsImage && event.key === Qt.Key_D && (event.modifiers & Qt.ControlModifier)) {
                             detailFlick.contentY = Math.min(
@@ -917,7 +957,7 @@ ShellRoot {
                         if (root.selectedEntry !== "") root.yank(root.selectedEntry)
                     } else if (event.text === "v") {
                         root.enterVisualMode()
-                    } else if (event.key === Qt.Key_L) {
+                    } else if (event.key === Qt.Key_L || event.key === Qt.Key_Tab) {
                         root.detailFocused = true
                     } else if (event.key === Qt.Key_Slash) {
                         root.enterInsertMode()
@@ -1357,11 +1397,11 @@ ShellRoot {
                                 ? "V/Esc exit  \u00b7  j/k extend  \u00b7  o swap  \u00b7  v char  \u00b7  Ctrl+V block  \u00b7  y copy"
                                : "Ctrl+V/Esc exit  \u00b7  j/k/h/l move  \u00b7  o diag  \u00b7  O col  \u00b7  v char  \u00b7  y copy")
                             : root.detailFocused
-                            ? "h/Esc list  \u00b7  j/k cursor  \u00b7  v/V/Ctrl+V visual  \u00b7  Enter fullscreen  \u00b7  y copy"
+                            ? "Tab/Esc list  \u00b7  hjkl cursor  \u00b7  v/V/Ctrl+V visual  \u00b7  Enter fullscreen  \u00b7  y copy"
                             : root.mode === "visual"
                                 ? "j/k  select  \u00b7  v / Esc  normal mode"
                                 : root.mode === "normal"
-                                    ? "j/k  navigate  \u00b7  v  visual  \u00b7  y  copy  \u00b7  l  detail  \u00b7  /  search  \u00b7  ?  help  \u00b7  Esc  close"
+                                    ? "j/k navigate  \u00b7  v visual  \u00b7  y copy  \u00b7  Tab detail  \u00b7  / search  \u00b7  ? help  \u00b7  Esc close"
                                     : "Esc  normal mode  \u00b7  ?  help"
                         color: cfg.color.base03
                         font.family: cfg.fontFamily
@@ -1469,7 +1509,7 @@ ShellRoot {
                                : root._visualMode === "line"
                                 ? "V/Esc exit  \u00b7  j/k extend  \u00b7  o swap  \u00b7  v char  \u00b7  Ctrl+V block  \u00b7  y copy"
                                : "Ctrl+V/Esc exit  \u00b7  j/k/h/l move  \u00b7  o diag  \u00b7  O col  \u00b7  v char  \u00b7  y copy")
-                            : "Esc back  \u00b7  v/V/Ctrl+V visual  \u00b7  y copy"
+                            : "Esc back  \u00b7  hjkl cursor  \u00b7  v/V/Ctrl+V visual  \u00b7  y copy"
                         color: cfg.color.base03
                         font.family: cfg.fontFamily
                         font.pixelSize: cfg.fontSize - 3
