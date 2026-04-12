@@ -34,7 +34,7 @@ list of clipboard entries from `cliphist`. SUPER+V toggles it via IPC.
 - ⬜ Make the help overlay context-aware — visually highlight the section that corresponds to the current mode (e.g. accent the header or show an indicator arrow), so all sections remain visible but the active one is called out
 - ✅ Fast search — haystacks pre-processed at load time; filter debounced at 80 ms; full-text cache updated via O(1) index lookup as decode streams in
 - ⬜ Insert mode in preview/fullscreen — edit the text content of an entry inline before copying; vim operator bindings (`ciw`, `dw`, `cit`, etc.); `i`/`a`/`I`/`A`/`o`/`O` to enter insert; Escape back to normal; `y` copies the (modified) content
-- ⬜ Timestamp on entries
+- ✅ Timestamp on entries — first-seen time shown right-aligned on each row ("just now" / "5m ago" / "3h ago" / "2d ago" / "4w ago"); persisted to `$XDG_DATA_HOME/kh-cliphist/timestamps` (id‹TAB›unix_seconds per line); stale IDs pruned on each load; refreshes when the overlay is reopened
 - ⬜ Source app attribution — record active Hyprland window (`hyprctl activewindow`) at copy time, stored in a side-store alongside the cliphist entry (needs a storage solution that doesn't corrupt binary clipboard data)
 - ⬜ Auto-paste — close the window and simulate Ctrl+V into the previously focused app via `wtype`
 - ✅ Delete from UI — `d` in normal mode deletes the selected entry; `d` in visual mode deletes the selected range; confirms via popup before executing; fade-out animation on deleted entries; cursor repositions to the entry above the deleted one; executed via `cliphist delete`

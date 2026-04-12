@@ -65,6 +65,10 @@ Item {
     property string _pinsFile: ""     // resolved once at startup
     property var    _pinsBuf:  []     // scratch buffer while loading the pins file
 
+    property var    _timestamps:     ({})  // {[id: string]: unix seconds (first seen)}
+    property string _timestampsFile: ""
+    property var    _timestampsBuf:  []    // scratch buffer while loading the timestamps file
+
     // ── Properties out ────────────────────────────────────────────────────────
     readonly property string selectedEntry: {
         const idx = list.currentIndex
@@ -228,6 +232,30 @@ Item {
         pinsWriteProcess.command = [bin.bash, "-c",
             'f="$1"; shift; printf "%s\\n" "$@" > "$f"', "--", _pinsFile].concat(ids)
         pinsWriteProcess.running = true
+    }
+
+    // ── Timestamps ────────────────────────────────────────────────────────────
+    // Returns a human-readable relative time string for a unix timestamp.
+    // Returns "" for ts=0 (not yet loaded).
+    function _relTime(ts) {
+        if (!ts) return ""
+        const diff = Math.floor(Date.now() / 1000) - ts
+        if (diff < 60)     return "just now"
+        if (diff < 3600)   return Math.floor(diff / 60) + "m ago"
+        if (diff < 86400)  return Math.floor(diff / 3600) + "h ago"
+        if (diff < 604800) return Math.floor(diff / 86400) + "d ago"
+        return Math.floor(diff / 604800) + "w ago"
+    }
+
+    // Persist the current timestamp map to disk (id<TAB>unix_seconds per line).
+    function _writeTimestamps() {
+        if (!_timestampsFile) return
+        const pairs = []
+        for (const [id, ts] of Object.entries(_timestamps)) pairs.push(id, String(ts))
+        tsWriteProcess.command = [bin.bash, "-c",
+            'f="$1"; shift; { while [[ $# -ge 2 ]]; do printf "%s\\t%s\\n" "$1" "$2"; shift 2; done; } > "$f"',
+            "--", _timestampsFile].concat(pairs)
+        tsWriteProcess.running = true
     }
 
     // Phase 2: called by deleteAnimTimer after the fade-out completes.
@@ -500,6 +528,22 @@ Item {
             clipList._processed    = processed
             clipList._processedIdx = idx
             clipList._runFilter()
+
+            // Record first-seen timestamp for new entries; prune stale IDs.
+            if (clipList._timestampsFile) {
+                const now     = Math.floor(Date.now() / 1000)
+                const updated = {}
+                let changed   = false
+                for (const [id, ts] of Object.entries(clipList._timestamps)) {
+                    if (id in idx) updated[id] = ts
+                    else changed = true   // stale entry pruned
+                }
+                for (const id of Object.keys(idx)) {
+                    if (!(id in updated)) { updated[id] = now; changed = true }
+                }
+                if (changed) { clipList._timestamps = updated; clipList._writeTimestamps() }
+            }
+
             fullTextDecodeProcess.exec([bin.cliphistDecodeAll])
         }
     }
@@ -546,7 +590,10 @@ Item {
     Process { id: deleteProcess }
 
     // ── Pin persistence ───────────────────────────────────────────────────────
-    Component.onCompleted: pinsPathProcess.running = true
+    Component.onCompleted: {
+        pinsPathProcess.running = true
+        tsPathProcess.running   = true
+    }
 
     // Step 1: resolve $XDG_DATA_HOME/kh-cliphist/pins and create the directory.
     Process {
@@ -578,6 +625,38 @@ Item {
 
     // Step 3: write pins on demand (command is set dynamically in _writePins).
     Process { id: pinsWriteProcess }
+
+    // ── Timestamp persistence ─────────────────────────────────────────────────
+    Process {
+        id: tsPathProcess
+        command: [bin.bash, "-c",
+            'f="${XDG_DATA_HOME:-$HOME/.local/share}/kh-cliphist/timestamps"' +
+            '; mkdir -p "$(dirname "$f")"' +
+            '; printf "%s\\n" "$f"']
+        stdout: SplitParser {
+            onRead: (line) => { if (line) clipList._timestampsFile = line }
+        }
+        onExited: { if (clipList._timestampsFile) tsReadProcess.running = true }
+    }
+
+    Process {
+        id: tsReadProcess
+        command: [bin.bash, "-c", '[ -f "$1" ] && cat "$1" || true', "--", clipList._timestampsFile]
+        stdout: SplitParser {
+            onRead: (line) => { if (line) clipList._timestampsBuf.push(line) }
+        }
+        onExited: {
+            const t = {}
+            for (const line of clipList._timestampsBuf) {
+                const tab = line.indexOf("\t")
+                if (tab > 0) t[line.substring(0, tab)] = parseInt(line.substring(tab + 1))
+            }
+            clipList._timestamps    = t
+            clipList._timestampsBuf = []
+        }
+    }
+
+    Process { id: tsWriteProcess }
 
     // ── UI ────────────────────────────────────────────────────────────────────
     Column {
@@ -757,10 +836,25 @@ Item {
                     }
 
                     Text {
-                        visible: !delegateRoot.isImage
-                        anchors.fill: parent
-                        anchors.leftMargin: 14
+                        id: tsLabel
+                        anchors.right: parent.right
                         anchors.rightMargin: 10
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: (clipList._timestamps, clipList._relTime(
+                            clipList._timestamps[delegateRoot.entryId] || 0))
+                        color: cfg.color.base03
+                        font.family: cfg.fontFamily
+                        font.pixelSize: cfg.fontSize - 4
+                    }
+
+                    Text {
+                        visible: !delegateRoot.isImage
+                        anchors.top: parent.top
+                        anchors.bottom: parent.bottom
+                        anchors.left: parent.left
+                        anchors.right: tsLabel.left
+                        anchors.leftMargin: 14
+                        anchors.rightMargin: 4
                         text: delegateRoot.preview
                         color: cfg.color.base05
                         font.family: cfg.fontFamily
