@@ -119,6 +119,7 @@
       packages.${system} = {
         kh-launcher = launcherConfig;
         kh-cliphist = cliphistConfig;
+        cliphistDecodeAll = cliphistDecodeAllScript;
       };
 
       apps.${system} = {
