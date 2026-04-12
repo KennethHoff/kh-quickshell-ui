@@ -234,6 +234,23 @@
             rm -rf "$xdg_runtime"
           '');
         };
+        kh-launcher = {
+          type = "app";
+          program = toString (pkgs.writeShellScript "run-kh-launcher" ''
+            qs=${lib.getExe' pkgs.quickshell "quickshell"}
+            "$qs" -p ${launcherConfig} &
+            QS_PID=$!
+            for i in $(seq 30); do
+              sleep 0.1
+              "$qs" ipc --pid "$QS_PID" call launcher toggle 2>/dev/null && break
+            done
+            while [[ "$("$qs" ipc --pid "$QS_PID" prop get launcher showing 2>/dev/null)" == "true" ]]; do
+              sleep 0.2
+            done
+            kill "$QS_PID" 2>/dev/null
+            wait "$QS_PID" 2>/dev/null
+          '');
+        };
         kh-launcher-daemon = {
           type = "app";
           program = toString (pkgs.writeShellScript "run-kh-launcher-daemon" ''
