@@ -39,6 +39,26 @@
 
       cliphistDecodeAllScript = import ./scripts/cliphist-decode-all.nix { inherit pkgs lib; };
 
+      viewConfig = pkgs.runCommand "kh-view-config" { } ''
+        mkdir -p $out/lib
+        cp ${self}/lib/*.qml $out/lib/
+        cp ${self}/qml/kh-view.qml $out/shell.qml
+        cp ${import ./config.nix {
+          inherit pkgs;
+          colors = {
+            base00 = "1e1e2e"; base01 = "181825"; base02 = "313244"; base03 = "45475a";
+            base04 = "585b70"; base05 = "cdd6f4"; base06 = "f5c2e7"; base07 = "b4befe";
+            base08 = "f38ba8"; base09 = "fab387"; base0A = "f9e2af"; base0B = "a6e3a1";
+            base0C = "94e2d5"; base0D = "89b4fa"; base0E = "cba6f7"; base0F = "f2cdcd";
+          };
+          fontName = "monospace";
+          fontSize = 14;
+        }} $out/NixConfig.qml
+        cp ${import ./ffi.nix {
+          inherit pkgs lib;
+        }} $out/NixBins.qml
+      '';
+
       cliphistConfig = pkgs.runCommand "kh-cliphist-config" { } ''
         mkdir -p $out/lib
         cp ${self}/lib/*.qml $out/lib/
@@ -93,6 +113,7 @@
       packages.${system} = {
         kh-cliphist = cliphistConfig;
         cliphistDecodeAll = cliphistDecodeAllScript;
+        kh-view = viewConfig;
       };
 
       apps.${system} = {
@@ -183,6 +204,25 @@
             done
             kill "$QS_PID" 2>/dev/null
             wait "$QS_PID" 2>/dev/null
+          '');
+        };
+        kh-view = {
+          type = "app";
+          # Usage: nix run .#kh-view -- <file>
+          #        <cmd> | nix run .#kh-view
+          program = toString (pkgs.writeShellScript "run-kh-view" ''
+            set -e
+            qs=${lib.getExe' pkgs.quickshell "quickshell"}
+            if [[ $# -ge 1 ]]; then
+              export KH_VIEW_FILE="$1"
+              exec "$qs" -p ${viewConfig}
+            else
+              tmp=$(mktemp)
+              trap 'rm -f "$tmp"' EXIT
+              cat > "$tmp"
+              export KH_VIEW_FILE="$tmp"
+              "$qs" -p ${viewConfig}
+            fi
           '');
         };
       };

@@ -108,6 +108,18 @@ progress bar and icon, then fades out automatically.
 
 ---
 
+## File Viewer
+
+One-shot fullscreen viewer for arbitrary text or image files. Accepts a file
+argument or stdin; wraps TextViewer in a full-screen overlay window.
+
+- ✅ `nix run .#kh-view -- <file>` or `<cmd> | nix run .#kh-view`
+- ✅ Image detection by extension (png/jpg/jpeg/gif/webp/bmp/svg)
+- ✅ `hjkl`/`gg`/`G`/`Ctrl+D`/`U` navigation; `v`/`V`/`Ctrl+V` visual select; `y` copies selection; `q`/`Esc` quits
+- ⬜ IPC support for scripted control
+
+---
+
 ## Undecided
 
 Features that make sense on laptops but have unclear value on a desktop.
