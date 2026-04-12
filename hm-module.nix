@@ -54,16 +54,29 @@ in
     };
   };
 
-  config = lib.mkIf config.programs.kh-ui.enable {
-    programs.quickshell = {
-      enable = lib.mkDefault true;
-      configs =
-        lib.optionalAttrs config.programs.kh-ui.launcher.enable {
-          kh-launcher = mkConfig { name = "kh-launcher"; qml = "kh-launcher.qml"; };
-        }
-        // lib.optionalAttrs config.programs.kh-ui.clipboard-history.enable {
-          kh-cliphist = mkConfig { name = "kh-cliphist"; qml = "kh-cliphist.qml"; };
-        };
-    };
-  };
+  config = lib.mkMerge [
+    (lib.mkIf config.programs.kh-ui.enable {
+      programs.quickshell = {
+        enable = lib.mkDefault true;
+        configs =
+          lib.optionalAttrs config.programs.kh-ui.launcher.enable {
+            kh-launcher = mkConfig { name = "kh-launcher"; qml = "kh-launcher.qml"; };
+          }
+          // lib.optionalAttrs config.programs.kh-ui.clipboard-history.enable {
+            kh-cliphist = mkConfig { name = "kh-cliphist"; qml = "kh-cliphist.qml"; };
+          };
+      };
+    })
+
+    (lib.mkIf (config.programs.kh-ui.enable && config.wayland.windowManager.hyprland.enable) {
+      wayland.windowManager.hyprland.settings.exec-once =
+        lib.optionals config.programs.kh-ui.launcher.enable [
+          "${lib.getExe pkgs.quickshell} -c kh-launcher"
+        ]
+        ++ lib.optionals config.programs.kh-ui.clipboard-history.enable [
+          "${lib.getExe pkgs.quickshell} -c kh-cliphist"
+          "${lib.getExe' pkgs.wl-clipboard "wl-paste"} --watch ${lib.getExe pkgs.cliphist} store"
+        ];
+    })
+  ];
 }
