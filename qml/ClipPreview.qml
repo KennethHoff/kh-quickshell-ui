@@ -64,7 +64,7 @@ Item {
         if (viewer.handleKey(event)) return true
 
         // These are returned false by TextViewer in normal mode
-        if (event.key === Qt.Key_Escape || event.key === Qt.Key_Tab) {
+        if (event.key === Qt.Key_Escape || event.key === Qt.Key_Tab || event.text === "q") {
             exitFocus(); return true
         }
         if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {

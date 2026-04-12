@@ -344,7 +344,7 @@ Item {
     }
     function _handleVisualKey(event) {
         // ── Exit / mode-switch ─────────────────────────────────────────────
-        if (event.key === Qt.Key_Escape) {
+        if (event.key === Qt.Key_Escape || event.text === "q") {
             const cp = edit.cursorPosition; _visualMode = ""; edit.select(cp, cp); return true
         }
         if (event.text === "v") {

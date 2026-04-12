@@ -78,7 +78,7 @@ Overlay {
         }
 
         // Non-filtering mode
-        if (event.key === Qt.Key_Escape || event.text === "?") {
+        if (event.key === Qt.Key_Escape || event.text === "?" || event.text === "q") {
             close()
         } else if (event.key === Qt.Key_Slash) {
             _filtering = true; _filterText = ""

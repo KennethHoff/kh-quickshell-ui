@@ -389,7 +389,7 @@ Item {
     // ── Private key handlers ──────────────────────────────────────────────────
     function _handleNormalKey(event) {
         if (event.text === "?") return false   // propagate → orchestrator opens help
-        if (event.key === Qt.Key_Escape) {
+        if (event.key === Qt.Key_Escape || event.text === "q") {
             closeRequested(); return true
         }
         if (event.key === Qt.Key_J || event.key === Qt.Key_Down) {
@@ -435,7 +435,7 @@ Item {
     }
 
     function _handleVisualKey(event) {
-        if (event.key === Qt.Key_Escape || event.text === "v") {
+        if (event.key === Qt.Key_Escape || event.text === "v" || event.text === "q") {
             enterNormalMode(); return true
         }
         if (event.key === Qt.Key_J || event.key === Qt.Key_Down) {

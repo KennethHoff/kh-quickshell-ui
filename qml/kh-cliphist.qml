@@ -164,7 +164,7 @@ ShellRoot {
                             if (list.selectedEntry !== "")
                                 { list.flash(list.selectedIndex); pasteEntry(list.selectedEntry) }
                             event.accepted = true
-                        } else if (event.key === Qt.Key_Escape) {
+                        } else if (event.key === Qt.Key_Escape || event.text === "q") {
                             root.fullscreenShowing = false; fsViewer.reset(); event.accepted = true
                         }
                         return
@@ -344,7 +344,7 @@ ShellRoot {
                         { key: "Enter",      desc: "fullscreen detail" },
                         { key: "Tab / Esc",  desc: "focus list (from detail)" },
                         { key: "/",          desc: "focus search" },
-                        { key: "Esc",        desc: "close" }
+                        { key: "q / Esc",    desc: "close" }
                     ]
                 }, {
                     title: "VISUAL MODE",
@@ -356,7 +356,7 @@ ShellRoot {
                         { key: "Ctrl+D",     desc: "half-page down" },
                         { key: "Ctrl+U",     desc: "half-page up" },
                         { key: "d",          desc: "delete selected entries" },
-                        { key: "v / Esc",    desc: "normal mode" }
+                        { key: "q / v / Esc", desc: "normal mode" }
                     ]
                 }, {
                     title: "INSERT MODE",
