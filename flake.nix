@@ -122,28 +122,26 @@
       };
 
       apps.${system} = {
-        # Single headless screenshot.
-        # Usage: nix run .#screenshot -- <kh-launcher|kh-cliphist> <name> [<ipc-call>...]
-        # Output: /tmp/qs-screenshots/<name>.png
+        # Headless screenshot(s) in a single run.
+        # Usage: nix run .#screenshot -- <app> <name> [<ipc-call>...] [-- <name> [<ipc-call>...]]...
+        # Multiple shots separated by -- share one sway instance and one run directory.
         # Each <ipc-call> is a function name with optional arg, e.g. "setView help" or "type Navigate".
         # The window is opened automatically via toggle before any calls are made.
         screenshot = {
           type = "app";
           program = toString (pkgs.writeShellScript "qs-screenshot" ''
             set -e
-            run=/tmp/qs-screenshots/$(date +%Y%m%d-%H%M%S)
-            if [[ "$1" == --run ]]; then run=$2; shift 2; fi
-            app=$1 name=$2; shift 2
-            mkdir -p "$run"
-            outfile=$run/$name.png
+            app=$1; shift
             case "$app" in
               kh-launcher) config=${launcherConfig}; target=launcher ;;
               kh-cliphist) config=${cliphistConfig}; target=viewer   ;;
-              *) echo "usage: screenshot [--run <dir>] <app> <name> [<ipc-call>...]" >&2; exit 1 ;;
+              *) echo "usage: screenshot <app> <name> [<ipc-call>...] [-- <name> [<ipc-call>...]]..." >&2; exit 1 ;;
             esac
             qs=${lib.getExe' pkgs.quickshell "quickshell"}
             grim=${lib.getExe pkgs.grim}
             sway=${lib.getExe pkgs.sway}
+            run=/tmp/qs-screenshots/$(date +%Y%m%d-%H%M%S)
+            mkdir -p "$run"
 
             xdg_runtime=$(mktemp -d)
             export XDG_RUNTIME_DIR=$xdg_runtime
@@ -157,23 +155,36 @@
             done
             export WAYLAND_DISPLAY=$(basename "$socket")
 
-            WAYLAND_DISPLAY=$WAYLAND_DISPLAY "$qs" -p "$config" >/dev/null 2>&1 &
-            pid=$!
-            for i in $(seq 30); do
-              sleep 0.1
-              "$qs" ipc --pid "$pid" call "$target" toggle >/dev/null 2>&1 && break
+            shoot() {
+              local name=$1; shift
+              local outfile=$run/$name.png
+              WAYLAND_DISPLAY=$WAYLAND_DISPLAY "$qs" -p "$config" >/dev/null 2>&1 &
+              local pid=$!
+              for i in $(seq 30); do
+                sleep 0.1
+                "$qs" ipc --pid "$pid" call "$target" toggle >/dev/null 2>&1 && break
+              done
+              for call in "$@"; do
+                read -ra words <<< "$call"
+                "$qs" ipc --pid "$pid" call "$target" "''${words[@]}" >/dev/null 2>&1 || true
+              done
+              sleep 0.4
+              WAYLAND_DISPLAY=$WAYLAND_DISPLAY "$grim" "$outfile"
+              echo "$outfile"
+              disown "$pid" 2>/dev/null; kill -9 "$pid" 2>/dev/null
+            }
+
+            # Split args on '--' and invoke shoot() for each group.
+            group=()
+            for arg in "$@" "--"; do
+              if [[ "$arg" == "--" ]]; then
+                [[ ''${#group[@]} -gt 0 ]] && shoot "''${group[@]}"
+                group=()
+              else
+                group+=("$arg")
+              fi
             done
 
-            for call in "$@"; do
-              read -ra words <<< "$call"
-              "$qs" ipc --pid "$pid" call "$target" "''${words[@]}" >/dev/null 2>&1 || true
-            done
-
-            sleep 0.4
-            WAYLAND_DISPLAY=$WAYLAND_DISPLAY "$grim" "$outfile"
-            echo "$outfile"
-
-            disown "$pid" 2>/dev/null; kill -9 "$pid" 2>/dev/null
             kill -9 "$SWAY_PID" 2>/dev/null
             rm -rf "$xdg_runtime"
           '');
