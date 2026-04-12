@@ -197,11 +197,11 @@ ShellRoot {
                         if (root.fullscreenShowing)
                             return preview.modeText !== ""
                                 ? preview.hintText
-                                : "Esc back  \u00b7  hjkl cursor  \u00b7  v/V/Ctrl+V visual  \u00b7  y copy"
+                                : "Esc back  \u00b7  hjkl/w/b/e cursor  \u00b7  0/$  line  \u00b7  v/V/Ctrl+V visual  \u00b7  y copy"
                         if (root.detailFocused)
                             return preview.modeText !== ""
                                 ? preview.hintText
-                                : "Tab/Esc list  \u00b7  hjkl cursor  \u00b7  v/V/Ctrl+V visual  \u00b7  Enter fullscreen  \u00b7  y copy"
+                                : "Tab/Esc list  \u00b7  hjkl/w/b/e cursor  \u00b7  0/$  line  \u00b7  v/V/Ctrl+V visual  \u00b7  Enter fullscreen  \u00b7  y copy"
                         return list.hintText
                     }
                     color: cfg.color.base03

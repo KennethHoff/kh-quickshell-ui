@@ -72,7 +72,7 @@ Item {
             return "V/Esc exit  \u00b7  j/k extend  \u00b7  o swap  \u00b7  v char  \u00b7  Ctrl+V block  \u00b7  y copy"
         if (_visualMode === "block")
             return "Ctrl+V/Esc exit  \u00b7  j/k/h/l move  \u00b7  o diag  \u00b7  O col  \u00b7  v char  \u00b7  y copy"
-        return "hjkl cursor  \u00b7  v/V/Ctrl+V visual"
+        return "hjkl cursor  \u00b7  w/b/e word  \u00b7  0/$  line  \u00b7  v/V/Ctrl+V visual"
     }
 
     // ── Signals ──────────────────────────────────────────────────────────────
@@ -110,6 +110,44 @@ Item {
             const cp = edit.cursorPosition
             if (cp < edit.text.length) { edit.select(cp + 1, cp + 1); _scrollIntoView(cp + 1) }
             return true
+        }
+
+        // ── Word motions ──────────────────────────────────────────────────
+        if (event.text === "w") {
+            const np = _wordForward(edit.cursorPosition)
+            edit.select(np, np); _scrollIntoView(np); return true
+        }
+        if (event.text === "W") {
+            const np = _WORDForward(edit.cursorPosition)
+            edit.select(np, np); _scrollIntoView(np); return true
+        }
+        if (event.text === "b") {
+            const np = _wordBackward(edit.cursorPosition)
+            edit.select(np, np); _scrollIntoView(np); return true
+        }
+        if (event.text === "B") {
+            const np = _WORDBackward(edit.cursorPosition)
+            edit.select(np, np); _scrollIntoView(np); return true
+        }
+        if (event.text === "e") {
+            const np = _wordEnd(edit.cursorPosition)
+            edit.select(np, np); _scrollIntoView(np); return true
+        }
+        if (event.text === "E") {
+            const np = _WORDEnd(edit.cursorPosition)
+            edit.select(np, np); _scrollIntoView(np); return true
+        }
+        if (event.text === "0") {
+            const np = _posLineStart(edit.cursorPosition)
+            edit.select(np, np); _scrollIntoView(np); return true
+        }
+        if (event.text === "$") {
+            const np = _posLineEnd(edit.cursorPosition)
+            edit.select(np, np); _scrollIntoView(np); return true
+        }
+        if (event.text === "^") {
+            const np = _posFirstNonBlank(edit.cursorPosition)
+            edit.select(np, np); _scrollIntoView(np); return true
         }
 
         // ── Enter visual ──────────────────────────────────────────────────
@@ -184,6 +222,92 @@ Item {
         for (let i = 0; i < t.length; i++) if (t[i] === '\n') n++
         return n
     }
+
+    // ── Word-motion helpers ───────────────────────────────────────────────────
+    function _isWordChar(ch) { return /\w/.test(ch) }
+    function _isSpace(ch)    { return ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r' }
+
+    // pos-based line helpers (complement the row-based ones above)
+    function _posLineStart(pos) {
+        const t = edit.text
+        while (pos > 0 && t[pos - 1] !== '\n') pos--
+        return pos
+    }
+    function _posLineEnd(pos) {
+        const t = edit.text; const n = t.length
+        while (pos < n && t[pos] !== '\n') pos++
+        return pos
+    }
+    function _posFirstNonBlank(pos) {
+        pos = _posLineStart(pos)
+        const t = edit.text; const n = t.length
+        while (pos < n && t[pos] !== '\n' && (t[pos] === ' ' || t[pos] === '\t')) pos++
+        return pos
+    }
+
+    // w — forward to start of next word
+    function _wordForward(pos) {
+        const t = edit.text; const n = t.length
+        if (pos >= n) return pos
+        const c = t[pos]
+        if      (_isWordChar(c))  while (pos < n && _isWordChar(t[pos]))                        pos++
+        else if (!_isSpace(c))    while (pos < n && !_isWordChar(t[pos]) && !_isSpace(t[pos]))  pos++
+        while (pos < n && _isSpace(t[pos])) pos++
+        return pos
+    }
+    // W — forward to start of next WORD (whitespace-delimited)
+    function _WORDForward(pos) {
+        const t = edit.text; const n = t.length
+        if (pos >= n) return pos
+        while (pos < n && !_isSpace(t[pos])) pos++
+        while (pos < n &&  _isSpace(t[pos])) pos++
+        return pos
+    }
+    // b — backward to start of current/previous word
+    function _wordBackward(pos) {
+        const t = edit.text
+        if (pos <= 0) return 0
+        pos--
+        while (pos > 0 && _isSpace(t[pos])) pos--
+        if (_isWordChar(t[pos]))
+            while (pos > 0 && _isWordChar(t[pos - 1]))                          pos--
+        else
+            while (pos > 0 && !_isWordChar(t[pos - 1]) && !_isSpace(t[pos - 1])) pos--
+        return pos
+    }
+    // B — backward to start of current/previous WORD
+    function _WORDBackward(pos) {
+        const t = edit.text
+        if (pos <= 0) return 0
+        pos--
+        while (pos > 0 && _isSpace(t[pos]))       pos--
+        while (pos > 0 && !_isSpace(t[pos - 1]))  pos--
+        return pos
+    }
+    // e — forward to end of current/next word
+    function _wordEnd(pos) {
+        const t = edit.text; const n = t.length
+        if (pos >= n - 1) return n > 0 ? n - 1 : 0
+        pos++
+        while (pos < n && _isSpace(t[pos])) pos++
+        if (pos >= n) return n - 1
+        if (_isWordChar(t[pos]))
+            while (pos + 1 < n && _isWordChar(t[pos + 1]))                          pos++
+        else
+            while (pos + 1 < n && !_isWordChar(t[pos + 1]) && !_isSpace(t[pos + 1])) pos++
+        return pos
+    }
+    // E — forward to end of current/next WORD
+    function _WORDEnd(pos) {
+        const t = edit.text; const n = t.length
+        if (pos >= n - 1) return n > 0 ? n - 1 : 0
+        pos++
+        while (pos < n && _isSpace(t[pos]))           pos++
+        if (pos >= n) return n - 1
+        while (pos + 1 < n && !_isSpace(t[pos + 1])) pos++
+        return pos
+    }
+
     function _scrollIntoView(pos) {
         const r = edit.positionToRectangle(pos)
         if (r.y + r.height > flick.contentY + flick.height)
@@ -306,6 +430,24 @@ Item {
                     edit.moveCursorSelection(np, TextEdit.SelectCharacters); _scrollIntoView(np)
                 }
                 return true
+            }
+            // ── Word motions (extend selection) ────────────────────────────
+            {
+                let np = -1
+                if      (event.text === "w") np = _wordForward(edit.cursorPosition)
+                else if (event.text === "W") np = _WORDForward(edit.cursorPosition)
+                else if (event.text === "b") np = _wordBackward(edit.cursorPosition)
+                else if (event.text === "B") np = _WORDBackward(edit.cursorPosition)
+                else if (event.text === "e") np = _wordEnd(edit.cursorPosition)
+                else if (event.text === "E") np = _WORDEnd(edit.cursorPosition)
+                else if (event.text === "0") np = _posLineStart(edit.cursorPosition)
+                else if (event.text === "$") np = _posLineEnd(edit.cursorPosition)
+                else if (event.text === "^") np = _posFirstNonBlank(edit.cursorPosition)
+                if (np >= 0 && np !== edit.cursorPosition) {
+                    edit.moveCursorSelection(np, TextEdit.SelectCharacters)
+                    _scrollIntoView(np)
+                }
+                if (np >= 0) return true
             }
             return false
         }
