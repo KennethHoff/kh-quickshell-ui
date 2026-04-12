@@ -35,6 +35,7 @@ ShellRoot {
 
     property bool   detailFocused: false
     property bool   fullscreenShowing: false
+    property int    _visualAnchor: 0
     property bool   _detailIsImage: false
     property string _detailText: ""
     property var    _detailLines: []
@@ -105,6 +106,12 @@ ShellRoot {
 
     function enterNormalMode() {
         root.mode = "normal"
+        normalModeHandler.forceActiveFocus()
+    }
+
+    function enterVisualMode() {
+        root._visualAnchor = resultList.currentIndex
+        root.mode = "visual"
         normalModeHandler.forceActiveFocus()
     }
 
@@ -328,6 +335,9 @@ ShellRoot {
             } else if (lk === "/" && root.helpShowing) {
                 root._helpFiltering = true
                 root.helpText = ""
+            } else if (lk === "v" && !root.helpShowing) {
+                if (root.mode === "visual") root.mode = "normal"
+                else root.enterVisualMode()
             } else if (lk === "l" && !root.helpShowing) {
                 root.detailFocused = true
             } else if (lk === "h" && root.detailFocused) {
@@ -512,6 +522,32 @@ ShellRoot {
                         return
                     }
 
+                    // ── Visual mode ───────────────────────────────────────────
+                    if (root.mode === "visual") {
+                        if (event.key === Qt.Key_Escape || event.text === "v") {
+                            root.mode = "normal"
+                        } else if (event.key === Qt.Key_J || event.key === Qt.Key_Down) {
+                            root.navDown()
+                        } else if (event.key === Qt.Key_K || event.key === Qt.Key_Up) {
+                            root.navUp()
+                        } else if (event.key === Qt.Key_G && (event.modifiers & Qt.ShiftModifier)) {
+                            root.navBottom()
+                        } else if (event.key === Qt.Key_G) {
+                            if (root._pendingG) { gTimer.stop(); root.navTop(); root._pendingG = false }
+                            else { root._pendingG = true; gTimer.restart() }
+                        } else if (event.key === Qt.Key_D && (event.modifiers & Qt.ControlModifier)) {
+                            root.navHalfDown()
+                        } else if (event.key === Qt.Key_U && (event.modifiers & Qt.ControlModifier)) {
+                            root.navHalfUp()
+                        } else if (event.text === "y") {
+                            if (root.selectedEntry !== "") root.yank(root.selectedEntry)
+                        } else {
+                            return
+                        }
+                        event.accepted = true
+                        return
+                    }
+
                     // ── Detail focus ──────────────────────────────────────────
                     if (root.detailFocused) {
                         const lineH = cfg.fontSize + 6
@@ -571,6 +607,8 @@ ShellRoot {
                         root.navHalfUp()
                     } else if (event.text === "y") {
                         if (root.selectedEntry !== "") root.yank(root.selectedEntry)
+                    } else if (event.text === "v") {
+                        root.enterVisualMode()
                     } else if (event.key === Qt.Key_L) {
                         root.detailFocused = true
                     } else if (event.key === Qt.Key_Slash) {
@@ -601,7 +639,7 @@ ShellRoot {
                         anchors.left: parent.left
                         anchors.leftMargin: 10
                         anchors.verticalCenter: parent.verticalCenter
-                        visible: root.mode === "normal"
+                        visible: root.mode !== "insert"
                         width: modeLabel.implicitWidth + 12
                         height: 22
                         radius: 4
@@ -610,8 +648,8 @@ ShellRoot {
                         Text {
                             id: modeLabel
                             anchors.centerIn: parent
-                            text: "NOR"
-                            color: cfg.color.base0D
+                            text: root.mode === "visual" ? "VIS" : "NOR"
+                            color: root.mode === "visual" ? cfg.color.base0E : cfg.color.base0D
                             font.family: cfg.fontFamily
                             font.pixelSize: cfg.fontSize - 3
                             font.bold: true
@@ -730,7 +768,16 @@ ShellRoot {
                             Rectangle {
                                 anchors.fill: parent
                                 anchors.margins: 2
-                                color: delegateRoot.isCurrent ? cfg.color.base02 : "transparent"
+                                color: {
+                                    if (root.mode === "visual") {
+                                        const lo = Math.min(root._visualAnchor, resultList.currentIndex)
+                                        const hi = Math.max(root._visualAnchor, resultList.currentIndex)
+                                        if (delegateRoot.index >= lo && delegateRoot.index <= hi)
+                                            return delegateRoot.isCurrent ? cfg.color.base03 : cfg.color.base02
+                                        return "transparent"
+                                    }
+                                    return delegateRoot.isCurrent ? cfg.color.base02 : "transparent"
+                                }
                                 radius: 6
 
                                 Image {
@@ -926,9 +973,11 @@ ShellRoot {
                         anchors.verticalCenter: parent.verticalCenter
                         text: root.detailFocused
                             ? "h / Esc  list  \u00b7  j/k  scroll  \u00b7  Enter  fullscreen  \u00b7  y  copy"
-                            : root.mode === "normal"
-                                ? "j/k  navigate  \u00b7  y  copy  \u00b7  l  detail  \u00b7  /  search  \u00b7  ?  help  \u00b7  Esc  close"
-                                : "Esc  normal mode  \u00b7  ?  help"
+                            : root.mode === "visual"
+                                ? "j/k  select  \u00b7  y  copy  \u00b7  v / Esc  normal mode"
+                                : root.mode === "normal"
+                                    ? "j/k  navigate  \u00b7  v  visual  \u00b7  y  copy  \u00b7  l  detail  \u00b7  /  search  \u00b7  ?  help  \u00b7  Esc  close"
+                                    : "Esc  normal mode  \u00b7  ?  help"
                         color: cfg.color.base03
                         font.family: cfg.fontFamily
                         font.pixelSize: cfg.fontSize - 3
@@ -1221,6 +1270,7 @@ ShellRoot {
                                     ShortcutRow { keys: "Ctrl+D"; action: "half-page down" }
                                     ShortcutRow { keys: "Ctrl+U"; action: "half-page up" }
                                     ShortcutRow { keys: "y";       action: "copy to clipboard" }
+                                    ShortcutRow { keys: "v";       action: "visual select mode" }
                                     ShortcutRow { keys: "l";       action: "focus detail pane" }
                                     ShortcutRow { keys: "Enter";   action: "fullscreen detail" }
                                     ShortcutRow { keys: "h / Esc"; action: "focus list" }
