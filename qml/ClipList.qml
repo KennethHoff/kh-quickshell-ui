@@ -178,7 +178,7 @@ Item {
         _runFilter()
 
         const newLen = filteredEntries.length
-        if (curIdx >= newLen && newLen > 0) list.currentIndex = newLen - 1
+        if (newLen > 0) list.currentIndex = Math.min(Math.max(0, curIdx - 1), newLen - 1)
     }
 
     // Append `text` to the search field (IPC use only — not for key events).
