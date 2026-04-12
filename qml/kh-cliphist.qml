@@ -196,8 +196,64 @@ ShellRoot {
 
     IpcHandler {
         target: "viewer"
-        readonly property bool showing: root.showing
-        function toggle() { root.showing = !root.showing }
+        readonly property bool   showing: root.showing
+        readonly property string view:    root.view
+        function toggle()   { root.showing = !root.showing }
+        function setView(v) { root.view = v }
+        function nav(dir) {
+            if (root.view === "detail") {
+                if (dir === "down")
+                    detailFlickable.contentY = Math.min(
+                        detailFlickable.contentHeight - detailFlickable.height,
+                        detailFlickable.contentY + 30)
+                else
+                    detailFlickable.contentY = Math.max(0, detailFlickable.contentY - 30)
+            } else if (root.view === "list") {
+                if (dir === "down" && resultList.currentIndex < resultList.count - 1)
+                    resultList.currentIndex++
+                else if (dir === "up" && resultList.currentIndex > 0)
+                    resultList.currentIndex--
+            }
+        }
+        function type(text) {
+            for (let i = 0; i < text.length; i++) {
+                const ch = text[i]
+                if (ch === "?") {
+                    if (root.view === "help") { root.view = "list"; root.helpFilter = "" }
+                    else if (root.view === "list") { root.view = "help"; root.helpFilter = "" }
+                } else if (root.view === "help") {
+                    root.helpFilter += ch
+                } else if (root.view === "list") {
+                    searchField.text += ch
+                }
+            }
+        }
+        function key(k) {
+            const lk = k.toLowerCase()
+            if (lk === "escape" || lk === "esc") {
+                if (root.view === "help") {
+                    if (root.helpFilter) root.helpFilter = ""; else root.view = "list"
+                } else if (root.view === "fullscreen") root.view = "detail"
+                else if (root.view === "detail") root.view = "list"
+                else root.showing = false
+            } else if (lk === "enter" || lk === "return") {
+                if (root.view === "detail") root.view = "fullscreen"
+                else if (root.view === "fullscreen") root.view = "detail"
+                else if (root.view === "list") {
+                    const entries = root.filteredEntries
+                    if (resultList.currentIndex >= 0 && resultList.currentIndex < entries.length)
+                        root.paste(entries[resultList.currentIndex])
+                }
+            } else if (lk === "tab") {
+                root.view = root.view === "list" ? "detail" : "list"
+            } else if (lk === "backspace") {
+                if (root.view === "help") root.helpFilter = root.helpFilter.slice(0, -1)
+                else searchField.text = searchField.text.slice(0, -1)
+            } else if (lk === "ctrl+w") {
+                if (root.view === "help") root.helpFilter = root.helpFilter.replace(/\S+\s*$/, "")
+                else searchField.text = searchField.text.replace(/\S+\s*$/, "")
+            }
+        }
     }
 
     // ── Window ───────────────────────────────────────────────────────────────

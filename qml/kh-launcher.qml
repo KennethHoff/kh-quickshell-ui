@@ -93,8 +93,67 @@ ShellRoot {
 
     IpcHandler {
         target: "launcher"
-        readonly property bool showing: root.showing
-        function toggle() { root.showing = !root.showing }
+        readonly property bool   showing: root.showing
+        readonly property string view:    root.view
+        function toggle()     { root.showing = !root.showing }
+        function setView(v)   { root.view = v }
+        function nav(dir) {
+            if (dir === "down") {
+                if (root.view === "actions") {
+                    if (root.actionEntry && root.actionIndex < root.actionEntry.actions.length - 1)
+                        root.actionIndex++
+                } else if (root.view === "list") {
+                    if (resultList.currentIndex < resultList.count - 1) resultList.currentIndex++
+                }
+            } else if (dir === "up") {
+                if (root.view === "actions") {
+                    if (root.actionIndex > 0) root.actionIndex--
+                } else if (root.view === "list") {
+                    if (resultList.currentIndex > 0) resultList.currentIndex--
+                }
+            }
+        }
+        function type(text) {
+            for (let i = 0; i < text.length; i++) {
+                const ch = text[i]
+                if (ch === "?") {
+                    if (root.view === "help") { root.view = "list"; root.helpFilter = "" }
+                    else if (root.view === "list") { root.view = "help"; root.helpFilter = "" }
+                } else if (root.view === "help") {
+                    root.helpFilter += ch
+                } else {
+                    searchField.text += ch
+                }
+            }
+        }
+        function key(k) {
+            const lk = k.toLowerCase()
+            if (lk === "escape" || lk === "esc") {
+                if (root.view === "help") {
+                    if (root.helpFilter) root.helpFilter = ""; else root.view = "list"
+                } else if (root.view === "actions") root.exitActionMode()
+                else root.showing = false
+            } else if (lk === "enter" || lk === "return") {
+                if (root.view === "actions") {
+                    if (root.actionEntry && root.actionIndex >= 0 &&
+                            root.actionIndex < root.actionEntry.actions.length)
+                        root.launchAction(root.actionEntry.actions[root.actionIndex])
+                } else if (root.view === "list") {
+                    const apps = root.filteredApps
+                    if (resultList.currentIndex >= 0 && resultList.currentIndex < apps.length)
+                        root.launch(apps[resultList.currentIndex])
+                }
+            } else if (lk === "tab") {
+                if (root.view === "actions") root.exitActionMode()
+                else root.enterActionMode()
+            } else if (lk === "backspace") {
+                if (root.view === "help") root.helpFilter = root.helpFilter.slice(0, -1)
+                else searchField.text = searchField.text.slice(0, -1)
+            } else if (lk === "ctrl+w") {
+                if (root.view === "help") root.helpFilter = root.helpFilter.replace(/\S+\s*$/, "")
+                else searchField.text = searchField.text.replace(/\S+\s*$/, "")
+            }
+        }
     }
 
     // ── Window ───────────────────────────────────────────────────────────────

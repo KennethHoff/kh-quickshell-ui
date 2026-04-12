@@ -119,17 +119,6 @@
       packages.${system} = {
         kh-launcher = launcherConfig;
         kh-cliphist = cliphistConfig;
-        screenshots  = pkgs.runCommand "quickshell-screenshots" {
-          src = self;
-          nativeBuildInputs = [ pkgs.qt6.qtdeclarative ];
-          QT_QPA_PLATFORM = "offscreen";
-        } ''
-          export HOME=$TMPDIR
-          mkdir $out
-          qmlImport=${pkgs.qt6.qtdeclarative}/lib/qt-6/qml
-          qml -I "$qmlImport" -I $src/lib $src/preview/kh-launcher.qml -- $out/kh-launcher.png
-          qml -I "$qmlImport" -I $src/lib $src/preview/kh-cliphist.qml -- $out/kh-cliphist.png
-        '';
       };
 
       apps.${system} = {
@@ -139,22 +128,32 @@
             set -e
             out=/tmp/qs-screenshots
             mkdir -p "$out"
-            qml=${pkgs.qt6.qtdeclarative}/bin/qml
-            src=${self}
-            imp=${pkgs.qt6.qtdeclarative}/lib/qt-6/qml
-            export QT_QPA_PLATFORM=offscreen
-            export HOME=$(mktemp -d)
-            launcher() { "$qml" -I "$imp" -I "$src/lib" "$src/preview/kh-launcher.qml" -- "$out/kh-launcher-$1.png" "$1"; }
-            cliphist() { "$qml" -I "$imp" -I "$src/lib" "$src/preview/kh-cliphist.qml" -- "$out/kh-cliphist-$1.png" "$1"; }
+            qs=${lib.getExe' pkgs.quickshell "quickshell"}
+            grim=${lib.getExe pkgs.grim}
 
-            launcher list
-            launcher help
-            launcher actions
-            cliphist list
-            cliphist detail
-            cliphist help
+            shoot() {
+              local name=$1 config=$2 ipc_target=$3 view=$4
+              local outfile="$out/$name.png"
+              "$qs" -p "$config" &
+              local pid=$!
+              # wait for IPC ready, then open
+              for i in $(seq 30); do
+                sleep 0.1
+                "$qs" ipc --pid "$pid" call "$ipc_target" toggle 2>/dev/null && break
+              done
+              # navigate to requested view
+              [[ -n "$view" ]] && "$qs" ipc --pid "$pid" call "$ipc_target" setView "$view" 2>/dev/null
+              sleep 0.4
+              "$grim" "$outfile"
+              echo "$outfile"
+              kill "$pid" 2>/dev/null; wait "$pid" 2>/dev/null
+            }
 
-            ls "$out/"
+            shoot kh-launcher-list    ${launcherConfig}  launcher ""
+            shoot kh-launcher-help    ${launcherConfig}  launcher help
+            shoot kh-cliphist-list    ${cliphistConfig}  viewer   ""
+            shoot kh-cliphist-detail  ${cliphistConfig}  viewer   detail
+            shoot kh-cliphist-help    ${cliphistConfig}  viewer   help
           '');
         };
         kh-launcher = {
