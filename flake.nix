@@ -131,6 +131,7 @@
             app=$1; shift
             case "$app" in
               kh-cliphist) config=${cliphistConfig}; target=viewer   ;;
+              kh-view)     config=${viewConfig};     target=""        ;;
               *) echo "usage: screenshot [--run <dir>] <app> <name> [<ipc-call>...] [-- <name> [<ipc-call>...]]..." >&2; exit 1 ;;
             esac
             qs=${lib.getExe' pkgs.quickshell "quickshell"}
@@ -155,10 +156,14 @@
               local outfile=$run/$name.png
               WAYLAND_DISPLAY=$WAYLAND_DISPLAY "$qs" -p "$config" >/dev/null 2>&1 &
               local pid=$!
-              for i in $(seq 30); do
-                sleep 0.1
-                "$qs" ipc --pid "$pid" call "$target" toggle >/dev/null 2>&1 && break
-              done
+              if [[ -n "$target" ]]; then
+                for i in $(seq 30); do
+                  sleep 0.1
+                  "$qs" ipc --pid "$pid" call "$target" toggle >/dev/null 2>&1 && break
+                done
+              else
+                sleep 1.5
+              fi
               for call in "$@"; do
                 local fn="''${call%% *}"
                 if [[ "$fn" == "$call" ]]; then
