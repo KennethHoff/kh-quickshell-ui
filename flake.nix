@@ -213,13 +213,14 @@
         };
         kh-view = {
           type = "app";
-          # Usage: nix run .#kh-view -- <file>
+          # Usage: nix run .#kh-view -- <file> [<file2>]
           #        <cmd> | nix run .#kh-view
           program = toString (pkgs.writeShellScript "run-kh-view" ''
             set -e
             qs=${lib.getExe' pkgs.quickshell "quickshell"}
             if [[ $# -ge 1 ]]; then
               export KH_VIEW_FILE="$1"
+              [[ $# -ge 2 ]] && export KH_VIEW_FILE2="$2"
               exec "$qs" -p ${viewConfig}
             else
               tmp=$(mktemp)
