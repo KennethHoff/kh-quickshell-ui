@@ -34,7 +34,7 @@ The window is **opened automatically** (toggle is implicit) for each shot.
 Open the screenshots using the pinned known-good kh-view commit. Pass all paths as arguments — they open side-by-side.
 
 ```bash
-nix run "git+file://$PWD?rev=890065b3f4ec3e90fa0110bb092e521a12c38d2e#kh-view" -- <path1> [<path2> ...]
+nix run "git+file://$PWD?rev=3724687a0e01b0d60db759ae528e087694353a56#kh-view" -- <path1> [<path2> ...]
 ```
 
 Update the pinned commit hash whenever kh-view reaches a new stable state.
@@ -48,5 +48,5 @@ nix run .#screenshot -- kh-launcher shot-a 'type chrm' -- shot-b "type 'chrm"
 # → /tmp/qs-screenshots/20260412-140000/shot-b.png
 
 # Display side-by-side
-nix run "git+file://$PWD?rev=890065b3f4ec3e90fa0110bb092e521a12c38d2e#kh-view" -- /tmp/qs-screenshots/20260412-140000/shot-a.png /tmp/qs-screenshots/20260412-140000/shot-b.png
+nix run "git+file://$PWD?rev=3724687a0e01b0d60db759ae528e087694353a56#kh-view" -- /tmp/qs-screenshots/20260412-140000/shot-a.png /tmp/qs-screenshots/20260412-140000/shot-b.png
 ```
