@@ -57,6 +57,9 @@ Item {
     property int    _visualAnchor:      0
     property var    _pendingDeleteLines:     []
     property int    _pendingDeleteCursorIdx: -1
+    property int    _pendingDeleteAnimLo:    -1
+    property int    _pendingDeleteAnimHi:    -1
+    property bool   _confirmingDelete:       false
 
     // ── Properties out ────────────────────────────────────────────────────────
     readonly property string selectedEntry: {
@@ -68,6 +71,11 @@ Item {
     readonly property string mode:     _mode
     readonly property string modeText: _mode === "visual" ? "VIS" : _mode === "normal" ? "NOR" : ""
     readonly property string hintText: {
+        if (_confirmingDelete) {
+            const n = _pendingDeleteLines.length
+            return (n === 1 ? "Delete entry?" : "Delete " + n + " entries?") +
+                   "  \u00b7  y confirm  \u00b7  Esc cancel"
+        }
         if (_mode === "visual")
             return "j/k  select  \u00b7  d delete  \u00b7  v / Esc  normal mode"
         if (_mode === "normal")
@@ -99,8 +107,11 @@ Item {
         _processedIdx   = {}
         _mode           = "normal"   // per ROADMAP: opens in normal mode
         _pendingG                = false
+        _confirmingDelete        = false
         _pendingDeleteLines      = []
         _pendingDeleteCursorIdx  = -1
+        _pendingDeleteAnimLo     = -1
+        _pendingDeleteAnimHi     = -1
         _visualAnchor            = 0
         searchField.text = ""
         list.currentIndex = 0
@@ -136,17 +147,18 @@ Item {
     // Trigger the blink animation on the delegate at `idx`.
     function flash(idx) { flashRequested(idx) }
 
-    // Phase 1 (normal mode): trigger fade-out on the selected entry.
+    // Phase 1 (normal mode): stage entry for deletion and ask for confirmation.
     function _deleteSelected() {
         const rawLine = selectedEntry
         if (rawLine === "" || _pendingDeleteLines.length > 0) return
         _pendingDeleteLines     = [rawLine]
         _pendingDeleteCursorIdx = Math.max(0, list.currentIndex - 1)
-        deleteAnimRequested(list.currentIndex)
-        deleteAnimTimer.restart()
+        _pendingDeleteAnimLo    = list.currentIndex
+        _pendingDeleteAnimHi    = list.currentIndex
+        _confirmingDelete       = true
     }
 
-    // Phase 1 (visual mode): trigger fade-out on the entire selection range.
+    // Phase 1 (visual mode): stage range for deletion and ask for confirmation.
     function _deleteVisualSelection() {
         if (_pendingDeleteLines.length > 0) return
         const lo    = Math.min(_visualAnchor, list.currentIndex)
@@ -155,9 +167,30 @@ Item {
         if (lines.length === 0) return
         _pendingDeleteLines     = lines.slice()
         _pendingDeleteCursorIdx = Math.max(0, lo - 1)
-        deleteRangeAnimRequested(lo, hi)
-        deleteAnimTimer.restart()
+        _pendingDeleteAnimLo    = lo
+        _pendingDeleteAnimHi    = hi
+        _confirmingDelete       = true
         enterNormalMode()
+    }
+
+    // Confirmed: start the fade-out animation; _executePendingDelete fires after it.
+    function _confirmDelete() {
+        _confirmingDelete = false
+        if (_pendingDeleteLines.length === 0) return
+        if (_pendingDeleteAnimLo === _pendingDeleteAnimHi)
+            deleteAnimRequested(_pendingDeleteAnimLo)
+        else
+            deleteRangeAnimRequested(_pendingDeleteAnimLo, _pendingDeleteAnimHi)
+        deleteAnimTimer.restart()
+    }
+
+    // Cancelled: discard the staged deletion.
+    function _cancelDelete() {
+        _confirmingDelete       = false
+        _pendingDeleteLines     = []
+        _pendingDeleteCursorIdx = -1
+        _pendingDeleteAnimLo    = -1
+        _pendingDeleteAnimHi    = -1
     }
 
     // Phase 2: called by deleteAnimTimer after the fade-out completes.
@@ -226,6 +259,11 @@ Item {
     function handleKey(event) {
         if (event.key === Qt.Key_Shift || event.key === Qt.Key_Control ||
             event.key === Qt.Key_Alt   || event.key === Qt.Key_Meta) return false
+        if (_confirmingDelete) {
+            if (event.text === "y") _confirmDelete()
+            else                    _cancelDelete()
+            return true
+        }
         if (_mode === "visual") return _handleVisualKey(event)
         if (_mode === "normal") return _handleNormalKey(event)
         return false
@@ -233,6 +271,11 @@ Item {
 
     function handleIpcKey(k) {
         const lk = k.toLowerCase()
+        if (_confirmingDelete) {
+            if (lk === "y") _confirmDelete()
+            else            _cancelDelete()
+            return true
+        }
         if (lk === "escape" || lk === "esc") {
             if (_mode !== "normal") { enterNormalMode(); return true }
             closeRequested(); return true
