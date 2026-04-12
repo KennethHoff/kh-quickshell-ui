@@ -1,26 +1,26 @@
 ---
 name: screenshot
-description: Take one or more headless screenshots of a quickshell app using the nix screenshot app, then display them inline.
-allowed-tools: Bash(nix run .#screenshot:*), Read
+description: Take one or more headless screenshots of a quickshell app, then display them in a new tmux pane using the kitty image protocol.
+allowed-tools: Bash(nix run .#screenshot:*), Bash(nix run nixpkgs#timg:*), Bash(tmux:*)
 ---
 
-Take screenshots using the headless screenshot app, then read and display the results.
+Take screenshots using the headless screenshot app, then render them in a new tmux pane.
 
-## Command
+## Step 1 — Capture
 
 ```bash
 nix run .#screenshot -- [--run <dir>] <app> <name> [<ipc-call>...] [-- <name> [<ipc-call>...]]...
 ```
 
-- `--run <dir>` — reuse an existing run directory (useful for iterative queries where you want successive attempts grouped together)
+- `--run <dir>` — reuse an existing run directory (useful for iterating on the same shot)
 - `<app>` — a package name from `packages.x86_64-linux` in `flake.nix`; check the flake for the current list
 - `<name>` — output filename without extension; saved to `<run-dir>/<name>.png`
 - `<ipc-call>` — function name with optional argument, space-separated in a single string
 - `--` — separates multiple shots; all shots share one sway instance and one run directory
 
-The window is **opened automatically** (toggle is implicit) for each shot. Only pass calls beyond the initial open.
+The window is **opened automatically** (toggle is implicit) for each shot.
 
-## IPC calls
+### IPC calls
 
 | Call | Effect |
 |---|---|
@@ -29,18 +29,26 @@ The window is **opened automatically** (toggle is implicit) for each shot. Only 
 | `nav down` / `nav up` | Move selection |
 | `key escape` | Close / go back |
 
-## Examples
+## Step 2 — Display
 
-Single shot:
+After capturing, open a new tmux pane and render the images there using timg with the kitty image protocol:
+
 ```bash
-nix run .#screenshot -- kh-launcher launcher-help 'setView help'
+tmux split-window -h "tmux set-option -p allow-passthrough on && nix run nixpkgs#timg -- <paths...>; echo; read -rp ''"
 ```
 
-Multiple related shots in one run:
+- Pass all output paths from step 1 as arguments to timg
+- `allow-passthrough` is set on the new pane so kitty graphics sequences reach the terminal
+- The pane stays open until the user presses Enter
+
+## Example (two comparison shots)
+
 ```bash
+# Capture
 nix run .#screenshot -- kh-launcher shot-a 'type chrm' -- shot-b "type 'chrm"
+# → /tmp/qs-screenshots/20260412-140000/shot-a.png
+# → /tmp/qs-screenshots/20260412-140000/shot-b.png
+
+# Display
+tmux split-window -h "tmux set-option -p allow-passthrough on && nix run nixpkgs#timg -- /tmp/qs-screenshots/20260412-140000/shot-a.png /tmp/qs-screenshots/20260412-140000/shot-b.png; echo; read -rp ''"
 ```
-
-## After running
-
-Read each output path printed to stdout and display the images using the Read tool.
