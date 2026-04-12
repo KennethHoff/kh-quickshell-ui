@@ -119,6 +119,16 @@
       packages.${system} = {
         kh-launcher = launcherConfig;
         kh-cliphist = cliphistConfig;
+        screenshots  = pkgs.runCommand "quickshell-screenshots" {
+          src = self;
+          nativeBuildInputs = [ pkgs.qt6.qtdeclarative ];
+          QT_QPA_PLATFORM = "offscreen";
+        } ''
+          export HOME=$TMPDIR
+          mkdir $out
+          qml -I $src/lib $src/preview/kh-launcher.qml -- $out/kh-launcher.png
+          qml -I $src/lib $src/preview/kh-cliphist.qml -- $out/kh-cliphist.png
+        '';
       };
 
       apps.${system} = {
