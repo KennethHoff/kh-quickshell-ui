@@ -23,9 +23,10 @@ ShellRoot {
     property bool   showing: false
     property string mode: "insert"   // "insert" | "normal"
     property var    allEntries: []
+    property var    filteredEntries: []
     property var    _buf: []
-    property var    _fullTextCache: ({})
-    property int    _cacheVersion: 0
+    property var    _processed: []       // [{line, isImage, haystack}] — parallel to allEntries
+    property var    _processedIdx: ({})  // id → index in _processed for O(1) full-text updates
     property bool   _pendingG: false
 
     signal itemPasted(int idx)
@@ -37,32 +38,26 @@ ShellRoot {
     }
 
     // ── Filtering ────────────────────────────────────────────────────────────
-    property var filteredEntries: {
-        const _ = root._cacheVersion
+    function _runFilter() {
         const parsed = searchParser.parseSearch(searchField.text)
-        if (parsed.type === "all" && !parsed.needle) return root.allEntries
-
+        if (parsed.type === "all" && !parsed.needle) {
+            root.filteredEntries = root.allEntries
+            return
+        }
         const scored = []
-        for (const line of root.allEntries) {
-            const id      = clipEntry.entryId(line)
-            const preview = clipEntry.entryPreview(line)
-            const isImage = preview.startsWith("[[")
-
-            if (parsed.type === "image" && !isImage) continue
-            if (parsed.type === "text"  &&  isImage) continue
-            if (!parsed.needle) { scored.push({ line, score: 0 }); continue }
-
-            const fullText = root._fullTextCache[id]
-            const haystack = (fullText || preview).toLowerCase().replace(/\s+/g, "")
+        for (const e of root._processed) {
+            if (parsed.type === "image" && !e.isImage) continue
+            if (parsed.type === "text"  &&  e.isImage) continue
+            if (!parsed.needle) { scored.push({ line: e.line, score: 0 }); continue }
             if (parsed.exact) {
-                if (haystack.includes(parsed.needle)) scored.push({ line, score: 0 })
+                if (e.haystack.includes(parsed.needle)) scored.push({ line: e.line, score: 0 })
             } else {
-                const score = fuzzy.fuzzyScore(parsed.needle, haystack)
-                if (score >= 0) scored.push({ line, score })
+                const score = fuzzy.fuzzyScore(parsed.needle, e.haystack)
+                if (score >= 0) scored.push({ line: e.line, score })
             }
         }
         scored.sort((a, b) => b.score - a.score)
-        return scored.map(s => s.line)
+        root.filteredEntries = scored.map(s => s.line)
     }
 
     // ── Actions ──────────────────────────────────────────────────────────────
@@ -110,8 +105,21 @@ ShellRoot {
         onExited: {
             root.allEntries = root._buf.slice()
             root._buf = []
-            root._fullTextCache = {}
-            root._cacheVersion = 0
+
+            const processed = [], idx = {}
+            for (let i = 0; i < root.allEntries.length; i++) {
+                const line = root.allEntries[i]
+                const tab  = line.indexOf("\t")
+                const id      = tab >= 0 ? line.substring(0, tab) : line
+                const preview = tab >= 0 ? line.substring(tab + 1) : line
+                const isImage = preview.startsWith("[[")
+                processed.push({ line, isImage, haystack: isImage ? "" : preview.toLowerCase().replace(/\s+/g, "") })
+                idx[id] = i
+            }
+            root._processed    = processed
+            root._processedIdx = idx
+
+            root._runFilter()
             fullTextDecodeProcess.exec([bin.cliphistDecodeAll])
         }
     }
@@ -124,8 +132,11 @@ ShellRoot {
                 if (tab < 0) return
                 const id = line.substring(0, tab)
                 try {
-                    root._fullTextCache[id] = JSON.parse(line.substring(tab + 1))
-                    root._cacheVersion++
+                    const fullText = JSON.parse(line.substring(tab + 1))
+                    const i = root._processedIdx[id]
+                    if (i !== undefined)
+                        root._processed[i].haystack = fullText.toLowerCase().replace(/\s+/g, "")
+                    searchDebounce.restart()
                 } catch (_) {}
             }
         }
@@ -138,6 +149,13 @@ ShellRoot {
         interval: 200
         repeat: false
         onTriggered: root.showing = false
+    }
+
+    Timer {
+        id: searchDebounce
+        interval: 80
+        repeat: false
+        onTriggered: root._runFilter()
     }
 
     Timer {
@@ -182,6 +200,8 @@ ShellRoot {
         function type(text: string) {
             if (root.mode !== "insert") root.enterInsertMode()
             searchField.text += text
+            searchDebounce.stop()
+            root._runFilter()
         }
     }
 
@@ -198,10 +218,12 @@ ShellRoot {
 
         onVisibleChanged: {
             if (visible) {
-                root.allEntries = []
-                root._buf = []
-                root._fullTextCache = {}
-                root._cacheVersion = 0
+                root.allEntries     = []
+                root.filteredEntries = []
+                root._buf           = []
+                root._processed     = []
+                root._processedIdx  = {}
+                searchDebounce.stop()
                 fullTextDecodeProcess.running = false
                 searchField.text = ""
                 resultList.currentIndex = 0
@@ -334,7 +356,7 @@ ShellRoot {
                             verticalAlignment: Text.AlignVCenter
                         }
 
-                        onTextChanged: resultList.currentIndex = 0
+                        onTextChanged: { resultList.currentIndex = 0; searchDebounce.restart() }
 
                         Keys.onEscapePressed: root.enterNormalMode()
 
