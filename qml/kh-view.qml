@@ -7,7 +7,7 @@
 //   where the list file contains one file path per line.
 //
 // Split mode (default): Tab cycles focus between panes.
-// Carousel mode (c):    h/l steps through files fullscreen.
+// Fullscreen mode (f):  h/l steps through files one at a time.
 // Both modes:           hjkl/Ctrl+D/U scroll; v/V/Ctrl+V visual; y yank; q/Esc quit.
 import QtQuick
 import Quickshell
@@ -25,7 +25,7 @@ ShellRoot {
     property var  _listLines:   []
     property bool _ready:       false
     property int  _focusedPane: 0
-    property bool _carousel:    false
+    property bool _fullscreen:    false
 
     Component.onCompleted: listProcess.running = true
 
@@ -78,12 +78,12 @@ ShellRoot {
                     Qt.quit(); event.accepted = true; return
                 }
 
-                // Toggle carousel mode
-                if (event.text === "c" && root._paths.length > 1) {
-                    root._carousel = !root._carousel; event.accepted = true; return
+                // Toggle fullscreen mode
+                if (event.text === "f" && root._paths.length > 1) {
+                    root._fullscreen = !root._fullscreen; event.accepted = true; return
                 }
 
-                if (root._carousel) {
+                if (root._fullscreen) {
                     // h/l navigate between files
                     if (event.key === Qt.Key_H || event.key === Qt.Key_Left) {
                         root._focusedPane = Math.max(0, root._focusedPane - 1)
@@ -114,9 +114,9 @@ ShellRoot {
                     required property string modelData  // file path
                     required property int    index
 
-                    visible: !root._carousel || pane.index === root._focusedPane
-                    x:      root._carousel ? 0 : pane.index * keyHandler._paneWidth
-                    width:  root._carousel ? keyHandler.width
+                    visible: !root._fullscreen || pane.index === root._focusedPane
+                    x:      root._fullscreen ? 0 : pane.index * keyHandler._paneWidth
+                    width:  root._fullscreen ? keyHandler.width
                             : pane.index < root._paths.length - 1
                               ? keyHandler._paneWidth
                               : keyHandler.width - pane.index * keyHandler._paneWidth
@@ -152,7 +152,7 @@ ShellRoot {
 
                     // Divider on the left edge (split mode only, not first pane)
                     Rectangle {
-                        visible: !root._carousel && pane.index > 0
+                        visible: !root._fullscreen && pane.index > 0
                         x: 0; width: 1; height: parent.height
                         color: root._focusedPane === pane.index ? cfg.color.base0D : cfg.color.base02
                     }
@@ -182,7 +182,7 @@ ShellRoot {
 
             // Carousel position indicator: "2 / 5"
             Text {
-                visible: root._carousel && root._paths.length > 1
+                visible: root._fullscreen && root._paths.length > 1
                 anchors.bottom: parent.bottom
                 anchors.right: parent.right
                 anchors.margins: 12

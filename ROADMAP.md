@@ -118,7 +118,7 @@ or stdin; shows all files side-by-side with Tab to cycle focus between panes.
 - ✅ N files shown side-by-side in equal-width panes; Tab cycles focus; active divider highlights
 - ✅ Per-pane: `hjkl`/`gg`/`G`/`Ctrl+D`/`U` scroll; `v`/`V`/`Ctrl+V` visual select; `y` copies selection
 - ✅ `q`/`Esc` quits
-- ✅ Carousel mode — `c` toggles single fullscreen pane; `h`/`l` steps through all loaded files; position shown as "N / total" in corner
+- ✅ Fullscreen mode — `f` toggles single fullscreen pane; `h`/`l` steps through all loaded files; position shown as "N / total" in corner
 - ⬜ IPC support for scripted control
 
 ---
