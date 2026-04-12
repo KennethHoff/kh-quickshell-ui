@@ -43,13 +43,10 @@ in
   options.programs.quickshell.kh-ui.enable =
     lib.mkEnableOption "kh-ui quickshell components (launcher + clipboard history)";
 
-  config = lib.mkIf config.programs.quickshell.kh-ui.enable {
-    programs.quickshell = {
-      enable = lib.mkDefault true;
-      configs = lib.mkIf config.programs.quickshell.enable {
-        kh-launcher = mkConfig { name = "kh-launcher"; qml = "kh-launcher.qml"; };
-        kh-cliphist = mkConfig { name = "kh-cliphist"; qml = "kh-cliphist.qml"; };
-      };
+  config = lib.mkIf (config.programs.quickshell.enable && config.programs.quickshell.kh-ui.enable) {
+    programs.quickshell.configs = {
+      kh-launcher = mkConfig { name = "kh-launcher"; qml = "kh-launcher.qml"; };
+      kh-cliphist = mkConfig { name = "kh-cliphist"; qml = "kh-cliphist.qml"; };
     };
   };
 }
