@@ -126,8 +126,9 @@
         } ''
           export HOME=$TMPDIR
           mkdir $out
-          qml -I $src/lib $src/preview/kh-launcher.qml -- $out/kh-launcher.png
-          qml -I $src/lib $src/preview/kh-cliphist.qml -- $out/kh-cliphist.png
+          qmlImport=${pkgs.qt6.qtdeclarative}/lib/qt-6/qml
+          qml -I "$qmlImport" -I $src/lib $src/preview/kh-launcher.qml -- $out/kh-launcher.png
+          qml -I "$qmlImport" -I $src/lib $src/preview/kh-cliphist.qml -- $out/kh-cliphist.png
         '';
       };
 
