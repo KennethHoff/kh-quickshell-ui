@@ -7,12 +7,16 @@ import Quickshell.Services.Mpris
 BarWidget {
     NixConfig { id: cfg }
 
-    readonly property var player: Mpris.players.length > 0
-        ? Mpris.players.get(0) : null
-    readonly property bool active: player !== null
+    // State in a QtObject so its id is globally accessible from nested children.
+    QtObject {
+        id: state
+        readonly property var  player: Mpris.players.length > 0
+            ? Mpris.players.get(0) : null
+        readonly property bool active: player !== null
+    }
 
-    implicitWidth: active ? row.implicitWidth + 16 : 0
-    visible: active
+    implicitWidth: state.active ? row.implicitWidth + 16 : 0
+    visible: state.active
 
     Row {
         id: row
@@ -23,23 +27,23 @@ BarWidget {
         Text {
             anchors.verticalCenter: parent.verticalCenter
             text: "⏮"
-            color: player && player.canGoPrevious ? cfg.color.base05 : cfg.color.base03
+            color: state.player && state.player.canGoPrevious ? cfg.color.base05 : cfg.color.base03
             font.pixelSize: cfg.fontSize
             MouseArea {
                 anchors.fill: parent
-                onClicked: if (player && player.canGoPrevious) player.previous()
+                onClicked: if (state.player && state.player.canGoPrevious) state.player.previous()
             }
         }
 
         // ── Play / Pause ───────────────────────────────────────────────────
         Text {
             anchors.verticalCenter: parent.verticalCenter
-            text: player && player.isPlaying ? "⏸" : "▶"
-            color: player && player.canControl ? cfg.color.base05 : cfg.color.base03
+            text: state.player && state.player.isPlaying ? "⏸" : "▶"
+            color: state.player && state.player.canControl ? cfg.color.base05 : cfg.color.base03
             font.pixelSize: cfg.fontSize
             MouseArea {
                 anchors.fill: parent
-                onClicked: if (player && player.canControl) player.togglePlaying()
+                onClicked: if (state.player && state.player.canControl) state.player.togglePlaying()
             }
         }
 
@@ -47,11 +51,11 @@ BarWidget {
         Text {
             anchors.verticalCenter: parent.verticalCenter
             text: "⏭"
-            color: player && player.canGoNext ? cfg.color.base05 : cfg.color.base03
+            color: state.player && state.player.canGoNext ? cfg.color.base05 : cfg.color.base03
             font.pixelSize: cfg.fontSize
             MouseArea {
                 anchors.fill: parent
-                onClicked: if (player && player.canGoNext) player.next()
+                onClicked: if (state.player && state.player.canGoNext) state.player.next()
             }
         }
 
@@ -62,13 +66,13 @@ BarWidget {
             font.family:    cfg.fontFamily
             font.pixelSize: cfg.fontSize - 1
             text: {
-                if (!player) return ""
-                const title  = player.trackTitle  || ""
-                const artist = player.trackArtist || ""
+                if (!state.player) return ""
+                const title  = state.player.trackTitle  || ""
+                const artist = state.player.trackArtist || ""
                 if (title && artist) return artist + " — " + title
                 if (title)           return title
                 if (artist)          return artist
-                return player.identity || ""
+                return state.player.identity || ""
             }
             elide: Text.ElideRight
             maximumLineCount: 1

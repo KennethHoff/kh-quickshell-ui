@@ -48,10 +48,12 @@ let
         [ "id: cfg"   "cfg."
           "id: row"   "row."
           "id: label" "label."
+          "id: state" "state."
         ]
         [ "id: cfg${suffix}"   "cfg${suffix}."
           "id: row${suffix}"   "row${suffix}."
           "id: label${suffix}" "label${suffix}."
+          "id: state${suffix}" "state${suffix}."
         ]
         inner;
     in uniqueInner;
