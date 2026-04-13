@@ -90,8 +90,11 @@ BarWidget {
         anchor.rect.y: layout.barHeight + 4
 
         // Dimensions: 240 px wide, aspect-matched to the workspace's monitor.
-        readonly property real mon_w: state.preview?.monitor?.width  ?? 1920
-        readonly property real mon_h: state.preview?.monitor?.height ?? 1080
+        // Monitor width/height are physical pixels; divide by scale to get
+        // logical pixels, which is the coordinate space used by lastIpcObject.
+        readonly property real mon_scale: state.preview?.monitor?.scale ?? 1
+        readonly property real mon_w: (state.preview?.monitor?.width  ?? 1920) / mon_scale
+        readonly property real mon_h: (state.preview?.monitor?.height ?? 1080) / mon_scale
         readonly property real scale: 240 / mon_w
 
         width:  240
