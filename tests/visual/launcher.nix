@@ -1,7 +1,7 @@
 # Visual test cases for kh-launcher.
 # Each case: { name, description, calls } where calls are IPC strings.
 # Run all cases: nix run .#test-launcher
-# Output:        tests/launcher/output/
+# Run one case:  nix run .#test-launcher -- <name>
 [
   {
     name        = "default";
