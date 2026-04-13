@@ -110,9 +110,6 @@ jobs:
                   # Force Qt Quick software renderer — no GPU available in CI,
                   # which causes OpenGL to silently fail and produce black frames.
                   QT_QUICK_BACKEND: software
-                  # Use fixture data instead of real system state (no installed
-                  # apps or clipboard history available on CI runners).
-                  KH_SCREENSHOT_FIXTURES: "1"
               run: |
                   python3 - << 'EOF'
                   import json, subprocess, os, shutil
