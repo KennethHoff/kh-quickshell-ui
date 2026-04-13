@@ -54,6 +54,36 @@
 
       nixBinsQml = import ./ffi.nix { inherit pkgs lib; };
 
+      # mkBarConfig builds the kh-bar derivation.
+      # extraPluginDirs: list of paths; their *.qml files are merged into $out/bar/
+      # alongside the built-in plugins, making them importable from BarLayout.qml.
+      mkBarConfig =
+        { leftPlugins  ? [ "Workspaces" ]
+        , rightPlugins ? [ "Clock" ]
+        , extraPluginDirs ? []
+        }:
+        let
+          resolvePlugin = name:
+            let extraSrc = lib.findFirst
+              (d: builtins.pathExists (d + "/${name}.qml"))
+              null
+              extraPluginDirs;
+            in { inherit name; src = if extraSrc != null then extraSrc + "/${name}.qml" else self + "/qml/bar/${name}.qml"; };
+          barLayoutQml = import ./bar-layout.nix {
+            inherit pkgs lib;
+            leftPlugins  = map resolvePlugin leftPlugins;
+            rightPlugins = map resolvePlugin rightPlugins;
+          };
+        in
+        pkgs.runCommand "kh-bar-config" { } ''
+          mkdir -p $out/lib
+          cp ${self}/lib/*.qml $out/lib/
+          cp ${self}/qml/kh-bar.qml $out/shell.qml
+          cp ${barLayoutQml} $out/BarLayout.qml
+          cp ${nixConfigQml} $out/NixConfig.qml
+          cp ${nixBinsQml} $out/NixBins.qml
+        '';
+
       viewConfig = pkgs.runCommand "kh-view-config" { } ''
         mkdir -p $out/lib
         cp ${self}/lib/*.qml $out/lib/
@@ -73,6 +103,11 @@
           extraBins = { scanApps = toString scanAppsScript; };
         }} $out/NixBins.qml
       '';
+
+      barConfig = mkBarConfig {
+        leftPlugins  = [ "Workspaces" ];
+        rightPlugins = [ "Clock" ];
+      };
 
       cliphistConfig = pkgs.runCommand "kh-cliphist-config" { } ''
         mkdir -p $out/lib
@@ -101,6 +136,7 @@
       };
 
       packages.${system} = {
+        kh-bar = barConfig;
         kh-cliphist = cliphistConfig;
         cliphistDecodeAll = cliphistDecodeAllScript;
         kh-view = viewConfig;
@@ -109,6 +145,13 @@
       };
 
       apps.${system} = {
+        kh-bar = {
+          type = "app";
+          program = toString (pkgs.writeShellScript "run-kh-bar" ''
+            qs=${lib.getExe' pkgs.quickshell "quickshell"}
+            exec "$qs" -p ${barConfig}
+          '');
+        };
         # Headless screenshot(s) in a single run.
         # Usage: nix run .#screenshot -- <app> <name> [<ipc-call>...] [-- <name> [<ipc-call>...]]...
         # Multiple shots separated by -- share one sway instance and one run directory.
@@ -122,6 +165,7 @@
             if [[ "$1" == --run ]]; then run=$2; shift 2; fi
             app=$1; shift
             case "$app" in
+              kh-bar)      config=${barConfig};      target=""        ;;
               kh-cliphist) config=${cliphistConfig}; target=viewer   ;;
               kh-launcher) config=${launcherConfig}; target=launcher ;;
               kh-view)     config=${viewConfig};     target=""

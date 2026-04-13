@@ -31,6 +31,30 @@ let
     extraBins.cliphistDecodeAll = toString cliphistDecodeAll;
   };
 
+  mkBarConfig =
+    { leftPlugins, rightPlugins, extraPluginDirs }:
+    let
+      resolvePlugin = name:
+        let extraSrc = lib.findFirst
+          (d: builtins.pathExists (d + "/${name}.qml"))
+          null
+          extraPluginDirs;
+        in { inherit name; src = if extraSrc != null then extraSrc + "/${name}.qml" else src + "/qml/bar/${name}.qml"; };
+      barLayoutQml = import (src + "/bar-layout.nix") {
+        inherit pkgs lib;
+        leftPlugins  = map resolvePlugin leftPlugins;
+        rightPlugins = map resolvePlugin rightPlugins;
+      };
+    in
+    pkgs.runCommandLocal "qs-kh-bar" { } ''
+      mkdir -p $out/lib
+      cp ${src}/lib/*.qml $out/lib/
+      cp ${src}/qml/kh-bar.qml $out/shell.qml
+      cp ${barLayoutQml} $out/BarLayout.qml
+      cp ${nixConfig} $out/NixConfig.qml
+      cp ${nixBins}   $out/NixBins.qml
+    '';
+
   mkConfig =
     {
       name,
@@ -48,15 +72,55 @@ in
 {
   options.programs.kh-ui = {
     enable = lib.mkEnableOption "kh-ui shell UI";
+
     clipboard-history.enable = lib.mkOption {
       type = lib.types.bool;
       default = true;
       description = "Enable the clipboard history viewer (kh-cliphist).";
     };
+
     launcher.enable = lib.mkOption {
       type = lib.types.bool;
       default = true;
       description = "Enable the application launcher (kh-launcher).";
+    };
+
+    bar = {
+      enable = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = "Enable the status bar (kh-bar).";
+      };
+      leftPlugins = lib.mkOption {
+        type = lib.types.listOf lib.types.str;
+        default = [ "Workspaces" ];
+        description = ''
+          QML type names to render in the left slot, left-to-right.
+          Built-in types: Workspaces.
+          Add custom types by placing their .qml files in a directory
+          listed in <option>extraPluginDirs</option>.
+        '';
+      };
+      rightPlugins = lib.mkOption {
+        type = lib.types.listOf lib.types.str;
+        default = [ "Clock" ];
+        description = ''
+          QML type names to render in the right slot, right-to-left.
+          Built-in types: Clock.
+          Add custom types by placing their .qml files in a directory
+          listed in <option>extraPluginDirs</option>.
+        '';
+      };
+      extraPluginDirs = lib.mkOption {
+        type = lib.types.listOf lib.types.path;
+        default = [ ];
+        description = ''
+          Paths to directories containing extra bar plugin .qml files.
+          Each file must define a type extending BarWidget with the same
+          filename as the type name (e.g. MyWidget.qml for MyWidget).
+          These are merged into the bar build alongside the built-in plugins.
+        '';
+      };
     };
   };
 
@@ -70,6 +134,11 @@ in
               name = "kh-cliphist";
               qml = "kh-cliphist.qml";
               extraQml = [ "ClipList.qml" "ClipPreview.qml" "MetaStore.qml" ];
+            };
+          } //
+          lib.optionalAttrs config.programs.kh-ui.bar.enable {
+            kh-bar = mkBarConfig {
+              inherit (config.programs.kh-ui.bar) leftPlugins rightPlugins extraPluginDirs;
             };
           } //
           lib.optionalAttrs config.programs.kh-ui.launcher.enable {
@@ -102,6 +171,9 @@ in
         ] ++
         lib.optionals config.programs.kh-ui.launcher.enable [
           "${lib.getExe pkgs.quickshell} -c kh-launcher"
+        ] ++
+        lib.optionals config.programs.kh-ui.bar.enable [
+          "${lib.getExe pkgs.quickshell} -c kh-bar"
         ];
     })
   ];
