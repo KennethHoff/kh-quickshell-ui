@@ -1,6 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=Neovim
-Exec=nvim
-Comment=Vim-fork focused on extensibility and agility
-Icon=nvim
