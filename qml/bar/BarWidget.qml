@@ -14,8 +14,8 @@
 import QtQuick
 
 Item {
-    property int barHeight: parent?.barHeight ?? 32
-    property var barWindow: parent?.barWindow ?? null
+    property int barHeight: parent ? parent.barHeight : 32
+    property var barWindow: parent ? parent.barWindow : null
 
     implicitHeight: barHeight
 
