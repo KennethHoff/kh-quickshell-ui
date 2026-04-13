@@ -69,11 +69,10 @@ The bar layout is a QML snippet set via `programs.kh-ui.bar.structure`. The defa
 
 ```nix
 programs.kh-ui.bar.structure = ''
-  BarLeft {
+  BarRow {
     Workspaces {}
     MediaPlayer {}
-  }
-  BarRight {
+    BarSpacer {}
     ControlCenter {}
     Clock {}
     Volume {}
@@ -82,7 +81,7 @@ programs.kh-ui.bar.structure = ''
 '';
 ```
 
-`BarLeft` lays children out left-to-right from the bar's left edge; `BarRight` lays them right-to-left from the right edge. Any combination of built-in types, lib components, and your own plugins can go inside either slot.
+`BarRow` is a full-width `RowLayout` row. `BarSpacer` expands to fill remaining space — place it between plugin groups to push them apart (equivalent to CSS `space-between`). Multiple `BarRow`s, additional spacers, or any other QML types can appear at the top level.
 
 #### Built-in plugins
 
@@ -101,10 +100,9 @@ programs.kh-ui.bar.structure = ''
 
 ```nix
 programs.kh-ui.bar.structure = ''
-  BarLeft {
+  BarRow {
     Workspaces {}
-  }
-  BarRight {
+    BarSpacer {}
     ControlPanel {
       Row {
         spacing: 8
@@ -124,7 +122,8 @@ Available composition types (no import statement needed):
 
 | Component | Purpose |
 |---|---|
-| `BarLeft` / `BarRight` | Layout slot containers |
+| `BarRow` | Full-width `RowLayout` row; children laid out left-to-right |
+| `BarSpacer` | Flexible spacer; expands to fill remaining width |
 | `ControlPanel` | `●●●` dropdown frame; children go in the popup panel |
 | `ControlTile` | Rounded toggle tile with label, sublabel, active/inactive colors |
 | `TailscalePanel` | Tailscale ControlTile; exposes `connected`, `selfIp`, `peers` |

@@ -77,7 +77,7 @@ A full status bar built in Quickshell, replacing Waybar.
 - ✅ Workspaces — show Hyprland workspaces, highlight active, click to switch
 - ✅ Workspace preview — hovering a workspace button for 300 ms renders a thumbnail popup; composites per-window `ScreencopyView` captures at Hyprland IPC positions scaled to 240 px wide; disappears on mouse leave; workspace name badge in corner
 - ✅ Clock — live HH:mm display, updates every second
-- ✅ Plugin system — plugins are authored as `.qml` files and wired in via Nix (`leftPlugins`/`rightPlugins`/`extraPluginDirs`); built at eval time so no runtime module import is needed
+- ✅ Plugin system — plugins are authored as `.qml` files and wired in via Nix (`structure`/`extraPluginDirs`); `BarRow` + `BarSpacer` replace `BarLeft`/`BarRight` for flexible space-between layout; built at eval time so no runtime module import is needed
 - ⬜ IPC support — expose a `bar` IPC target so plugins (or external scripts) can query or mutate bar state; useful for things like toggling a dropdown panel from a keybind
 - ⬜ Active window title — display the focused window's app name and title
 - ✅ Audio controls — volume level (scroll to adjust) and mute toggle (click) via PipeWire; hidden when no sink is available

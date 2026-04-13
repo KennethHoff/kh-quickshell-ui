@@ -89,11 +89,10 @@ in
       structure = lib.mkOption {
         type = lib.types.str;
         default = ''
-              BarLeft {
+              BarRow {
                   Workspaces {}
                   MediaPlayer {}
-              }
-              BarRight {
+                  BarSpacer {}
                   ControlCenter {}
                   Clock {}
                   Volume {}
@@ -105,24 +104,24 @@ in
           inside the root BarLayout Item, which exposes <literal>barHeight</literal>
           and <literal>barWindow</literal> to all children via the parent chain.
 
-          Use <literal>BarLeft</literal> and <literal>BarRight</literal> to
-          position plugin groups. Any QML type available in $out/ can be used —
-          built-in plugins, lib components, and types from extraPluginDirs.
+          Use <literal>BarRow</literal> for a full-width row and
+          <literal>BarSpacer</literal> to push items apart (CSS space-between
+          equivalent). Any QML type available in $out/ can be used — built-in
+          plugins, lib components, and types from extraPluginDirs.
 
           Built-in plugins: Workspaces, MediaPlayer, ControlCenter, Clock,
           Volume, Tray.
 
           Built-in layout / composition types:
-          BarLeft, BarRight, BarDropdown, ControlPanel, ControlTile,
+          BarRow, BarSpacer, BarDropdown, ControlPanel, ControlTile,
           TailscalePanel, EthernetPanel, TailscalePeers,
           DropdownHeader, DropdownDivider, DropdownItem.
 
           Example — custom composition without ControlCenter:
           <programlisting>
-          BarLeft {
+          BarRow {
               Workspaces {}
-          }
-          BarRight {
+              BarSpacer {}
               ControlPanel {
                   Row {
                       spacing: 8

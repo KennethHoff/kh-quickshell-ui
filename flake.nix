@@ -102,11 +102,10 @@
 
       barConfig = mkBarConfig {
         structure = ''
-              BarLeft {
+              BarRow {
                   Workspaces {}
                   MediaPlayer {}
-              }
-              BarRight {
+                  BarSpacer {}
                   ControlCenter {}
                   Clock {}
                   Volume {}
