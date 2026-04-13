@@ -65,41 +65,80 @@ programs.kh-ui = {
 
 ### 4. Configure the bar
 
-The bar has a left slot (left-to-right) and a right slot (right-to-left). Default layout:
+The bar layout is a QML snippet set via `programs.kh-ui.bar.structure`. The default:
 
 ```nix
-programs.kh-ui.bar = {
-  leftPlugins  = [ "Workspaces" "MediaPlayer" ];
-  rightPlugins = [ "ControlCenter" "Clock" "Volume" "Tray" ];
-};
+programs.kh-ui.bar.structure = ''
+  BarLeft {
+    Workspaces {}
+    MediaPlayer {}
+  }
+  BarRight {
+    ControlCenter {}
+    Clock {}
+    Volume {}
+    Tray {}
+  }
+'';
 ```
 
-Built-in plugins:
+`BarLeft` lays children out left-to-right from the bar's left edge; `BarRight` lays them right-to-left from the right edge. Any combination of built-in types, lib components, and your own plugins can go inside either slot.
 
-| Plugin | Slot | Description |
-|---|---|---|
-| `Workspaces` | left | Hyprland workspace switcher; hover for live preview thumbnail |
-| `MediaPlayer` | left | MPRIS prev/play-pause/next + track info; hidden when no player active |
-| `ControlCenter` | right | `●●●` button → panel with Ethernet and Tailscale tiles + peer list |
-| `Clock` | right | `HH:mm:ss` clock |
-| `Volume` | right | PipeWire volume; scroll to adjust, click to mute; hidden when no sink |
-| `Tray` | right | StatusNotifierItem tray icons; left-click activates, right-click menu |
+#### Built-in plugins
+
+| Plugin | Description |
+|---|---|
+| `Workspaces` | Hyprland workspace switcher; hover for live preview thumbnail |
+| `MediaPlayer` | MPRIS prev/play-pause/next + track info; hidden when no player active |
+| `ControlCenter` | `●●●` button → panel with Ethernet + Tailscale tiles and peer list |
+| `Clock` | `HH:mm:ss` clock |
+| `Volume` | PipeWire volume; scroll to adjust, click to mute; hidden when no sink |
+| `Tray` | StatusNotifierItem tray icons; left-click activates, right-click menu |
+
+#### Composable panel components
+
+`ControlCenter` is just one possible composition. You can build your own panel directly in the structure string:
+
+```nix
+programs.kh-ui.bar.structure = ''
+  BarLeft {
+    Workspaces {}
+  }
+  BarRight {
+    ControlPanel {
+      Row {
+        spacing: 8
+        EthernetPanel {}
+        TailscalePanel { id: ts }
+      }
+      TailscalePeers { source: ts }
+    }
+    Clock {}
+    Volume {}
+    Tray {}
+  }
+'';
+```
+
+Available composition types (no import statement needed):
+
+| Component | Purpose |
+|---|---|
+| `BarLeft` / `BarRight` | Layout slot containers |
+| `ControlPanel` | `●●●` dropdown frame; children go in the popup panel |
+| `ControlTile` | Rounded toggle tile with label, sublabel, active/inactive colors |
+| `TailscalePanel` | Tailscale ControlTile; exposes `connected`, `selfIp`, `peers` |
+| `EthernetPanel` | Ethernet ControlTile; exposes `connected`, `iface` |
+| `TailscalePeers` | Peer list section; bind via `source: <TailscalePanel id>` |
+| `BarDropdown` | Generic bar button that opens a popup panel |
+| `DropdownHeader` | Muted section heading |
+| `DropdownDivider` | 1 px horizontal rule |
+| `DropdownItem` | Row with dot indicator, primary label, secondary label |
+| `NixConfig` | Theme colors (`color.baseXX`), font family and size |
 
 #### Writing a custom plugin
 
 A plugin is a `BarWidget` subtype. `BarWidget` handles the sizing boilerplate; you only need to set `implicitWidth`.
-
-The bar also exposes these shared library components at the config root, usable in any plugin without an import statement:
-
-| Component | Purpose |
-|---|---|
-| `NixConfig` | Theme colors (`cfg.color.baseXX`), font family, font size |
-| `BarDropdown` | Button that opens a popup panel; add children as panel content |
-| `ControlCenterPanel` | Like `BarDropdown` but with a tile `Flow` (`tiles:`) above the content |
-| `ControlTile` | Rounded toggle tile with label, sublabel, and active/inactive colors |
-| `DropdownHeader` | Muted section heading inside a dropdown panel |
-| `DropdownDivider` | 1 px horizontal rule |
-| `DropdownItem` | Row with optional dot indicator, primary label, and secondary label |
 
 Example `MyWidget.qml`:
 
@@ -122,12 +161,20 @@ BarWidget {
 }
 ```
 
-Place your plugin files in a directory and pass it via `extraPluginDirs`. Plugins are referenced by filename (without `.qml`):
+Place your plugin files in a directory and pass it via `extraPluginDirs`. All `.qml` files in those directories are copied into the bar config root and become available by filename in `structure`:
 
 ```nix
 programs.kh-ui.bar = {
-  leftPlugins     = [ "Workspaces" "MyWidget" ];
-  rightPlugins    = [ "ControlCenter" "Clock" "Volume" "Tray" ];
+  structure = ''
+    BarLeft {
+      Workspaces {}
+      MyWidget {}
+    }
+    BarRight {
+      ControlCenter {}
+      Clock {}
+    }
+  '';
   extraPluginDirs = [ ./bar-plugins ];  # directory containing MyWidget.qml
 };
 ```
