@@ -13,7 +13,7 @@ BarWidget {
         font.family:    cfg.fontFamily
         font.pixelSize: cfg.fontSize - 1
 
-        function refresh() { text = Qt.formatTime(new Date(), "HH:mm") }
+        function refresh() { text = Qt.formatTime(new Date(), "HH:mm:ss") }
         Component.onCompleted: refresh()
     }
 
