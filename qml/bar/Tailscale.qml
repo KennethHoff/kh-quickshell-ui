@@ -73,11 +73,11 @@ BarWidget {
     PopupWindow {
         id: panel
         anchor.window: layout.barWindow
-        anchor.rect.x: layout.barWindow ? layout.barWindow.width - panel.width - 8 : 0
+        anchor.rect.x: layout.barWindow ? layout.barWindow.width - panel.implicitWidth - 8 : 0
         anchor.rect.y: layout.barHeight
         visible: state.panelOpen
-        width: 300
-        height: col.implicitHeight + 16
+        implicitWidth: 300
+        implicitHeight: col.implicitHeight + 16
         color: "transparent"
 
         Rectangle {

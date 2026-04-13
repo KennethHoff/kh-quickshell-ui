@@ -84,8 +84,8 @@ BarWidget {
         anchor.window: layout.barWindow
         anchor.rect.x: layout.barWindow
             ? Math.max(0, Math.min(
-                Math.round(state.btnX + 14 - panel.width / 2),
-                layout.barWindow.width - panel.width))
+                Math.round(state.btnX + 14 - panel.implicitWidth / 2),
+                layout.barWindow.width - panel.implicitWidth))
             : 0
         anchor.rect.y: layout.barHeight + 4
 
@@ -97,8 +97,8 @@ BarWidget {
         readonly property real mon_h: (state.preview?.monitor?.height ?? 1080) / mon_scale
         readonly property real scale: 240 / mon_w
 
-        width:  240
-        height: Math.round(mon_h * scale)
+        implicitWidth:  240
+        implicitHeight: Math.round(mon_h * scale)
         color:  "transparent"
 
         visible: state.preview !== null && layout.barWindow !== null
