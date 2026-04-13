@@ -130,8 +130,7 @@ BarWidget {
                     ScreencopyView {
                         anchors.fill: parent
                         captureSource: modelData.wayland ?? null
-                        live: false
-                        Component.onCompleted: captureFrame()
+                        live: true
                     }
                 }
             }
