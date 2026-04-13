@@ -182,7 +182,9 @@
             xdg_runtime=$(mktemp -d)
             export XDG_RUNTIME_DIR=$xdg_runtime
             export WLR_BACKENDS=headless WLR_RENDERER=pixman WLR_HEADLESS_OUTPUTS=1
-            "$sway" --config /dev/null >/dev/null 2>&1 &
+            sway_config=$(mktemp)
+            echo 'output HEADLESS-1 resolution 3840x2160' > "$sway_config"
+            "$sway" --config "$sway_config" >/dev/null 2>&1 &
             SWAY_PID=$!
             for i in $(seq 40); do
               sleep 0.1
