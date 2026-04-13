@@ -40,7 +40,7 @@ BarWidget {
                             modelData.activate()
                         } else if (modelData.hasMenu) {
                             const pos = mapToItem(null, 0, height)
-                            modelData.display(layout.barWindow, pos.x, pos.y)
+                            modelData.display(barWindow, pos.x, pos.y)
                         }
                     }
                 }

@@ -44,7 +44,7 @@ Item {
     // Children of BarDropdown are placed into the popup content column.
     default property alias content: col.data
 
-    // Read from the plugin wrapper set by bar-layout.nix.
+    // Read from the plugin (BarWidget exposes both; BarLeft/BarRight propagate them).
     readonly property var  _barWindow: parent ? parent.barWindow : null
     readonly property int  _barHeight: parent ? parent.barHeight : 32
 

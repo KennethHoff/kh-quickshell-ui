@@ -81,13 +81,13 @@ BarWidget {
     // ── Workspace preview popup ────────────────────────────────────────────
     PopupWindow {
         id: panel
-        anchor.window: layout.barWindow
-        anchor.rect.x: layout.barWindow
+        anchor.window: barWindow
+        anchor.rect.x: barWindow
             ? Math.max(0, Math.min(
                 Math.round(state.btnX + 14 - panel.implicitWidth / 2),
-                layout.barWindow.width - panel.implicitWidth))
+                barWindow.width - panel.implicitWidth))
             : 0
-        anchor.rect.y: layout.barHeight + 4
+        anchor.rect.y: barHeight + 4
 
         // Dimensions: 240 px wide, aspect-matched to the workspace's monitor.
         // Monitor width/height are physical pixels; divide by scale to get
@@ -101,7 +101,7 @@ BarWidget {
         implicitHeight: Math.round(mon_h * scale)
         color:  "transparent"
 
-        visible: state.preview !== null && layout.barWindow !== null
+        visible: state.preview !== null && barWindow !== null
 
         Rectangle {
             anchors.fill: parent
