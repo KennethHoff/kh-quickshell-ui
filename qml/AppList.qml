@@ -651,10 +651,48 @@ Item {
                     color: actionDelegate.isCurrent ? cfg.color.base02 : "transparent"
                     radius: 6
 
+                    Item {
+                        id: actionIcon
+                        anchors.left: parent.left
+                        anchors.leftMargin: 10
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 28
+                        height: 28
+
+                        Image {
+                            id: actionIconImage
+                            anchors.fill: parent
+                            source: appList.selectedApp && appList.selectedApp.icon !== ""
+                                    ? ("file://" + appList.selectedApp.icon) : ""
+                            fillMode: Image.PreserveAspectFit
+                            sourceSize: Qt.size(28, 28)
+                            smooth: true
+                            visible: status === Image.Ready
+                        }
+
+                        Rectangle {
+                            anchors.fill: parent
+                            visible: actionIconImage.status !== Image.Ready
+                            color: cfg.color.base02
+                            radius: 5
+
+                            Text {
+                                anchors.centerIn: parent
+                                text: appList.selectedApp ? appList.selectedApp.name.charAt(0).toUpperCase() : ""
+                                color: cfg.color.base05
+                                font.family: cfg.fontFamily
+                                font.pixelSize: 14
+                                font.bold: true
+                            }
+                        }
+                    }
+
                     Text {
-                        anchors.fill: parent
-                        anchors.leftMargin: 14
+                        anchors.left: actionIcon.right
+                        anchors.leftMargin: 10
+                        anchors.right: parent.right
                         anchors.rightMargin: 12
+                        anchors.verticalCenter: parent.verticalCenter
                         text: modelData.name
                         color: cfg.color.base05
                         font.family: cfg.fontFamily

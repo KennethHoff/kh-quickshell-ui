@@ -59,7 +59,7 @@ Searchable application launcher (`quickshell -c kh-launcher`).
 - ✅ Flash animation (green) when an app or action is launched
 - ✅ `?` toggles a searchable help overlay listing all keybinds; help sections are mode-aware (actions vs. normal/insert)
 - ✅ App icons — display the icon image (not just name) in the list row
-- ⬜ App icons in actions mode — show the parent app's icon next to each desktop action entry
+- ✅ App icons in actions mode — show the parent app's icon next to each desktop action entry
 - ⬜ Window switcher mode — fuzzy search over all open windows by app name or title, across all workspaces and monitors; Enter focuses the window and switches to its workspace
 - ⬜ Window switcher mode — fuzzy search over all open windows by app name or title, across all workspaces and monitors; Enter focuses the window and switches to its workspace
 - ⬜ Emoji picker mode — fuzzy search emoji by name; Enter copies to clipboard
@@ -124,7 +124,7 @@ or stdin; shows all files side-by-side with Tab to cycle focus between panes.
 - ✅ `q`/`Esc` quits
 - ✅ Fullscreen mode — `f` toggles single fullscreen pane; `h`/`l` steps through all loaded files; dot indicators at bottom center show position
 - ✅ IPC support — `target: "viewer"`; `next()`/`prev()`/`seek(n)`/`quit()`/`setFullscreen(bool)`/`key(k)`; readable props `currentIndex`, `count`, `fullscreen`, `hasPrev`, `hasNext`; enables scripted slideshows and library review workflows
-- ⬜ Monitor selection — `--monitor <name|index>` flag to open the window on a specific monitor; defaults to the monitor containing the active window
+- ✅ Monitor selection — `--monitor <name|index>` flag to open the window on a specific monitor; defaults to the monitor containing the active window
 
 ---
 
