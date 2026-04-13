@@ -40,24 +40,26 @@
       cliphistDecodeAllScript  = import ./scripts/cliphist-decode-all.nix  { inherit pkgs lib; };
       scanAppsScript           = import ./scripts/scan-apps.nix            { inherit pkgs lib; };
 
+      nixConfigQml = import ./config.nix {
+        inherit pkgs;
+        colors = {
+          base00 = "1e1e2e"; base01 = "181825"; base02 = "313244"; base03 = "45475a";
+          base04 = "585b70"; base05 = "cdd6f4"; base06 = "f5c2e7"; base07 = "b4befe";
+          base08 = "f38ba8"; base09 = "fab387"; base0A = "f9e2af"; base0B = "a6e3a1";
+          base0C = "94e2d5"; base0D = "89b4fa"; base0E = "cba6f7"; base0F = "f2cdcd";
+        };
+        fontName = "monospace";
+        fontSize = 14;
+      };
+
+      nixBinsQml = import ./ffi.nix { inherit pkgs lib; };
+
       viewConfig = pkgs.runCommand "kh-view-config" { } ''
         mkdir -p $out/lib
         cp ${self}/lib/*.qml $out/lib/
         cp ${self}/qml/kh-view.qml $out/shell.qml
-        cp ${import ./config.nix {
-          inherit pkgs;
-          colors = {
-            base00 = "1e1e2e"; base01 = "181825"; base02 = "313244"; base03 = "45475a";
-            base04 = "585b70"; base05 = "cdd6f4"; base06 = "f5c2e7"; base07 = "b4befe";
-            base08 = "f38ba8"; base09 = "fab387"; base0A = "f9e2af"; base0B = "a6e3a1";
-            base0C = "94e2d5"; base0D = "89b4fa"; base0E = "cba6f7"; base0F = "f2cdcd";
-          };
-          fontName = "monospace";
-          fontSize = 14;
-        }} $out/NixConfig.qml
-        cp ${import ./ffi.nix {
-          inherit pkgs lib;
-        }} $out/NixBins.qml
+        cp ${nixConfigQml} $out/NixConfig.qml
+        cp ${nixBinsQml} $out/NixBins.qml
       '';
 
       launcherConfig = pkgs.runCommand "kh-launcher-config" { } ''
@@ -65,22 +67,10 @@
         cp ${self}/lib/*.qml $out/lib/
         cp ${self}/qml/kh-launcher.qml $out/shell.qml
         cp ${self}/qml/AppList.qml $out/
-        cp ${import ./config.nix {
-          inherit pkgs;
-          colors = {
-            base00 = "1e1e2e"; base01 = "181825"; base02 = "313244"; base03 = "45475a";
-            base04 = "585b70"; base05 = "cdd6f4"; base06 = "f5c2e7"; base07 = "b4befe";
-            base08 = "f38ba8"; base09 = "fab387"; base0A = "f9e2af"; base0B = "a6e3a1";
-            base0C = "94e2d5"; base0D = "89b4fa"; base0E = "cba6f7"; base0F = "f2cdcd";
-          };
-          fontName = "monospace";
-          fontSize = 14;
-        }} $out/NixConfig.qml
+        cp ${nixConfigQml} $out/NixConfig.qml
         cp ${import ./ffi.nix {
           inherit pkgs lib;
-          extraBins = {
-            scanApps = toString scanAppsScript;
-          };
+          extraBins = { scanApps = toString scanAppsScript; };
         }} $out/NixBins.qml
       '';
 
@@ -91,22 +81,10 @@
         cp ${self}/qml/ClipList.qml $out/
         cp ${self}/qml/ClipPreview.qml $out/
         cp ${self}/qml/MetaStore.qml $out/
-        cp ${import ./config.nix {
-          inherit pkgs;
-          colors = {
-            base00 = "1e1e2e"; base01 = "181825"; base02 = "313244"; base03 = "45475a";
-            base04 = "585b70"; base05 = "cdd6f4"; base06 = "f5c2e7"; base07 = "b4befe";
-            base08 = "f38ba8"; base09 = "fab387"; base0A = "f9e2af"; base0B = "a6e3a1";
-            base0C = "94e2d5"; base0D = "89b4fa"; base0E = "cba6f7"; base0F = "f2cdcd";
-          };
-          fontName = "monospace";
-          fontSize = 14;
-        }} $out/NixConfig.qml
+        cp ${nixConfigQml} $out/NixConfig.qml
         cp ${import ./ffi.nix {
           inherit pkgs lib;
-          extraBins = {
-            cliphistDecodeAll = toString cliphistDecodeAllScript;
-          };
+          extraBins = { cliphistDecodeAll = toString cliphistDecodeAllScript; };
         }} $out/NixBins.qml
       '';
     in
