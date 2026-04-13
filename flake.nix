@@ -165,7 +165,7 @@
       '';
 
       # Visual test cases for kh-launcher — baked into the test runner at eval time.
-      launcherVisualTests = import ./tests/visual/launcher.nix;
+      launcherVisualTests = import ./tests/launcher/cases.nix;
 
       # Pre-built shot args: 'name' call call -- 'name' call ...
       launcherTestArgs = lib.concatStringsSep " -- " (map (c:
@@ -207,7 +207,7 @@
           program = toString (pkgs.writeShellScript "test-launcher" ''
             set -e
             root=$(git rev-parse --show-toplevel)
-            out=$root/tests/visual/output/launcher
+            out=$root/tests/launcher/output
             mkdir -p "$out"
 
             echo "kh-launcher visual tests"
