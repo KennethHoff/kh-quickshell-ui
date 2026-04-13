@@ -3,6 +3,12 @@ name: PR Screenshots
 on:
     pull_request:
         types: [opened, synchronize, reopened]
+    workflow_dispatch:
+        inputs:
+            pr_number:
+                description: PR number to post screenshots to
+                required: true
+                type: number
 
 permissions:
     contents: write
@@ -20,8 +26,9 @@ jobs:
 
             - name: Get changed files
               run: |
-                  git fetch origin ${{ github.base_ref }}
-                  git diff --name-only origin/${{ github.base_ref }}...HEAD > /tmp/changed_files.txt
+                  base=${{ github.base_ref || 'master' }}
+                  git fetch origin "$base"
+                  git diff --name-only origin/"$base"...HEAD > /tmp/changed_files.txt
                   echo "Changed files:"
                   cat /tmp/changed_files.txt
 
@@ -147,8 +154,8 @@ jobs:
               if: steps.plan.outputs.needed == 'true'
               id: push
               run: |
-                  pr=${{ github.event.pull_request.number }}
-                  sha=${{ github.event.pull_request.head.sha }}
+                  pr=${{ github.event.pull_request.number || inputs.pr_number }}
+                  sha=${{ github.event.pull_request.head.sha || github.sha }}
                   short=${sha:0:7}
 
                   git config user.name "github-actions[bot]"
@@ -181,7 +188,7 @@ jobs:
                   GH_TOKEN: ${{ github.token }}
                   SCREENSHOT_PLAN: ${{ steps.plan.outputs.json }}
                   BASE_URL: ${{ steps.push.outputs.base_url }}
-                  PR_NUMBER: ${{ github.event.pull_request.number }}
+                  PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
               run: |
                   python3 - << 'EOF'
                   import json, os, subprocess
