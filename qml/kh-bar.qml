@@ -1,6 +1,7 @@
 // Status bar — orchestrator.
 //
 // Daemon: quickshell -c kh-bar
+//@ pragma UseQApplication
 //
 // This file owns: the panel window per screen and the bar chrome (background,
 // border). Which plugins appear and where is determined entirely by
