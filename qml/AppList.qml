@@ -530,11 +530,24 @@ Item {
                     color: appDelegate.isCurrent ? cfg.color.base02 : "transparent"
                     radius: 6
 
+                    Image {
+                        id: appIcon
+                        anchors.left: parent.left
+                        anchors.leftMargin: 10
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 32
+                        height: 32
+                        source: modelData.icon !== "" ? ("file://" + modelData.icon) : ""
+                        fillMode: Image.PreserveAspectFit
+                        sourceSize: Qt.size(32, 32)
+                        smooth: true
+                    }
+
                     Column {
                         anchors.verticalCenter: parent.verticalCenter
-                        anchors.left: parent.left
+                        anchors.left: appIcon.right
                         anchors.right: parent.right
-                        anchors.leftMargin: 14
+                        anchors.leftMargin: 8
                         anchors.rightMargin: 12
                         spacing: 1
 
