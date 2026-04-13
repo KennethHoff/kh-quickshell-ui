@@ -41,6 +41,41 @@
       scanAppsScript           = import ./scripts/scan-apps.nix            { inherit pkgs lib; };
       scanActionsScript        = import ./scripts/scan-actions.nix         { inherit pkgs lib; };
 
+      # Cliphist wrapper: returns fixture data when KH_SCREENSHOT_FIXTURES=1,
+      # otherwise delegates to the real binary. Bundled into every build —
+      # the env var is never set in normal use.
+      cliphistFixtureList    = "${self}/fixtures/cliphist-list.tsv";
+      cliphistFixtureTerminal = "${self}/fixtures/terminal.png";
+      cliphistFixturePhoto    = "${self}/fixtures/photo.png";
+      cliphistWrapper = pkgs.writeShellScript "cliphist" ''
+        if [[ -n "''${KH_SCREENSHOT_FIXTURES:-}" ]]; then
+          case "$1" in
+            list)
+              cat ${cliphistFixtureList}
+              ;;
+            decode)
+              # cliphist decode reads "id\tpreview" from stdin.
+              # For image entries, rotate through fixture images by entry ID.
+              # For text entries, return the preview text.
+              IFS=$'\t' read -r _id _preview
+              if [[ "$_preview" == "[["* ]]; then
+                case "$(( _id % 2 ))" in
+                  0) cat ${cliphistFixtureTerminal} ;;
+                  1) cat ${cliphistFixturePhoto} ;;
+                esac
+              else
+                printf '%s' "$_preview"
+              fi
+              ;;
+            *)
+              exec ${lib.getExe pkgs.cliphist} "$@"
+              ;;
+          esac
+        else
+          exec ${lib.getExe pkgs.cliphist} "$@"
+        fi
+      '';
+
       viewConfig = pkgs.runCommand "kh-view-config" { } ''
         mkdir -p $out/lib
         cp ${self}/lib/*.qml $out/lib/
@@ -106,6 +141,7 @@
         }} $out/NixConfig.qml
         cp ${import ./ffi.nix {
           inherit pkgs lib;
+          cliphistBin = toString cliphistWrapper;
           extraBins = {
             cliphistDecodeAll = toString cliphistDecodeAllScript;
           };
@@ -174,6 +210,11 @@
                 ;;
               *) echo "usage: screenshot [--run <dir>] <app> <name> [<ipc-call>...] [-- <name> [<ipc-call>...]]..." >&2; exit 1 ;;
             esac
+            if [[ -n "''${KH_SCREENSHOT_FIXTURES:-}" ]]; then
+              export XDG_DATA_DIRS="${self}/fixtures"
+              export XDG_DATA_HOME="/dev/null"
+              rm -f /tmp/kh-cliphist-*
+            fi
             qs=${lib.getExe' pkgs.quickshell "quickshell"}
             grim=${lib.getExe pkgs.grim}
             sway=${lib.getExe pkgs.sway}

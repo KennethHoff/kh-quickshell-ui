@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=Slack
+Exec=slack
+Comment=Team communication and collaboration
+Icon=slack

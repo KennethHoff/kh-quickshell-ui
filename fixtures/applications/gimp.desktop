@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=GIMP
+Exec=gimp
+Comment=Create images and edit photographs
+Icon=gimp
