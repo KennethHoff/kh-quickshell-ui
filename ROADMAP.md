@@ -85,6 +85,10 @@ A full status bar built in Quickshell, replacing Waybar.
 - ⬜ Calendar — clock with dropdown calendar on click
 - ⬜ Taskbar icons — tray icons for running apps via system tray protocol
 - ✅ Tailscale — connection status (`ts: on (N)` / `ts: off`); click to open a dropdown panel showing this machine's IP, all peers with hostname, Tailscale IP, and online/offline indicator; polls `tailscale status --json` every 10 s
+- ⬜ Tailscale: toggle connected/disconnected — button in the panel header to run `tailscale up` / `tailscale down`; status label updates reactively after command completes
+- ⬜ Tailscale: exit node selection — list exit-node-capable peers in the panel; click one to run `tailscale set --exit-node=<ip>`; show active exit node highlighted; click again (or a "clear" button) to run `tailscale set --exit-node=` to disable
+- ⬜ Tailscale: advertise exit node toggle — checkbox/button to run `tailscale set --advertise-exit-node` on/off for the local machine
+- ⬜ Tailscale: shields-up toggle — toggle `tailscale set --shields-up` to block incoming connections; reflected in panel UI
 - ⬜ Sonarr — badge when new episodes are downloaded; click to open a panel showing recently grabbed episodes and upcoming releases (polls Sonarr API)
 - ⬜ Other candidates: network status, battery, notifications indicator
 
