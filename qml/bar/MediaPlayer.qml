@@ -10,8 +10,7 @@ BarWidget {
     // State in a QtObject so its id is globally accessible from nested children.
     QtObject {
         id: state
-        readonly property var  player: Mpris.players.length > 0
-            ? Mpris.players.get(0) : null
+        readonly property var  player: Mpris.players.values[0] ?? null
         readonly property bool active: player !== null
     }
 
