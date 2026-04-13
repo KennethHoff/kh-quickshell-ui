@@ -83,7 +83,7 @@ A full status bar built in Quickshell, replacing Waybar.
 - ✅ Audio controls — volume level (scroll to adjust) and mute toggle (click) via PipeWire; hidden when no sink is available
 - ✅ MPRIS media controls — prev/play-pause/next buttons + artist/title display; shows first active player, hidden when none
 - ⬜ Calendar — clock with dropdown calendar on click
-- ⬜ Taskbar icons — tray icons for running apps via system tray protocol
+- ✅ Taskbar icons — tray icons via StatusNotifierItem protocol; left click activates, right click shows native context menu via `display()`; hidden when no items present
 - ✅ Tailscale — connection status (`ts: on (N)` / `ts: off`); click to open a dropdown panel showing this machine's IP, all peers with hostname, Tailscale IP, and online/offline indicator; polls `tailscale status --json` every 10 s
 - ⬜ Tailscale: toggle connected/disconnected — button in the panel header to run `tailscale up` / `tailscale down`; status label updates reactively after command completes
 - ⬜ Tailscale: exit node selection — list exit-node-capable peers in the panel; click one to run `tailscale set --exit-node=<ip>`; show active exit node highlighted; click again (or a "clear" button) to run `tailscale set --exit-node=` to disable

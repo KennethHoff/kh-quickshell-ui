@@ -98,6 +98,7 @@ pkgs.writeText "BarLayout.qml" ''
   import Quickshell.Io
   import Quickshell.Services.Pipewire
   import Quickshell.Services.Mpris
+  import Quickshell.Services.SystemTray
   import Quickshell.Wayland
 
   Item {
