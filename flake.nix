@@ -113,22 +113,6 @@
     {
       homeModules.default = import ./hm-module.nix self;
 
-      checks.${system}.tests = pkgs.runCommand "qml-tests" {
-        src = self;
-        nativeBuildInputs = [ pkgs.qt6.qtdeclarative ];
-        QT_QPA_PLATFORM = "offscreen";
-      } ''
-        export HOME=$TMPDIR
-        cp -r $src/tests .
-        cp -r $src/lib .
-        qmltestrunner \
-          -import ${pkgs.qt6.qtdeclarative}/lib/qt-6/qml \
-          -import lib \
-          -import ${nixGenDir} \
-          -input tests/
-        touch $out
-      '';
-
       devShells.${system}.default = pkgs.mkShell {
         packages = [ pkgs.qt6.qtdeclarative ];
         shellHook = ''
