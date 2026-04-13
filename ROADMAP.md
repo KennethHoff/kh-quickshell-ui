@@ -48,7 +48,7 @@ Searchable application launcher (`quickshell -c kh-launcher`).
 
 - ✅ Fuzzy search over installed apps by name and description; haystacks are `name + comment`
 - ✅ Search filters: `'` exact match, `^` prefix, `$` suffix, `!` negation; space-separated tokens combine with AND
-- ✅ Description shown in list (one line below app name); app icons not yet displayed as images
+- ✅ Description shown in list (one line below app name)
 - ✅ `j`/`k` navigate, `Enter` launch; opens in insert mode (search field focused)
 - ✅ Ctrl+1–9 launches the selected app on workspace 1–9 via `hyprctl dispatch exec [workspace N]`
 - ✅ `l` / Tab enters actions mode for the selected app (only switches if the app has actions)
@@ -58,7 +58,8 @@ Searchable application launcher (`quickshell -c kh-launcher`).
 - ✅ Window closes automatically after launching
 - ✅ Flash animation (green) when an app or action is launched
 - ✅ `?` toggles a searchable help overlay listing all keybinds; help sections are mode-aware (actions vs. normal/insert)
-- ⬜ App icons — display the icon image (not just name) in the list row
+- ✅ App icons — display the icon image (not just name) in the list row
+- ⬜ App icons in actions mode — show the parent app's icon next to each desktop action entry
 - ⬜ Window switcher mode — fuzzy search over all open windows by app name or title, across all workspaces and monitors; Enter focuses the window and switches to its workspace
 - ⬜ Window switcher mode — fuzzy search over all open windows by app name or title, across all workspaces and monitors; Enter focuses the window and switches to its workspace
 - ⬜ Emoji picker mode — fuzzy search emoji by name; Enter copies to clipboard
