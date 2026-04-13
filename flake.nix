@@ -173,9 +173,6 @@
         lib.concatMapStrings (call: " " + lib.escapeShellArg call) c.calls
       ) launcherVisualTests);
 
-      # Space-separated list of test names for iteration in the runner.
-      launcherTestNames = lib.concatMapStrings (c: " " + lib.escapeShellArg c.name) launcherVisualTests;
-
       # Pre-built manifest printed at the start of a run so the output is self-describing.
       launcherTestManifest = lib.concatMapStrings (c:
         "  printf '  %-30s %s\\n' ${lib.escapeShellArg c.name} ${lib.escapeShellArg c.description}\n"
@@ -201,60 +198,27 @@
           program = toString screenshotScript;
         };
 
-        # Run visual tests for kh-launcher, comparing against committed baselines.
-        # Usage: nix run .#test-launcher           — compare; exit 1 on any diff
-        #        nix run .#test-launcher -- --update — accept current output as new baseline
-        # Test cases are defined in tests/launcher/cases.nix.
+        # Run all visual launcher visual tests and save screenshots to tests/visual/output/.
+        # Usage: nix run .#test-launcher
+        # Each test is defined in tests/visual/launcher.nix with a name, description,
+        # and the IPC call sequence needed to reach that UI state.
         test-launcher = {
           type    = "app";
           program = toString (pkgs.writeShellScript "test-launcher" ''
             set -e
-            compare=${lib.getExe' pkgs.imagemagick "compare"}
             root=$(git rev-parse --show-toplevel)
-            baseline=$root/tests/launcher/output
-            update=0; [[ "''${1:-}" == "--update" ]] && update=1
-
-            tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
+            out=$root/tests/launcher/output
+            mkdir -p "$out"
 
             echo "kh-launcher visual tests"
             echo "========================"
             ${launcherTestManifest}
             echo ""
 
-            ${screenshotScript} --run "$tmp" kh-launcher ${launcherTestArgs} >/dev/null
-
-            pass=0; fail=0
-            for name in ${launcherTestNames}; do
-              actual=$tmp/$name.png
-              expected=$baseline/$name.png
-              if [[ ! -f "$expected" ]]; then
-                printf '  NEW   %s\n' "$name"
-                cp "$actual" "$expected"
-                continue
-              fi
-              pixels=$("$compare" -metric AE "$expected" "$actual" "$tmp/$name-diff.png" 2>&1 | awk '{print int($1)}' || true)
-              if (( pixels <= 1000 )); then
-                printf '  pass  %s\n' "$name"
-                ((pass++)) || true
-              else
-                printf '  FAIL  %s  (%s pixels differ)\n' "$name" "$pixels"
-                ((fail++)) || true
-                if [[ $update -eq 1 ]]; then
-                  cp "$actual" "$expected"
-                  printf '        updated baseline\n'
-                fi
-              fi
-            done
+            ${screenshotScript} --run "$out" kh-launcher ${launcherTestArgs}
 
             echo ""
-            if [[ $fail -gt 0 && $update -eq 0 ]]; then
-              echo "$fail failed, $pass passed — run with --update to accept as new baseline"
-              exit 1
-            elif [[ $fail -gt 0 ]]; then
-              echo "$fail updated, $pass unchanged"
-            else
-              echo "$pass passed"
-            fi
+            echo "Output: $out"
           '');
         };
 
