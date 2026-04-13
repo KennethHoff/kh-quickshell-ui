@@ -158,6 +158,8 @@
             set -e
             run=/tmp/qs-screenshots/$(date +%Y%m%d-%H%M%S)
             if [[ "$1" == --run ]]; then run=$2; shift 2; fi
+            grim_output_flag=""
+            if [[ "$1" == --output ]]; then grim_output_flag="-o $2"; shift 2; fi
             app=$1; shift
             case "$app" in
               kh-cliphist) config=${cliphistConfig}; target=viewer   ;;
@@ -169,7 +171,7 @@
                   export KH_VIEW_LIST="$_kv_list"
                 fi
                 ;;
-              *) echo "usage: screenshot [--run <dir>] <app> <name> [<ipc-call>...] [-- <name> [<ipc-call>...]]..." >&2; exit 1 ;;
+              *) echo "usage: screenshot [--run <dir>] [--output <name>] <app> <name> [<ipc-call>...] [-- <name> [<ipc-call>...]]..." >&2; exit 1 ;;
             esac
             qs=${lib.getExe' pkgs.quickshell "quickshell"}
             grim=${lib.getExe pkgs.grim}
@@ -178,9 +180,9 @@
 
             xdg_runtime=$(mktemp -d)
             export XDG_RUNTIME_DIR=$xdg_runtime
-            export WLR_BACKENDS=headless WLR_RENDERER=pixman WLR_HEADLESS_OUTPUTS=1
+            export WLR_BACKENDS=headless WLR_RENDERER=pixman WLR_HEADLESS_OUTPUTS=2
             sway_config=$(mktemp)
-            echo 'output HEADLESS-1 resolution 3840x2160' > "$sway_config"
+            printf 'output HEADLESS-1 resolution 3840x2160 position 0,0\noutput HEADLESS-2 resolution 1920x1080 position 3840,0\n' > "$sway_config"
             "$sway" --config "$sway_config" >/dev/null 2>&1 &
             SWAY_PID=$!
             for i in $(seq 40); do
@@ -213,7 +215,7 @@
                 fi
               done
               sleep 0.4
-              WAYLAND_DISPLAY=$WAYLAND_DISPLAY "$grim" "$outfile"
+              WAYLAND_DISPLAY=$WAYLAND_DISPLAY "$grim" $grim_output_flag "$outfile"
               echo "$outfile"
               disown "$pid" 2>/dev/null; kill -9 "$pid" 2>/dev/null
             }
@@ -286,11 +288,20 @@
         };
         kh-view = {
           type = "app";
-          # Usage: nix run .#kh-view -- <file> [<file2> ...]
-          #        <cmd> | nix run .#kh-view
+          # Usage: nix run .#kh-view -- [--monitor <name|index>] <file> [<file2> ...]
+          #        <cmd> | nix run .#kh-view [--monitor <name|index>]
           program = toString (pkgs.writeShellScript "run-kh-view" ''
             set -e
             qs=${lib.getExe' pkgs.quickshell "quickshell"}
+
+            # Parse --monitor flag; export as KH_VIEW_MONITOR for the QML to read
+            while [[ $# -gt 0 ]]; do
+              case "$1" in
+                --monitor) export KH_VIEW_MONITOR="$2"; shift 2 ;;
+                *) break ;;
+              esac
+            done
+
             list=$(mktemp)
             trap 'rm -f "$list"' EXIT
             if [[ $# -ge 1 ]]; then

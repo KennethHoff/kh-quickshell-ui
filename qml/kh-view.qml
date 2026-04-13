@@ -28,6 +28,26 @@ ShellRoot {
     property bool _fullscreen:  false
     property bool _wrap:        true
 
+    // ── Monitor selection ─────────────────────────────────────────────────────
+    // Resolves KH_VIEW_MONITOR (name or index) to a single-element list for
+    // use as a Variants model. Variants creates the window knowing the target
+    // screen from the start — required because the layer-shell protocol binds
+    // a surface to a specific output at commit time and cannot reassign it.
+    // Note: WlrLayershell.screen is read-only; PanelWindow.screen is writable.
+    readonly property var _screenModel: {
+        const screens = Quickshell.screens
+        if (screens.length === 0) return []
+        const spec = Quickshell.env("KH_VIEW_MONITOR")
+        if (spec !== null && spec !== "") {
+            for (let i = 0; i < screens.length; i++) {
+                if (screens[i].name === spec) return [screens[i]]
+            }
+            const idx = parseInt(spec, 10)
+            if (!isNaN(idx) && idx >= 0 && idx < screens.length) return [screens[idx]]
+        }
+        return [screens[0]]
+    }
+
     Component.onCompleted: listProcess.running = true
 
     // ── Read path list from KH_VIEW_LIST ──────────────────────────────────────
@@ -81,14 +101,20 @@ ShellRoot {
     }
 
     // ── Window ────────────────────────────────────────────────────────────────
-    WlrLayershell {
+    Variants {
+        model: root._screenModel
+
+    PanelWindow {
         id: win
+        required property ShellScreen modelData
+        screen: modelData
         visible: true
         color: cfg.color.base00
-        layer: WlrLayer.Overlay
-        keyboardFocus: WlrKeyboardFocus.Exclusive
-        exclusionMode: ExclusionMode.Ignore
-        namespace: "kh-view"
+        WlrLayershell.layer: WlrLayer.Overlay
+        WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
+        WlrLayershell.exclusionMode: ExclusionMode.Ignore
+        WlrLayershell.namespace: "kh-view"
+        exclusiveZone: -1
         anchors { top: true; bottom: true; left: true; right: true }
 
         Item {
@@ -227,5 +253,6 @@ ShellRoot {
                 }
             }
         }
-    }
+    } // PanelWindow
+    } // Variants
 }
