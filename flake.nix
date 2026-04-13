@@ -10,35 +10,8 @@
       pkgs = nixpkgs.legacyPackages.${system};
       lib = pkgs.lib;
 
-      stubColors = {
-        base00 = "000000"; base01 = "111111"; base02 = "222222"; base03 = "333333";
-        base04 = "444444"; base05 = "555555"; base06 = "666666"; base07 = "777777";
-        base08 = "888888"; base09 = "999999"; base0A = "aaaaaa"; base0B = "bbbbbb";
-        base0C = "cccccc"; base0D = "dddddd"; base0E = "eeeeee"; base0F = "ffffff";
-      };
-
-      # Named QML module directories for qmltestrunner / devShell.
-      nixGenDir = pkgs.runCommand "nix-gen-dir" { } ''
-        mkdir -p $out/NixConfig $out/NixBins
-
-        printf '%s\n' "module NixConfig" "NixConfig 1.0 NixConfig.qml" \
-          > $out/NixConfig/qmldir
-        cp ${import ./config.nix {
-          inherit pkgs;
-          colors   = stubColors;
-          fontName = "TestFont";
-          fontSize = 12;
-        }} $out/NixConfig/NixConfig.qml
-
-        printf '%s\n' "module NixBins" "NixBins 1.0 NixBins.qml" \
-          > $out/NixBins/qmldir
-        cp ${import ./ffi.nix {
-          inherit pkgs lib;
-        }} $out/NixBins/NixBins.qml
-      '';
-
-      cliphistDecodeAllScript  = import ./scripts/cliphist-decode-all.nix  { inherit pkgs lib; };
-      scanAppsScript           = import ./scripts/scan-apps.nix            { inherit pkgs lib; };
+      cliphistDecodeAllScript = import ./scripts/cliphist-decode-all.nix { inherit pkgs lib; };
+      scanAppsScript          = import ./scripts/scan-apps.nix           { inherit pkgs lib; };
 
       viewConfig = pkgs.runCommand "kh-view-config" { } ''
         mkdir -p $out/lib
@@ -109,130 +82,146 @@
           };
         }} $out/NixBins.qml
       '';
+
+      # Shared headless screenshot script.
+      # Usage: screenshot [--run <dir>] <app> <name> [<ipc-call>...] [-- <name> [<ipc-call>...]]...
+      screenshotScript = pkgs.writeShellScript "qs-screenshot" ''
+        set -e
+        run=/tmp/qs-screenshots/$(date +%Y%m%d-%H%M%S)
+        if [[ "$1" == --run ]]; then run=$2; shift 2; fi
+        app=$1; shift
+        case "$app" in
+          kh-cliphist) config=${cliphistConfig}; target=viewer   ;;
+          kh-launcher) config=${launcherConfig}; target=launcher ;;
+          kh-view)     config=${viewConfig};     target=""
+            # Build the list file from KH_VIEW_FILE (or KH_VIEW_LIST if already set)
+            if [[ -z "''${KH_VIEW_LIST:-}" && -n "''${KH_VIEW_FILE:-}" ]]; then
+              _kv_list=$(mktemp); printf '%s\n' "$KH_VIEW_FILE" > "$_kv_list"
+              export KH_VIEW_LIST="$_kv_list"
+            fi
+            ;;
+          *) echo "usage: screenshot [--run <dir>] <app> <name> [<ipc-call>...] [-- <name> [<ipc-call>...]]..." >&2; exit 1 ;;
+        esac
+        qs=${lib.getExe' pkgs.quickshell "quickshell"}
+        grim=${lib.getExe pkgs.grim}
+        sway=${lib.getExe pkgs.sway}
+        mkdir -p "$run"
+
+        xdg_runtime=$(mktemp -d)
+        export XDG_RUNTIME_DIR=$xdg_runtime
+        export WLR_BACKENDS=headless WLR_RENDERER=pixman WLR_HEADLESS_OUTPUTS=1
+        sway_config=$(mktemp)
+        echo 'output HEADLESS-1 resolution 3840x2160' > "$sway_config"
+        "$sway" --config "$sway_config" >/dev/null 2>&1 &
+        SWAY_PID=$!
+        for i in $(seq 40); do
+          sleep 0.1
+          socket=$(ls "$xdg_runtime"/wayland-* 2>/dev/null | grep -v lock | head -1)
+          [[ -n "$socket" ]] && break
+        done
+        export WAYLAND_DISPLAY=$(basename "$socket")
+
+        shoot() {
+          local name=$1; shift
+          local outfile=$run/$name.png
+          WAYLAND_DISPLAY=$WAYLAND_DISPLAY "$qs" -p "$config" >/dev/null 2>&1 &
+          local pid=$!
+          if [[ -n "$target" ]]; then
+            for i in $(seq 30); do
+              sleep 0.1
+              "$qs" ipc --pid "$pid" call "$target" toggle >/dev/null 2>&1 && break
+            done
+          else
+            sleep 1.5
+          fi
+          for call in "$@"; do
+            local fn="''${call%% *}"
+            if [[ "$fn" == "$call" ]]; then
+              "$qs" ipc --pid "$pid" call "$target" "$fn" >/dev/null 2>&1 || true
+            else
+              local arg="''${call#* }"
+              "$qs" ipc --pid "$pid" call "$target" "$fn" "$arg" >/dev/null 2>&1 || true
+            fi
+          done
+          sleep 0.4
+          WAYLAND_DISPLAY=$WAYLAND_DISPLAY "$grim" "$outfile"
+          echo "$outfile"
+          disown "$pid" 2>/dev/null; kill -9 "$pid" 2>/dev/null
+        }
+
+        # Split args on '--' and invoke shoot() for each group.
+        group=()
+        for arg in "$@" "--"; do
+          if [[ "$arg" == "--" ]]; then
+            [[ ''${#group[@]} -gt 0 ]] && shoot "''${group[@]}"
+            group=()
+          else
+            group+=("$arg")
+          fi
+        done
+
+        kill -9 "$SWAY_PID" 2>/dev/null
+        rm -rf "$xdg_runtime"
+      '';
+
+      # Visual test cases for kh-launcher — baked into the test runner at eval time.
+      launcherVisualTests = import ./tests/visual/launcher.nix;
+
+      # Pre-built shot args: 'name' call call -- 'name' call ...
+      launcherTestArgs = lib.concatStringsSep " -- " (map (c:
+        lib.escapeShellArg c.name +
+        lib.concatMapStrings (call: " " + lib.escapeShellArg call) c.calls
+      ) launcherVisualTests);
+
+      # Pre-built manifest printed at the start of a run so the output is self-describing.
+      launcherTestManifest = lib.concatMapStrings (c:
+        "  printf '  %-30s %s\\n' ${lib.escapeShellArg c.name} ${lib.escapeShellArg c.description}\n"
+      ) launcherVisualTests;
+
     in
     {
       homeModules.default = import ./hm-module.nix self;
 
-      checks.${system}.tests = pkgs.runCommand "qml-tests" {
-        src = self;
-        nativeBuildInputs = [ pkgs.qt6.qtdeclarative ];
-        QT_QPA_PLATFORM = "offscreen";
-      } ''
-        export HOME=$TMPDIR
-        cp -r $src/tests .
-        cp -r $src/lib .
-        qmltestrunner \
-          -import ${pkgs.qt6.qtdeclarative}/lib/qt-6/qml \
-          -import lib \
-          -import ${nixGenDir} \
-          -input tests/
-        touch $out
-      '';
-
-      devShells.${system}.default = pkgs.mkShell {
-        packages = [ pkgs.qt6.qtdeclarative ];
-        shellHook = ''
-          export QT_QPA_PLATFORM=offscreen
-          export QML_IMPORT_PATH=${pkgs.qt6.qtdeclarative}/lib/qt-6/qml:$PWD/lib:${nixGenDir}
-          echo "Run tests: qmltestrunner -input tests/"
-        '';
-      };
-
       packages.${system} = {
-        kh-cliphist = cliphistConfig;
+        kh-cliphist       = cliphistConfig;
         cliphistDecodeAll = cliphistDecodeAllScript;
-        kh-view = viewConfig;
-        kh-launcher = launcherConfig;
-        scanApps = scanAppsScript;
+        kh-view           = viewConfig;
+        kh-launcher       = launcherConfig;
+        scanApps          = scanAppsScript;
       };
 
       apps.${system} = {
-        # Headless screenshot(s) in a single run.
+        # Headless screenshots.
         # Usage: nix run .#screenshot -- <app> <name> [<ipc-call>...] [-- <name> [<ipc-call>...]]...
-        # Multiple shots separated by -- share one sway instance and one run directory.
-        # Each <ipc-call> is a function name with optional arg, e.g. "setView help" or "type Navigate".
-        # The window is opened automatically via toggle before any calls are made.
         screenshot = {
-          type = "app";
-          program = toString (pkgs.writeShellScript "qs-screenshot" ''
+          type    = "app";
+          program = toString screenshotScript;
+        };
+
+        # Run all visual launcher visual tests and save screenshots to tests/visual/output/.
+        # Usage: nix run .#test-launcher
+        # Each test is defined in tests/visual/launcher.nix with a name, description,
+        # and the IPC call sequence needed to reach that UI state.
+        test-launcher = {
+          type    = "app";
+          program = toString (pkgs.writeShellScript "test-launcher" ''
             set -e
-            run=/tmp/qs-screenshots/$(date +%Y%m%d-%H%M%S)
-            if [[ "$1" == --run ]]; then run=$2; shift 2; fi
-            app=$1; shift
-            case "$app" in
-              kh-cliphist) config=${cliphistConfig}; target=viewer   ;;
-              kh-launcher) config=${launcherConfig}; target=launcher ;;
-              kh-view)     config=${viewConfig};     target=""
-                # Build the list file from KH_VIEW_FILE (or KH_VIEW_LIST if already set)
-                if [[ -z "''${KH_VIEW_LIST:-}" && -n "''${KH_VIEW_FILE:-}" ]]; then
-                  _kv_list=$(mktemp); printf '%s\n' "$KH_VIEW_FILE" > "$_kv_list"
-                  export KH_VIEW_LIST="$_kv_list"
-                fi
-                ;;
-              *) echo "usage: screenshot [--run <dir>] <app> <name> [<ipc-call>...] [-- <name> [<ipc-call>...]]..." >&2; exit 1 ;;
-            esac
-            qs=${lib.getExe' pkgs.quickshell "quickshell"}
-            grim=${lib.getExe pkgs.grim}
-            sway=${lib.getExe pkgs.sway}
-            mkdir -p "$run"
+            root=$(git rev-parse --show-toplevel)
+            out=$root/tests/visual/output
+            mkdir -p "$out"
 
-            xdg_runtime=$(mktemp -d)
-            export XDG_RUNTIME_DIR=$xdg_runtime
-            export WLR_BACKENDS=headless WLR_RENDERER=pixman WLR_HEADLESS_OUTPUTS=1
-            sway_config=$(mktemp)
-            echo 'output HEADLESS-1 resolution 3840x2160' > "$sway_config"
-            "$sway" --config "$sway_config" >/dev/null 2>&1 &
-            SWAY_PID=$!
-            for i in $(seq 40); do
-              sleep 0.1
-              socket=$(ls "$xdg_runtime"/wayland-* 2>/dev/null | grep -v lock | head -1)
-              [[ -n "$socket" ]] && break
-            done
-            export WAYLAND_DISPLAY=$(basename "$socket")
+            echo "kh-launcher visual tests"
+            echo "========================"
+            ${launcherTestManifest}
+            echo ""
 
-            shoot() {
-              local name=$1; shift
-              local outfile=$run/$name.png
-              WAYLAND_DISPLAY=$WAYLAND_DISPLAY "$qs" -p "$config" >/dev/null 2>&1 &
-              local pid=$!
-              if [[ -n "$target" ]]; then
-                for i in $(seq 30); do
-                  sleep 0.1
-                  "$qs" ipc --pid "$pid" call "$target" toggle >/dev/null 2>&1 && break
-                done
-              else
-                sleep 1.5
-              fi
-              for call in "$@"; do
-                local fn="''${call%% *}"
-                if [[ "$fn" == "$call" ]]; then
-                  "$qs" ipc --pid "$pid" call "$target" "$fn" >/dev/null 2>&1 || true
-                else
-                  local arg="''${call#* }"
-                  "$qs" ipc --pid "$pid" call "$target" "$fn" "$arg" >/dev/null 2>&1 || true
-                fi
-              done
-              sleep 0.4
-              WAYLAND_DISPLAY=$WAYLAND_DISPLAY "$grim" "$outfile"
-              echo "$outfile"
-              disown "$pid" 2>/dev/null; kill -9 "$pid" 2>/dev/null
-            }
+            ${screenshotScript} --run "$out" kh-launcher ${launcherTestArgs}
 
-            # Split args on '--' and invoke shoot() for each group.
-            group=()
-            for arg in "$@" "--"; do
-              if [[ "$arg" == "--" ]]; then
-                [[ ''${#group[@]} -gt 0 ]] && shoot "''${group[@]}"
-                group=()
-              else
-                group+=("$arg")
-              fi
-            done
-
-            kill -9 "$SWAY_PID" 2>/dev/null
-            rm -rf "$xdg_runtime"
+            echo ""
+            echo "Output: $out"
           '');
         };
+
         kh-launcher = {
           type = "app";
           program = toString (pkgs.writeShellScript "run-kh-launcher" ''
