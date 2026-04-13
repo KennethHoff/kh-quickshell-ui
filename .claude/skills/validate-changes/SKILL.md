@@ -30,7 +30,7 @@ nix eval '/home/kennethhoff/nix#nixosConfigurations.nixos-desktop.config.home-ma
 
 For full usage details, see [references/nix-eval.md](references/nix-eval.md).
 
-## Step 3 — Build (final verification only)
+## Step 3 — Build and inspect generated QML (final verification only)
 
 Build all packages to verify they actually compile. This is expensive — only run it when confident the changes are complete or near-complete. Steps 1 and 2 are cheap and should be used freely during iteration.
 
@@ -44,6 +44,17 @@ nix build \
 ```
 
 A passing run produces no output. On failure, see [references/nix-build.md](references/nix-build.md) for how to interpret errors.
+
+### Inspecting generated QML
+
+Some files are generated at build time (e.g. `BarLayout.qml` from `bar-layout.nix`). After building `kh-bar`, inspect the actual output to verify the generated code looks right — especially after changes to `bar-layout.nix` or adding new plugins:
+
+```bash
+nix build .#kh-bar --no-link --print-out-paths 2>/dev/null \
+  | xargs -I{} cat {}/BarLayout.qml
+```
+
+This is the code Quickshell actually runs. If plugins aren't rendering or there are runtime errors, this is the first place to look.
 
 ## Step 4 — Screenshot (QML changes)
 

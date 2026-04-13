@@ -36,6 +36,23 @@ The first `error: builder for` line is the root cause. The subsequent "dependenc
 - `--print-build-logs` / `-L` — show full build logs (helpful for debugging shell script errors in config derivations)
 - `--rebuild` — force rebuild even if the output already exists in the store
 
+## Inspecting generated QML files
+
+Some QML files are generated at build time by Nix (e.g. `BarLayout.qml` from `bar-layout.nix`).
+To inspect the actual generated output after a build:
+
+```bash
+# Print the store path, then cat a generated file
+nix build .#kh-bar --no-link --print-out-paths 2>/dev/null \
+  | xargs -I{} cat {}/BarLayout.qml
+
+# Or list all files in the package
+nix build .#kh-bar --no-link --print-out-paths 2>/dev/null | xargs ls -R
+```
+
+This is essential when debugging bar plugin rendering issues — the inlined plugin
+bodies in `BarLayout.qml` are the actual code Quickshell runs, not the source `.qml` files.
+
 ## Why build after flake check?
 
 `nix flake check` evaluates Nix expressions but does not invoke builders. Things that only fail at build time:
