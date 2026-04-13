@@ -39,11 +39,20 @@ let
         lines;
       inner = lib.concatStringsSep "\n        "
         (lib.init (builtins.tail bodyLines));
-      # Make NixConfig id unique per plugin to avoid "id is not unique" errors
-      # when multiple plugins are inlined into the same QML file.
+      # Rename all QML ids to plugin-scoped names to avoid "id is not unique"
+      # errors when multiple plugins are inlined into the same QML file.
+      # Covers every id used across the built-in plugins; user plugins that
+      # introduce new ids must avoid clashing with other plugins' ids.
+      suffix = "_${name}";
       uniqueInner = builtins.replaceStrings
-        ["id: cfg"  "cfg."]
-        ["id: cfg_${name}"  "cfg_${name}."]
+        [ "id: cfg"   "cfg."
+          "id: row"   "row."
+          "id: label" "label."
+        ]
+        [ "id: cfg${suffix}"   "cfg${suffix}."
+          "id: row${suffix}"   "row${suffix}."
+          "id: label${suffix}" "label${suffix}."
+        ]
         inner;
     in uniqueInner;
 
@@ -72,6 +81,8 @@ pkgs.writeText "BarLayout.qml" ''
   // Configure plugins via the bar-layout.nix arguments or the hm-module options.
   import QtQuick
   import Quickshell.Hyprland
+  import Quickshell.Services.Pipewire
+  import Quickshell.Services.Mpris
 
   Item {
       id: layout

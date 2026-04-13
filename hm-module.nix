@@ -93,20 +93,20 @@ in
       };
       leftPlugins = lib.mkOption {
         type = lib.types.listOf lib.types.str;
-        default = [ "Workspaces" ];
+        default = [ "Workspaces" "MediaPlayer" ];
         description = ''
           QML type names to render in the left slot, left-to-right.
-          Built-in types: Workspaces.
+          Built-in types: Workspaces, MediaPlayer.
           Add custom types by placing their .qml files in a directory
           listed in <option>extraPluginDirs</option>.
         '';
       };
       rightPlugins = lib.mkOption {
         type = lib.types.listOf lib.types.str;
-        default = [ "Clock" ];
+        default = [ "Clock" "Volume" ];
         description = ''
           QML type names to render in the right slot, right-to-left.
-          Built-in types: Clock.
+          Built-in types: Clock, Volume.
           Add custom types by placing their .qml files in a directory
           listed in <option>extraPluginDirs</option>.
         '';
