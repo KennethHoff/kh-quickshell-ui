@@ -59,7 +59,8 @@ let
       cp ${src}/lib/DropdownHeader.qml  $out/
       cp ${src}/lib/DropdownDivider.qml $out/
       cp ${src}/lib/DropdownItem.qml    $out/
-      cp ${src}/lib/ControlTile.qml     $out/
+      cp ${src}/lib/ControlTile.qml          $out/
+      cp ${src}/lib/ControlCenterPanel.qml  $out/
     '';
 
   mkConfig =

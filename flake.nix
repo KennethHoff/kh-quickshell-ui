@@ -88,7 +88,8 @@
           cp ${self}/lib/DropdownHeader.qml $out/
           cp ${self}/lib/DropdownDivider.qml $out/
           cp ${self}/lib/DropdownItem.qml   $out/
-          cp ${self}/lib/ControlTile.qml    $out/
+          cp ${self}/lib/ControlTile.qml         $out/
+          cp ${self}/lib/ControlCenterPanel.qml $out/
         '';
 
       viewConfig = pkgs.runCommand "kh-view-config" { } ''

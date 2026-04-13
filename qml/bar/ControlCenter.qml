@@ -1,6 +1,7 @@
-// Bar plugin: macOS-style Control Center aggregating network toggles.
-// Currently includes Tailscale and WiFi.
-// Click the bar button to open the panel.
+// Bar plugin: macOS-style Control Center.
+// Add or remove ControlTile children in the `tiles:` block to customise
+// the tile row; add DropdownHeader / DropdownItem / Repeater children
+// below for per-section details.
 import QtQuick
 import Quickshell.Io
 
@@ -13,7 +14,6 @@ BarWidget {
         property bool   connected: false
         property string selfIp:    ""
         property var    peers:     []
-        property bool   exitNode:  false
     }
 
     Process {
@@ -42,15 +42,20 @@ BarWidget {
         }
     }
 
+    Process {
+        id: tsToggleProc
+        onExited: { tsProc.running = true }
+    }
+
     // ── Ethernet state ─────────────────────────────────────────────────────
     QtObject {
-        id: wifiState
+        id: ethState
         property bool   connected: false
         property string iface:     ""
     }
 
     Process {
-        id: wifiProc
+        id: ethProc
         running: true
         command: ["nmcli", "-t", "-f", "DEVICE,TYPE,STATE", "dev"]
         stdout: StdioCollector {
@@ -61,11 +66,11 @@ BarWidget {
                     return parts[1] === "ethernet" && parts[2] === "connected"
                 })
                 if (active) {
-                    wifiState.connected = true
-                    wifiState.iface = active.split(":")[0]
+                    ethState.connected = true
+                    ethState.iface = active.split(":")[0]
                 } else {
-                    wifiState.connected = false
-                    wifiState.iface = ""
+                    ethState.connected = false
+                    ethState.iface = ""
                 }
             }
         }
@@ -77,63 +82,56 @@ BarWidget {
         running: true
         repeat: true
         onTriggered: {
-            if (!tsProc.running)   tsProc.running   = true
-            if (!wifiProc.running) wifiProc.running = true
+            if (!tsProc.running)  tsProc.running  = true
+            if (!ethProc.running) ethProc.running = true
         }
     }
 
-    implicitWidth: dropdown.implicitWidth
+    implicitWidth: panel.implicitWidth
 
-    BarDropdown {
-        id: dropdown
+    ControlCenterPanel {
+        id: panel
         anchors.fill: parent
 
-        label: "●●●"
-        labelColor: cfg.color.base05
-        panelBg:    cfg.color.base01
+        panelBg:     cfg.color.base01
         panelBorder: cfg.color.base02
         fontFamily:  cfg.fontFamily
         fontSize:    cfg.fontSize
-        panelWidth:  300
 
-        // ── Tiles row ──────────────────────────────────────────────────────
-        Row {
-            width: parent.width
-            spacing: 8
-
+        // ── Tiles ──────────────────────────────────────────────────────────
+        tiles: [
             ControlTile {
-                label:      "ethernet"
-                sublabel:   wifiState.connected ? wifiState.iface : "off"
-                active:     wifiState.connected
-                activeColor:      cfg.color.base0D
-                inactiveColor:    cfg.color.base02
-                activeLabelColor: cfg.color.base00
+                label:              "ethernet"
+                sublabel:           ethState.connected ? ethState.iface : "off"
+                active:             ethState.connected
+                activeColor:        cfg.color.base0D
+                inactiveColor:      cfg.color.base02
+                activeLabelColor:   cfg.color.base00
                 inactiveLabelColor: cfg.color.base05
-                sublabelColor:    cfg.color.base03
-                fontFamily: cfg.fontFamily
-                fontSize:   cfg.fontSize
-            }
-
+                sublabelColor:      cfg.color.base03
+                fontFamily:         cfg.fontFamily
+                fontSize:           cfg.fontSize
+            },
             ControlTile {
-                label:    "tailscale"
-                sublabel: tsState.connected ? tsState.selfIp : "off"
-                active:   tsState.connected
-                activeColor:      cfg.color.base0B
-                inactiveColor:    cfg.color.base02
-                activeLabelColor: cfg.color.base00
+                label:              "tailscale"
+                sublabel:           tsState.connected ? tsState.selfIp : "off"
+                active:             tsState.connected
+                activeColor:        cfg.color.base0B
+                inactiveColor:      cfg.color.base02
+                activeLabelColor:   cfg.color.base00
                 inactiveLabelColor: cfg.color.base05
-                sublabelColor:    cfg.color.base03
-                fontFamily: cfg.fontFamily
-                fontSize:   cfg.fontSize
+                sublabelColor:      cfg.color.base03
+                fontFamily:         cfg.fontFamily
+                fontSize:           cfg.fontSize
                 onTileClicked: {
-                    const cmd = tsState.connected ? ["tailscale", "down"] : ["tailscale", "up"]
-                    tsToggleProc.command = cmd
+                    tsToggleProc.command = tsState.connected
+                        ? ["tailscale", "down"] : ["tailscale", "up"]
                     tsToggleProc.running = true
                 }
             }
-        }
+        ]
 
-        // ── Tailscale peers ────────────────────────────────────────────────
+        // ── Tailscale peer list ────────────────────────────────────────────
         DropdownDivider {
             dividerColor: cfg.color.base02
             visible: tsState.peers.length > 0
@@ -158,14 +156,6 @@ BarWidget {
                 fontFamily:     cfg.fontFamily
                 fontSize:       cfg.fontSize
             }
-        }
-    }
-
-    // ── Tailscale toggle process ───────────────────────────────────────────
-    Process {
-        id: tsToggleProc
-        onExited: {
-            tsProc.running = true
         }
     }
 }
