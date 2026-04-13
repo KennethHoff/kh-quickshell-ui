@@ -39,7 +39,6 @@
 
       cliphistDecodeAllScript  = import ./scripts/cliphist-decode-all.nix  { inherit pkgs lib; };
       scanAppsScript           = import ./scripts/scan-apps.nix            { inherit pkgs lib; };
-      scanActionsScript        = import ./scripts/scan-actions.nix         { inherit pkgs lib; };
 
       viewConfig = pkgs.runCommand "kh-view-config" { } ''
         mkdir -p $out/lib
@@ -80,8 +79,7 @@
         cp ${import ./ffi.nix {
           inherit pkgs lib;
           extraBins = {
-            scanApps    = toString scanAppsScript;
-            scanActions = toString scanActionsScript;
+            scanApps = toString scanAppsScript;
           };
         }} $out/NixBins.qml
       '';
@@ -146,7 +144,6 @@
         kh-view = viewConfig;
         kh-launcher = launcherConfig;
         scanApps = scanAppsScript;
-        scanActions = scanActionsScript;
       };
 
       apps.${system} = {

@@ -18,7 +18,6 @@ let
   cliphistDecodeAll = import (src + "/scripts/cliphist-decode-all.nix") { inherit pkgs lib; };
 
   scanAppsScript    = import (src + "/scripts/scan-apps.nix")           { inherit pkgs lib; };
-  scanActionsScript = import (src + "/scripts/scan-actions.nix")        { inherit pkgs lib; };
 
   nixConfig = import (src + "/config.nix") {
     inherit pkgs;
@@ -79,8 +78,7 @@ in
                 nixBins = import (src + "/ffi.nix") {
                   inherit pkgs lib;
                   extraBins = {
-                    scanApps    = toString scanAppsScript;
-                    scanActions = toString scanActionsScript;
+                    scanApps = toString scanAppsScript;
                   };
                 };
               in
