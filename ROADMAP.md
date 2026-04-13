@@ -74,7 +74,10 @@ Searchable application launcher (`quickshell -c kh-launcher`).
 
 A full status bar built in Quickshell, replacing Waybar.
 
-- ⬜ Workspaces — show Hyprland workspaces, highlight active, click to switch
+- ✅ Workspaces — show Hyprland workspaces, highlight active, click to switch
+- ✅ Clock — live HH:mm display, updates every second
+- ✅ Plugin system — plugins are authored as `.qml` files and wired in via Nix (`leftPlugins`/`rightPlugins`/`extraPluginDirs`); built at eval time so no runtime module import is needed
+- ⬜ IPC support — expose a `bar` IPC target so plugins (or external scripts) can query or mutate bar state; useful for things like toggling a dropdown panel from a keybind
 - ⬜ Active window title — display the focused window's app name and title
 - ⬜ Audio controls — volume level and mute toggle via PipeWire/WirePlumber
 - ⬜ MPRIS media controls — play/pause, track title from any MPRIS-compatible player
