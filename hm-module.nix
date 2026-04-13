@@ -103,9 +103,14 @@ in
         type = lib.types.listOf lib.types.str;
         default = [ "Workspaces" "MediaPlayer" ];
         description = ''
-          QML type names to render in the left slot, left-to-right.
-          Built-in types: Workspaces, MediaPlayer.
-          Add custom types by placing their .qml files in a directory
+          QML type names to render in the left slot of the bar, left-to-right.
+
+          Built-in plugins:
+          - Workspaces   — Hyprland workspace switcher with hover preview thumbnails
+          - MediaPlayer  — MPRIS prev/play-pause/next controls and track info;
+                           hidden when no player is active
+
+          Add custom plugins by placing their .qml files in a directory
           listed in <option>extraPluginDirs</option>.
         '';
       };
@@ -113,9 +118,21 @@ in
         type = lib.types.listOf lib.types.str;
         default = [ "ControlCenter" "Clock" "Volume" "Tray" ];
         description = ''
-          QML type names to render in the right slot, right-to-left.
-          Built-in types: ControlCenter, Clock, Volume, Tray.
-          Add custom types by placing their .qml files in a directory
+          QML type names to render in the right slot of the bar, right-to-left.
+
+          Built-in plugins:
+          - ControlCenter — macOS-style ●●● button that opens a panel with
+                            ControlTile toggles (Ethernet, Tailscale) and a
+                            Tailscale peer list; Tailscale tile runs
+                            `tailscale up/down` on click
+          - Clock         — HH:mm:ss clock, updates every second
+          - Volume        — PipeWire default-sink volume; scroll to adjust,
+                            click to mute/unmute; hidden when no sink present
+          - Tray          — StatusNotifierItem system tray icons; left-click
+                            activates, right-click shows native context menu;
+                            hidden when no items present
+
+          Add custom plugins by placing their .qml files in a directory
           listed in <option>extraPluginDirs</option>.
         '';
       };
@@ -124,9 +141,10 @@ in
         default = [ ];
         description = ''
           Paths to directories containing extra bar plugin .qml files.
-          Each file must define a type extending BarWidget with the same
-          filename as the type name (e.g. MyWidget.qml for MyWidget).
-          These are merged into the bar build alongside the built-in plugins.
+          Each file must define a BarWidget subtype with the same filename
+          as the type name (e.g. MyWidget.qml exposes the MyWidget type).
+          Plugin files are merged into the bar build alongside the built-in
+          plugins and are referenced by name in leftPlugins/rightPlugins.
         '';
       };
     };

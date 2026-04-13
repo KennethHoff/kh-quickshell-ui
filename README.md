@@ -65,41 +65,58 @@ programs.kh-ui = {
 
 ### 4. Configure the bar
 
-The bar displays plugins in a left slot and a right slot. The default layout is Workspaces on the left and Clock on the right.
+The bar has a left slot (left-to-right) and a right slot (right-to-left). Default layout:
 
 ```nix
 programs.kh-ui.bar = {
-  leftPlugins  = [ "Workspaces" ];  # default
-  rightPlugins = [ "Clock" ];        # default
+  leftPlugins  = [ "Workspaces" "MediaPlayer" ];
+  rightPlugins = [ "ControlCenter" "Clock" "Volume" "Tray" ];
 };
 ```
 
+Built-in plugins:
+
+| Plugin | Slot | Description |
+|---|---|---|
+| `Workspaces` | left | Hyprland workspace switcher; hover for live preview thumbnail |
+| `MediaPlayer` | left | MPRIS prev/play-pause/next + track info; hidden when no player active |
+| `ControlCenter` | right | `●●●` button → panel with Ethernet and Tailscale tiles + peer list |
+| `Clock` | right | `HH:mm:ss` clock |
+| `Volume` | right | PipeWire volume; scroll to adjust, click to mute; hidden when no sink |
+| `Tray` | right | StatusNotifierItem tray icons; left-click activates, right-click menu |
+
 #### Writing a custom plugin
 
-A plugin is a `.qml` file that acts as a self-contained `Item`. It must:
-- Declare `required property int barHeight` — the bar passes its height through this.
-- Set `implicitWidth` to size the item horizontally; `implicitHeight` is handled for you.
+A plugin is a `BarWidget` subtype. `BarWidget` handles the sizing boilerplate; you only need to set `implicitWidth`.
+
+The bar also exposes these shared library components at the config root, usable in any plugin without an import statement:
+
+| Component | Purpose |
+|---|---|
+| `NixConfig` | Theme colors (`cfg.color.baseXX`), font family, font size |
+| `BarDropdown` | Button that opens a popup panel; add children as panel content |
+| `ControlCenterPanel` | Like `BarDropdown` but with a tile `Flow` (`tiles:`) above the content |
+| `ControlTile` | Rounded toggle tile with label, sublabel, and active/inactive colors |
+| `DropdownHeader` | Muted section heading inside a dropdown panel |
+| `DropdownDivider` | 1 px horizontal rule |
+| `DropdownItem` | Row with optional dot indicator, primary label, and secondary label |
 
 Example `MyWidget.qml`:
 
 ```qml
 import QtQuick
 
-Item {
-    required property int barHeight
-    implicitHeight: barHeight
-    width: implicitWidth
-    height: implicitHeight
+BarWidget {
+    NixConfig { id: cfg }
 
-    NixConfig { id: cfg }  // theme colors and font
-
-    implicitWidth: label.implicitWidth + 16
+    implicitWidth: _label.implicitWidth + 16
 
     Text {
+        id: _label
         anchors.centerIn: parent
-        text: "hello"
-        color: cfg.color.base05
-        font.family: cfg.fontFamily
+        text:           "hello"
+        color:          cfg.color.base05
+        font.family:    cfg.fontFamily
         font.pixelSize: cfg.fontSize
     }
 }
@@ -109,8 +126,8 @@ Place your plugin files in a directory and pass it via `extraPluginDirs`. Plugin
 
 ```nix
 programs.kh-ui.bar = {
-  leftPlugins    = [ "Workspaces" "MyWidget" ];
-  rightPlugins   = [ "Clock" ];
+  leftPlugins     = [ "Workspaces" "MyWidget" ];
+  rightPlugins    = [ "ControlCenter" "Clock" "Volume" "Tray" ];
   extraPluginDirs = [ ./bar-plugins ];  # directory containing MyWidget.qml
 };
 ```
