@@ -42,15 +42,24 @@ ShellRoot {
     // ── IPC ───────────────────────────────────────────────────────────────────
     IpcHandler {
         target: "launcher"
-        readonly property bool   showing: root.showing
-        readonly property string mode:    list.mode
+        readonly property bool   showing:     root.showing
+        readonly property string mode:        list.mode
+        readonly property var    selectedApp: list.selectedApp
+        readonly property var    actions:     list._actions
 
         function toggle()           { root.showing = !root.showing }
+        function enterActionsMode() { list.enterActionsMode() }
         function setMode(m: string) {
             if (m === "insert") { list.enterInsertMode() }
             else { list.enterNormalMode(); normalModeHandler.forceActiveFocus() }
         }
-        function nav(dir: string) { list.nav(dir) }
+        function nav(dir: string) {
+            const d = dir.toLowerCase()
+            if      (d === "down")   list.navDown()
+            else if (d === "up")     list.navUp()
+            else if (d === "top")    list.navTop()
+            else if (d === "bottom") list.navBottom()
+        }
         function key(k: string) {
             const lk = k.toLowerCase()
             if (lk === "?") {

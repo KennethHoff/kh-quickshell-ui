@@ -106,10 +106,32 @@ Item {
     function enterActionsMode() {
         const app = selectedApp
         if (!app) return false
-        _actions = []
-        actionsProcess.command = [bin.scanActions, app._filePath]
-        actionsProcess.running = true
-        return true
+
+        const fv = Qt.createQmlObject('import Quickshell.Io; FileView { blockAllReads: true }', appList)
+        fv.path = app._filePath
+        const actions = []
+        let inAction = false, name = "", exec = ""
+        for (const line of fv.text().split("\n")) {
+            if (line.startsWith("[Desktop Action ")) {
+                if (inAction && name && exec) actions.push({ name, exec })
+                inAction = true; name = ""; exec = ""
+            } else if (line.startsWith("[")) {
+                if (inAction && name && exec) actions.push({ name, exec })
+                inAction = false
+            } else if (inAction) {
+                if (line.startsWith("Name="))      name = line.slice(5).trim()
+                else if (line.startsWith("Exec=")) exec = line.slice(5).replace(/%[fFuUdDnNick]/g, "").trim()
+            }
+        }
+        if (inAction && name && exec) actions.push({ name, exec })
+        fv.destroy()
+
+        _actions = actions
+        if (actions.length > 0) {
+            _mode = "actions"
+            actionList.currentIndex = 0
+        }
+        return actions.length > 0
     }
 
     function flash(idx) { flashRequested(idx) }
@@ -343,28 +365,6 @@ Item {
         }
     }
 
-    property var _actionsBuf: []
-
-    Process {
-        id: actionsProcess
-        stdout: SplitParser {
-            onRead: (line) => {
-                if (line === "") return
-                const tab = line.indexOf("\t")
-                if (tab < 0) return
-                appList._actionsBuf.push({ name: line.substring(0, tab), exec: line.substring(tab + 1) })
-            }
-        }
-        onExited: {
-            appList._actions = appList._actionsBuf.slice()
-            appList._actionsBuf = []
-            if (appList._actions.length > 0) {
-                appList._mode = "actions"
-                actionList.currentIndex = 0
-            }
-        }
-    }
-
     Timer {
         id: searchDebounce
         interval: 80
@@ -420,7 +420,7 @@ Item {
                 anchors.fill: parent
                 anchors.leftMargin: appList._mode !== "insert" ? modeTag.width + 18 : 14
                 anchors.rightMargin: 14
-                color: cfg.color.base05
+                color: appList._mode === "actions" ? "transparent" : cfg.color.base05
                 font.family: cfg.fontFamily
                 font.pixelSize: cfg.fontSize
                 clip: true
@@ -440,7 +440,7 @@ Item {
                 // Actions mode: show selected app name in the bar
                 Text {
                     anchors.fill: parent
-                    anchors.leftMargin: 0
+                    anchors.leftMargin: modeTag.width + 8
                     visible: appList._mode === "actions" && appList.selectedApp !== null
                     text: appList.selectedApp ? "Actions \u2014 " + appList.selectedApp.name : ""
                     color: cfg.color.base04
