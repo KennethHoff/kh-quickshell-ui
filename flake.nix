@@ -88,6 +88,7 @@
           cp ${self}/lib/DropdownHeader.qml $out/
           cp ${self}/lib/DropdownDivider.qml $out/
           cp ${self}/lib/DropdownItem.qml   $out/
+          cp ${self}/lib/ControlTile.qml    $out/
         '';
 
       viewConfig = pkgs.runCommand "kh-view-config" { } ''
@@ -112,7 +113,7 @@
 
       barConfig = mkBarConfig {
         leftPlugins  = [ "Workspaces" "MediaPlayer" ];
-        rightPlugins = [ "Tailscale" "Clock" "Volume" "Tray" ];
+        rightPlugins = [ "ControlCenter" "Clock" "Volume" "Tray" ];
       };
 
       cliphistConfig = pkgs.runCommand "kh-cliphist-config" { } ''

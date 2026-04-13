@@ -53,6 +53,13 @@ let
       cp ${barLayoutQml} $out/BarLayout.qml
       cp ${nixConfig} $out/NixConfig.qml
       cp ${nixBins}   $out/NixBins.qml
+      # Bar-specific shared components — copied to root so Quickshell
+      # auto-discovers them without needing an explicit import statement.
+      cp ${src}/lib/BarDropdown.qml     $out/
+      cp ${src}/lib/DropdownHeader.qml  $out/
+      cp ${src}/lib/DropdownDivider.qml $out/
+      cp ${src}/lib/DropdownItem.qml    $out/
+      cp ${src}/lib/ControlTile.qml     $out/
     '';
 
   mkConfig =
@@ -103,10 +110,10 @@ in
       };
       rightPlugins = lib.mkOption {
         type = lib.types.listOf lib.types.str;
-        default = [ "Tailscale" "Clock" "Volume" "Tray" ];
+        default = [ "ControlCenter" "Clock" "Volume" "Tray" ];
         description = ''
           QML type names to render in the right slot, right-to-left.
-          Built-in types: Tailscale, Clock, Volume, Tray.
+          Built-in types: ControlCenter, Clock, Volume, Tray.
           Add custom types by placing their .qml files in a directory
           listed in <option>extraPluginDirs</option>.
         '';

@@ -84,8 +84,8 @@ A full status bar built in Quickshell, replacing Waybar.
 - ✅ MPRIS media controls — prev/play-pause/next buttons + artist/title display; shows first active player, hidden when none
 - ⬜ Calendar — clock with dropdown calendar on click
 - ✅ Taskbar icons — tray icons via StatusNotifierItem protocol; left click activates, right click shows native context menu via `display()`; hidden when no items present
-- ✅ Tailscale — connection status (`ts: on (N)` / `ts: off`); click to open a dropdown panel showing this machine's IP, all peers with hostname, Tailscale IP, and online/offline indicator; polls `tailscale status --json` every 10 s
-- ⬜ Tailscale: toggle connected/disconnected — button in the panel header to run `tailscale up` / `tailscale down`; status label updates reactively after command completes
+- ✅ Control Center — macOS-style `●●●` button that opens a panel with `ControlTile` toggle tiles for WiFi (nmcli) and Tailscale; Tailscale tile runs `tailscale up/down` on click; peer list below the tiles; replaces the standalone Tailscale plugin
+- ✅ Tailscale: toggle connected/disconnected — Tailscale tile in Control Center runs `tailscale up` / `tailscale down` on click; status updates reactively after command completes
 - ⬜ Tailscale: exit node selection — list exit-node-capable peers in the panel; click one to run `tailscale set --exit-node=<ip>`; show active exit node highlighted; click again (or a "clear" button) to run `tailscale set --exit-node=` to disable
 - ⬜ Tailscale: advertise exit node toggle — checkbox/button to run `tailscale set --advertise-exit-node` on/off for the local machine
 - ⬜ Tailscale: shields-up toggle — toggle `tailscale set --shields-up` to block incoming connections; reflected in panel UI
