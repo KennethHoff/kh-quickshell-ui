@@ -82,6 +82,12 @@
           cp ${barLayoutQml} $out/BarLayout.qml
           cp ${nixConfigQml} $out/NixConfig.qml
           cp ${nixBinsQml} $out/NixBins.qml
+          # Bar-specific shared components — copied to root so Quickshell
+          # auto-discovers them without needing an explicit import statement.
+          cp ${self}/lib/BarDropdown.qml    $out/
+          cp ${self}/lib/DropdownHeader.qml $out/
+          cp ${self}/lib/DropdownDivider.qml $out/
+          cp ${self}/lib/DropdownItem.qml   $out/
         '';
 
       viewConfig = pkgs.runCommand "kh-view-config" { } ''

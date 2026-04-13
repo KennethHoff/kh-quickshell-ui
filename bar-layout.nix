@@ -97,7 +97,6 @@ pkgs.writeText "BarLayout.qml" ''
   // Configure plugins via the bar-layout.nix arguments or the hm-module options.
   import QtQuick
   import Quickshell
-  import "lib"
   import Quickshell.Hyprland
   import Quickshell.Io
   import Quickshell.Services.Pipewire
