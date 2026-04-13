@@ -7,6 +7,7 @@ import Quickshell.Hyprland
 import Quickshell.Wayland
 
 BarWidget {
+    id: root
     NixConfig { id: cfg }
 
     // Hover-preview state — one shared popup for all workspace buttons.
@@ -81,13 +82,13 @@ BarWidget {
     // ── Workspace preview popup ────────────────────────────────────────────
     PopupWindow {
         id: panel
-        anchor.window: barWindow
-        anchor.rect.x: barWindow
+        anchor.window: root.barWindow
+        anchor.rect.x: root.barWindow
             ? Math.max(0, Math.min(
                 Math.round(state.btnX + 14 - panel.implicitWidth / 2),
-                barWindow.width - panel.implicitWidth))
+                root.barWindow.width - panel.implicitWidth))
             : 0
-        anchor.rect.y: barHeight + 4
+        anchor.rect.y: root.barHeight + 4
 
         // Dimensions: 240 px wide, aspect-matched to the workspace's monitor.
         // Monitor width/height are physical pixels; divide by scale to get
@@ -101,7 +102,7 @@ BarWidget {
         implicitHeight: Math.round(mon_h * scale)
         color:  "transparent"
 
-        visible: state.preview !== null && barWindow !== null
+        visible: state.preview !== null && root.barWindow !== null
 
         Rectangle {
             anchors.fill: parent
