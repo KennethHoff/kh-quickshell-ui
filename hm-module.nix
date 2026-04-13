@@ -32,35 +32,22 @@ let
   };
 
   mkBarConfig =
-    { leftPlugins, rightPlugins, extraPluginDirs }:
+    { structure, extraPluginDirs }:
     let
-      resolvePlugin = name:
-        let extraSrc = lib.findFirst
-          (d: builtins.pathExists (d + "/${name}.qml"))
-          null
-          extraPluginDirs;
-        in { inherit name; src = if extraSrc != null then extraSrc + "/${name}.qml" else src + "/qml/bar/${name}.qml"; };
-      barLayoutQml = import (src + "/bar-layout.nix") {
-        inherit pkgs lib;
-        leftPlugins  = map resolvePlugin leftPlugins;
-        rightPlugins = map resolvePlugin rightPlugins;
-      };
+      barLayoutQml = import (src + "/bar-config.nix") { inherit pkgs structure; };
     in
     pkgs.runCommandLocal "qs-kh-bar" { } ''
-      mkdir -p $out/lib
-      cp ${src}/lib/*.qml $out/lib/
+      mkdir -p $out
       cp ${src}/qml/kh-bar.qml $out/shell.qml
       cp ${barLayoutQml} $out/BarLayout.qml
       cp ${nixConfig} $out/NixConfig.qml
       cp ${nixBins}   $out/NixBins.qml
-      # Bar-specific shared components — copied to root so Quickshell
-      # auto-discovers them without needing an explicit import statement.
-      cp ${src}/lib/BarDropdown.qml     $out/
-      cp ${src}/lib/DropdownHeader.qml  $out/
-      cp ${src}/lib/DropdownDivider.qml $out/
-      cp ${src}/lib/DropdownItem.qml    $out/
-      cp ${src}/lib/ControlTile.qml          $out/
-      cp ${src}/lib/ControlCenterPanel.qml  $out/
+      # All lib components — auto-discovered by Quickshell.
+      cp ${src}/lib/*.qml $out/
+      # All built-in bar plugins — auto-discovered by Quickshell.
+      cp ${src}/qml/bar/*.qml $out/
+      # Extra plugin dirs (user-supplied types).
+      ${lib.concatMapStrings (d: "cp ${toString d}/*.qml $out/\n") extraPluginDirs}
     '';
 
   mkConfig =
@@ -99,52 +86,66 @@ in
         default = true;
         description = "Enable the status bar (kh-bar).";
       };
-      leftPlugins = lib.mkOption {
-        type = lib.types.listOf lib.types.str;
-        default = [ "Workspaces" "MediaPlayer" ];
-        description = ''
-          QML type names to render in the left slot of the bar, left-to-right.
-
-          Built-in plugins:
-          - Workspaces   — Hyprland workspace switcher with hover preview thumbnails
-          - MediaPlayer  — MPRIS prev/play-pause/next controls and track info;
-                           hidden when no player is active
-
-          Add custom plugins by placing their .qml files in a directory
-          listed in <option>extraPluginDirs</option>.
+      structure = lib.mkOption {
+        type = lib.types.str;
+        default = ''
+              BarLeft {
+                  Workspaces {}
+                  MediaPlayer {}
+              }
+              BarRight {
+                  ControlCenter {}
+                  Clock {}
+                  Volume {}
+                  Tray {}
+              }
         '';
-      };
-      rightPlugins = lib.mkOption {
-        type = lib.types.listOf lib.types.str;
-        default = [ "ControlCenter" "Clock" "Volume" "Tray" ];
         description = ''
-          QML type names to render in the right slot of the bar, right-to-left.
+          QML structure for the bar layout. The string is placed verbatim
+          inside the root BarLayout Item, which exposes <literal>barHeight</literal>
+          and <literal>barWindow</literal> to all children via the parent chain.
 
-          Built-in plugins:
-          - ControlCenter — macOS-style ●●● button that opens a panel with
-                            ControlTile toggles (Ethernet, Tailscale) and a
-                            Tailscale peer list; Tailscale tile runs
-                            `tailscale up/down` on click
-          - Clock         — HH:mm:ss clock, updates every second
-          - Volume        — PipeWire default-sink volume; scroll to adjust,
-                            click to mute/unmute; hidden when no sink present
-          - Tray          — StatusNotifierItem system tray icons; left-click
-                            activates, right-click shows native context menu;
-                            hidden when no items present
+          Use <literal>BarLeft</literal> and <literal>BarRight</literal> to
+          position plugin groups. Any QML type available in $out/ can be used —
+          built-in plugins, lib components, and types from extraPluginDirs.
 
-          Add custom plugins by placing their .qml files in a directory
-          listed in <option>extraPluginDirs</option>.
+          Built-in plugins: Workspaces, MediaPlayer, ControlCenter, Clock,
+          Volume, Tray.
+
+          Built-in layout / composition types:
+          BarLeft, BarRight, BarDropdown, ControlPanel, ControlTile,
+          TailscalePanel, EthernetPanel, TailscalePeers,
+          DropdownHeader, DropdownDivider, DropdownItem.
+
+          Example — custom composition without ControlCenter:
+          <programlisting>
+          BarLeft {
+              Workspaces {}
+          }
+          BarRight {
+              ControlPanel {
+                  Row {
+                      spacing: 8
+                      EthernetPanel {}
+                      TailscalePanel { id: ts }
+                  }
+                  TailscalePeers { source: ts }
+              }
+              Clock {}
+              Volume {}
+              Tray {}
+          }
+          </programlisting>
         '';
       };
       extraPluginDirs = lib.mkOption {
         type = lib.types.listOf lib.types.path;
         default = [ ];
         description = ''
-          Paths to directories containing extra bar plugin .qml files.
-          Each file must define a BarWidget subtype with the same filename
-          as the type name (e.g. MyWidget.qml exposes the MyWidget type).
-          Plugin files are merged into the bar build alongside the built-in
-          plugins and are referenced by name in leftPlugins/rightPlugins.
+          Paths to directories containing extra bar plugin or component .qml files.
+          All *.qml files from each directory are copied into the bar config root
+          and auto-discovered by Quickshell, making their types available by name
+          in the <option>structure</option> string.
         '';
       };
     };
@@ -164,7 +165,7 @@ in
           } //
           lib.optionalAttrs config.programs.kh-ui.bar.enable {
             kh-bar = mkBarConfig {
-              inherit (config.programs.kh-ui.bar) leftPlugins rightPlugins extraPluginDirs;
+              inherit (config.programs.kh-ui.bar) structure extraPluginDirs;
             };
           } //
           lib.optionalAttrs config.programs.kh-ui.launcher.enable {

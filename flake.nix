@@ -54,42 +54,30 @@
 
       nixBinsQml = import ./ffi.nix { inherit pkgs lib; };
 
-      # mkBarConfig builds the kh-bar derivation.
-      # extraPluginDirs: list of paths; their *.qml files are merged into $out/bar/
-      # alongside the built-in plugins, making them importable from BarLayout.qml.
+      # mkBarConfig builds the kh-bar derivation from a QML structure string.
+      # structure: QML snippet; its top-level items are children of BarLayout's
+      #            root Item (which exposes barHeight and barWindow).
+      # extraPluginDirs: list of paths; all *.qml files are copied into $out/
+      #            making them auto-discoverable as additional bar types.
       mkBarConfig =
-        { leftPlugins  ? [ "Workspaces" ]
-        , rightPlugins ? [ "Clock" ]
+        { structure
         , extraPluginDirs ? []
         }:
         let
-          resolvePlugin = name:
-            let extraSrc = lib.findFirst
-              (d: builtins.pathExists (d + "/${name}.qml"))
-              null
-              extraPluginDirs;
-            in { inherit name; src = if extraSrc != null then extraSrc + "/${name}.qml" else self + "/qml/bar/${name}.qml"; };
-          barLayoutQml = import ./bar-layout.nix {
-            inherit pkgs lib;
-            leftPlugins  = map resolvePlugin leftPlugins;
-            rightPlugins = map resolvePlugin rightPlugins;
-          };
+          barLayoutQml = import ./bar-config.nix { inherit pkgs structure; };
         in
         pkgs.runCommand "kh-bar-config" { } ''
-          mkdir -p $out/lib
-          cp ${self}/lib/*.qml $out/lib/
+          mkdir -p $out
           cp ${self}/qml/kh-bar.qml $out/shell.qml
           cp ${barLayoutQml} $out/BarLayout.qml
           cp ${nixConfigQml} $out/NixConfig.qml
           cp ${nixBinsQml} $out/NixBins.qml
-          # Bar-specific shared components — copied to root so Quickshell
-          # auto-discovers them without needing an explicit import statement.
-          cp ${self}/lib/BarDropdown.qml    $out/
-          cp ${self}/lib/DropdownHeader.qml $out/
-          cp ${self}/lib/DropdownDivider.qml $out/
-          cp ${self}/lib/DropdownItem.qml   $out/
-          cp ${self}/lib/ControlTile.qml         $out/
-          cp ${self}/lib/ControlCenterPanel.qml $out/
+          # All lib components — auto-discovered by Quickshell.
+          cp ${self}/lib/*.qml $out/
+          # All built-in bar plugins — auto-discovered by Quickshell.
+          cp ${self}/qml/bar/*.qml $out/
+          # Extra plugin dirs (user-supplied types).
+          ${lib.concatMapStrings (d: "cp ${toString d}/*.qml $out/\n") extraPluginDirs}
         '';
 
       viewConfig = pkgs.runCommand "kh-view-config" { } ''
@@ -113,8 +101,18 @@
       '';
 
       barConfig = mkBarConfig {
-        leftPlugins  = [ "Workspaces" "MediaPlayer" ];
-        rightPlugins = [ "ControlCenter" "Clock" "Volume" "Tray" ];
+        structure = ''
+              BarLeft {
+                  Workspaces {}
+                  MediaPlayer {}
+              }
+              BarRight {
+                  ControlCenter {}
+                  Clock {}
+                  Volume {}
+                  Tray {}
+              }
+        '';
       };
 
       cliphistConfig = pkgs.runCommand "kh-cliphist-config" { } ''
