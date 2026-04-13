@@ -530,17 +530,39 @@ Item {
                     color: appDelegate.isCurrent ? cfg.color.base02 : "transparent"
                     radius: 6
 
-                    Image {
+                    Item {
                         id: appIcon
                         anchors.left: parent.left
                         anchors.leftMargin: 10
                         anchors.verticalCenter: parent.verticalCenter
                         width: 32
                         height: 32
-                        source: modelData.icon !== "" ? ("file://" + modelData.icon) : ""
-                        fillMode: Image.PreserveAspectFit
-                        sourceSize: Qt.size(32, 32)
-                        smooth: true
+
+                        Image {
+                            id: appIconImage
+                            anchors.fill: parent
+                            source: modelData.icon !== "" ? ("file://" + modelData.icon) : ""
+                            fillMode: Image.PreserveAspectFit
+                            sourceSize: Qt.size(32, 32)
+                            smooth: true
+                            visible: status === Image.Ready
+                        }
+
+                        Rectangle {
+                            anchors.fill: parent
+                            visible: appIconImage.status !== Image.Ready
+                            color: cfg.color.base02
+                            radius: 6
+
+                            Text {
+                                anchors.centerIn: parent
+                                text: modelData.name.charAt(0).toUpperCase()
+                                color: cfg.color.base05
+                                font.family: cfg.fontFamily
+                                font.pixelSize: 16
+                                font.bold: true
+                            }
+                        }
                     }
 
                     Column {
