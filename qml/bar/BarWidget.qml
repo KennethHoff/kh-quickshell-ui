@@ -4,16 +4,17 @@
 // implicitHeight tracks barHeight automatically; width/height are bound
 // to their implicit counterparts so Row layout works correctly.
 //
+// barHeight is read from the parent chain (BarLeft/BarRight expose it,
+// which read it from the BarLayout Item). Explicit override is still
+// possible by setting barHeight directly on the plugin instance.
+//
 // cfg is NOT part of this interface — plugins that need theme access
 // declare their own `NixConfig { id: cfg }` directly. Since NixConfig.qml
 // is placed in $out/ alongside all plugin files, it is auto-discoverable.
-//
-// Usage (in kh-bar.qml or BarLayout.qml):
-//   Clock { barHeight: root.barHeight }
 import QtQuick
 
 Item {
-    required property int barHeight
+    property int barHeight: parent?.barHeight ?? 32
 
     implicitHeight: barHeight
 
