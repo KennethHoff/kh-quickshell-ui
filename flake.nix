@@ -207,7 +207,7 @@
           program = toString (pkgs.writeShellScript "test-launcher" ''
             set -e
             root=$(git rev-parse --show-toplevel)
-            out=$root/tests/visual/output
+            out=$root/tests/visual/output/launcher
             mkdir -p "$out"
 
             echo "kh-launcher visual tests"
