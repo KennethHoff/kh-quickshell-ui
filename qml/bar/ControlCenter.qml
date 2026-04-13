@@ -42,27 +42,30 @@ BarWidget {
         }
     }
 
-    // ── WiFi state ─────────────────────────────────────────────────────────
+    // ── Ethernet state ─────────────────────────────────────────────────────
     QtObject {
         id: wifiState
         property bool   connected: false
-        property string ssid:      ""
+        property string iface:     ""
     }
 
     Process {
         id: wifiProc
         running: true
-        command: ["nmcli", "-t", "-f", "ACTIVE,SSID", "dev", "wifi"]
+        command: ["nmcli", "-t", "-f", "DEVICE,TYPE,STATE", "dev"]
         stdout: StdioCollector {
             onStreamFinished: {
                 const lines = text.trim().split("\n")
-                const active = lines.find(l => l.startsWith("yes:"))
+                const active = lines.find(l => {
+                    const parts = l.split(":")
+                    return parts[1] === "ethernet" && parts[2] === "connected"
+                })
                 if (active) {
                     wifiState.connected = true
-                    wifiState.ssid = active.slice(4)
+                    wifiState.iface = active.split(":")[0]
                 } else {
                     wifiState.connected = false
-                    wifiState.ssid = ""
+                    wifiState.iface = ""
                 }
             }
         }
@@ -99,8 +102,8 @@ BarWidget {
             spacing: 8
 
             ControlTile {
-                label:      "wifi"
-                sublabel:   wifiState.connected ? wifiState.ssid : "off"
+                label:      "ethernet"
+                sublabel:   wifiState.connected ? wifiState.iface : "off"
                 active:     wifiState.connected
                 activeColor:      cfg.color.base0D
                 inactiveColor:    cfg.color.base02
