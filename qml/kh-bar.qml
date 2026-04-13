@@ -20,6 +20,7 @@ ShellRoot {
         model: Quickshell.screens
 
         delegate: PanelWindow {
+            id: barPanel
             property var modelData
             screen: modelData
             anchors.top:   true
@@ -44,6 +45,7 @@ ShellRoot {
                 BarLayout {
                     anchors.fill: parent
                     barHeight: root.barHeight
+                    barWindow: barPanel
                 }
             }
         }

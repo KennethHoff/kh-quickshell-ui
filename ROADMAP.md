@@ -84,7 +84,7 @@ A full status bar built in Quickshell, replacing Waybar.
 - ✅ MPRIS media controls — prev/play-pause/next buttons + artist/title display; shows first active player, hidden when none
 - ⬜ Calendar — clock with dropdown calendar on click
 - ⬜ Taskbar icons — tray icons for running apps via system tray protocol
-- ⬜ Tailscale — connection status; click to open a panel showing connected peers, their IPs, and online/offline state
+- ✅ Tailscale — connection status (`ts: on (N)` / `ts: off`); click to open a dropdown panel showing this machine's IP, all peers with hostname, Tailscale IP, and online/offline indicator; polls `tailscale status --json` every 10 s
 - ⬜ Sonarr — badge when new episodes are downloaded; click to open a panel showing recently grabbed episodes and upcoming releases (polls Sonarr API)
 - ⬜ Other candidates: network status, battery, notifications indicator
 

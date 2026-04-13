@@ -103,10 +103,10 @@ in
       };
       rightPlugins = lib.mkOption {
         type = lib.types.listOf lib.types.str;
-        default = [ "Clock" "Volume" ];
+        default = [ "Tailscale" "Clock" "Volume" ];
         description = ''
           QML type names to render in the right slot, right-to-left.
-          Built-in types: Clock, Volume.
+          Built-in types: Tailscale, Clock, Volume.
           Add custom types by placing their .qml files in a directory
           listed in <option>extraPluginDirs</option>.
         '';

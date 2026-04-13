@@ -106,7 +106,7 @@
 
       barConfig = mkBarConfig {
         leftPlugins  = [ "Workspaces" "MediaPlayer" ];
-        rightPlugins = [ "Clock" "Volume" ];
+        rightPlugins = [ "Tailscale" "Clock" "Volume" ];
       };
 
       cliphistConfig = pkgs.runCommand "kh-cliphist-config" { } ''
