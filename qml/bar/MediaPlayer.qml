@@ -7,7 +7,7 @@ import Quickshell.Services.Mpris
 BarWidget {
     NixConfig { id: cfg }
 
-    readonly property MprisPlayer player: Mpris.players.length > 0
+    readonly property var player: Mpris.players.length > 0
         ? Mpris.players.get(0) : null
     readonly property bool active: player !== null
 

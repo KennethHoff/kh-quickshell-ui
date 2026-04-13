@@ -9,7 +9,7 @@ BarWidget {
     // Bind the default sink so its audio properties stay live.
     PwObjectTracker { objects: [Pipewire.defaultAudioSink] }
 
-    readonly property PwNode sink:  Pipewire.defaultAudioSink
+    readonly property var  sink:    Pipewire.defaultAudioSink
     readonly property bool   valid: sink !== null && sink.audio !== null
     readonly property bool   muted: valid && sink.audio.muted
     readonly property real   vol:   valid ? sink.audio.volume : 0
