@@ -49,19 +49,21 @@ let
           "id: row"   "row."
           "id: label" "label."
           "id: state" "state."
-          "id: proc"  "proc."
-          "id: timer" "timer."
-          "id: panel" "panel."
-          "id: col"   "col."
+          "id: proc"     "proc."
+          "id: timer"    "timer."
+          "id: panel"    "panel."
+          "id: col"      "col."
+          "id: dropdown" "dropdown."
         ]
-        [ "id: cfg${suffix}"   "cfg${suffix}."
-          "id: row${suffix}"   "row${suffix}."
-          "id: label${suffix}" "label${suffix}."
-          "id: state${suffix}" "state${suffix}."
-          "id: proc${suffix}"  "proc${suffix}."
-          "id: timer${suffix}" "timer${suffix}."
-          "id: panel${suffix}" "panel${suffix}."
-          "id: col${suffix}"   "col${suffix}."
+        [ "id: cfg${suffix}"      "cfg${suffix}."
+          "id: row${suffix}"      "row${suffix}."
+          "id: label${suffix}"    "label${suffix}."
+          "id: state${suffix}"    "state${suffix}."
+          "id: proc${suffix}"     "proc${suffix}."
+          "id: timer${suffix}"    "timer${suffix}."
+          "id: panel${suffix}"    "panel${suffix}."
+          "id: col${suffix}"      "col${suffix}."
+          "id: dropdown${suffix}" "dropdown${suffix}."
         ]
         inner;
     in uniqueInner;
@@ -73,6 +75,7 @@ let
             // ── ${p.name} ──
             Item {
                 property int barHeight: layout.barHeight
+                property var barWindow: layout.barWindow
                 implicitHeight: barHeight
                 width: implicitWidth
                 height: implicitHeight
@@ -94,6 +97,7 @@ pkgs.writeText "BarLayout.qml" ''
   // Configure plugins via the bar-layout.nix arguments or the hm-module options.
   import QtQuick
   import Quickshell
+  import "lib"
   import Quickshell.Hyprland
   import Quickshell.Io
   import Quickshell.Services.Pipewire
