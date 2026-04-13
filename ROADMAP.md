@@ -75,7 +75,7 @@ Searchable application launcher (`quickshell -c kh-launcher`).
 A full status bar built in Quickshell, replacing Waybar.
 
 - ✅ Workspaces — show Hyprland workspaces, highlight active, click to switch
-- ⬜ Workspace preview — hovering a workspace button renders a live thumbnail of that workspace's contents in a popup; thumbnail is a scaled-down capture of the workspace surface via the `hyprland/toplevel-export-v1` or equivalent Wayland protocol; popup appears after a short hover delay (~300 ms) and disappears on mouse leave
+- ✅ Workspace preview — hovering a workspace button for 300 ms renders a thumbnail popup; composites per-window `ScreencopyView` captures at Hyprland IPC positions scaled to 240 px wide; disappears on mouse leave; workspace name badge in corner
 - ✅ Clock — live HH:mm display, updates every second
 - ✅ Plugin system — plugins are authored as `.qml` files and wired in via Nix (`leftPlugins`/`rightPlugins`/`extraPluginDirs`); built at eval time so no runtime module import is needed
 - ⬜ IPC support — expose a `bar` IPC target so plugins (or external scripts) can query or mutate bar state; useful for things like toggling a dropdown panel from a keybind
