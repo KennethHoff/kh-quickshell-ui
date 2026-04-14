@@ -39,6 +39,7 @@ list of clipboard entries from `cliphist`. SUPER+V toggles it via IPC.
 - ⬜ Auto-paste — close the window and simulate Ctrl+V into the previously focused app via `wtype`
 - ✅ Delete from UI — `d` in normal mode deletes the selected entry; `d` in visual mode deletes the selected range; confirms via popup before executing; fade-out animation on deleted entries; cursor repositions to the entry above the deleted one; executed via `cliphist delete`
 - ✅ Pinned entries — `p` toggles pin on the selected entry; pinned entries sort to the top of the list (both unfiltered and search-filtered); persisted to `$XDG_DATA_HOME/kh-cliphist/pins` (one entry ID per line); deleting a pinned entry removes it from the pin set; 3 px coloured bar on the left edge of each pinned delegate row
+- ⬜ Batch pin in visual mode — `p` in visual mode toggles pin on all entries in the selected range; `handleVisualKey` currently does not handle `p`
 
 ---
 
@@ -62,6 +63,7 @@ Searchable application launcher (`quickshell -c kh-launcher`).
 - ✅ `?` toggles a searchable help overlay listing all keybinds; help sections are mode-aware (actions vs. normal/insert)
 - ✅ App icons — display the icon image (not just name) in the list row
 - ✅ App icons in actions mode — show the parent app's icon next to each desktop action entry
+- ⬜ Frequency-weighted results — track launch counts per app in a local counter file; blend match score with usage frequency so frequently-launched apps surface higher; decays over time so stale counts don't dominate
 - ⬜ Script mode — any external process can push a list of items (label, description, icon, callback command) into the launcher via IPC and receive the user's selection back; makes the launcher infinitely extensible without baking in every mode; Nix option to register named script modes that appear alongside built-in modes
 
 ### Modes
@@ -90,6 +92,7 @@ A full status bar built in Quickshell, replacing Waybar.
 
 - ✅ Workspaces — show Hyprland workspaces, highlight active, click to switch
 - ✅ Workspace preview — hovering a workspace button for 300 ms renders a thumbnail popup; composites per-window `ScreencopyView` captures at Hyprland IPC positions scaled to 240 px wide; disappears on mouse leave; workspace name badge in corner
+- ⬜ Workspace preview click-through — clicking a window inside the preview thumbnail focuses that specific window directly, not just the workspace
 - ⬜ Submap indicator — show the active Hyprland submap name (e.g. `resize`, `passthrough`) in the bar when a non-default submap is active; hidden during normal operation; sourced from the `submap` Hyprland IPC event
 - ⬜ Scratchpad indicator — show a count of hidden scratchpad windows; click cycles through them via `hyprctl dispatch togglespecialworkspace`; hidden when scratchpad is empty
 
@@ -106,15 +109,21 @@ A full status bar built in Quickshell, replacing Waybar.
 ### Audio
 
 - ✅ Audio controls — volume level (scroll to adjust) and mute toggle (click) via PipeWire; hidden when no sink is available
+- ⬜ Microphone mute toggle — mutes the configured virtual PipeWire source node (not the physical device); the setup uses virtual sinks and sources that physical devices and apps route through, so mute targets the virtual node to silence all inputs simultaneously; configured via Nix with the target node name
+- ⬜ Output device quick switch — right-click or dropdown on the volume widget to select between available PipeWire sinks without opening the full Audio Mixer
 
 ### Media (MPRIS)
 
 - ✅ MPRIS media controls — prev/play-pause/next buttons + artist/title display; shows first active player, hidden when none
 - ⬜ MPRIS multi-source — when more than one player is active, show a dropdown (or similar) to select which source is displayed rather than always picking the first one
+- ⬜ Seek bar — progress indicator showing position within the current track; click or drag to seek; sourced from MPRIS `Position` and `Length` metadata
+- ⬜ Album art — thumbnail of the current track's artwork sourced from MPRIS `mpris:artUrl`; shown alongside artist/title
+- ⬜ Shuffle / repeat toggles — buttons reflecting and toggling the MPRIS `Shuffle` and `LoopStatus` properties
 
 ### System Tray
 
 - ✅ Taskbar icons — tray icons via StatusNotifierItem protocol; left click activates, right click shows native context menu via `display()`; hidden when no items present
+- ⬜ Overflow bucket — when icon count exceeds a configured limit, least-recently-interacted icons collapse into an expander chip; click expander to reveal the overflow tray
 
 ### Control Center
 
@@ -216,6 +225,7 @@ or stdin; shows all files side-by-side with Tab to cycle focus between panes.
 - ✅ Fullscreen mode — `f` toggles single fullscreen pane; `h`/`l` steps through all loaded files; dot indicators at bottom center show position
 - ✅ IPC support — `target: "viewer"`; `next()`/`prev()`/`seek(n)`/`quit()`/`setFullscreen(bool)`/`key(k)`; readable props `currentIndex`, `count`, `fullscreen`, `hasPrev`, `hasNext`; enables scripted slideshows and library review workflows
 - ⬜ Monitor selection — `--monitor <name|index>` flag to open the window on a specific monitor; defaults to the monitor containing the active window
+- ⬜ Syntax highlighting — detect language from file extension and apply token-level colouring using Tree-sitter or `bat` themes; code files become significantly easier to read
 - ⬜ Directory and glob input — `kh-view ./images/` opens all recognised media files in a directory; `kh-view ./images/*.png` expands the glob; files sorted by name by default
 - ⬜ Image gallery mode — when all panes are images, `g` toggles a grid thumbnail view; `h`/`j`/`k`/`l` navigate the grid; Enter opens the selected image in fullscreen; natural entry point when opening a directory of images
 
@@ -298,6 +308,7 @@ Considered and deprioritised. Kept here to avoid re-litigating.
 - **Font browser** — grid/list of installed fonts with live preview text
 - **IDE project picker** — fuzzy search project directories and open in editor; terminal workflow already covers this
 - **Dictionary** — inline word definition via WordNet; search engine covers the need
+- **Clock timestamp copy** — click the clock to copy the current time to clipboard; too niche and a widget action with no visual feedback is confusing
 
 ---
 
