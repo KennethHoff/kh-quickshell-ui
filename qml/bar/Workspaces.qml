@@ -50,14 +50,24 @@ BarWidget {
                 if (Hyprland.workspaces.values[i].name === name)
                     { activateWorkspace(Hyprland.workspaces.values[i]); return }
         }
+        // ipc only
+        function showPreview(name: string): void {
+            for (let i = 0; i < Hyprland.workspaces.values.length; i++)
+                if (Hyprland.workspaces.values[i].name === name)
+                    { state.btnX = 0; state.preview = Hyprland.workspaces.values[i]; return }
+        }
+        // ipc only
+        function hidePreview(): void { timer.stop(); state.pending = null; state.preview = null }
     }
 
     IpcHandler {
         target: "bar.workspaces"
 
-        function getFocused(): string          { return functionality.getFocused() }
-        function list(): string                { return functionality.list() }
-        function switchTo(name: string): void  { functionality.switchTo(name) }
+        function getFocused(): string               { return functionality.getFocused() }
+        function list(): string                     { return functionality.list() }
+        function switchTo(name: string): void       { functionality.switchTo(name) }
+        function showPreview(name: string): void    { functionality.showPreview(name) }
+        function hidePreview(): void                { functionality.hidePreview() }
     }
 
     // 300 ms hover delay before the preview appears.
