@@ -118,6 +118,7 @@
         mkdir -p $out/lib
         cp ${self}/lib/*.qml $out/lib/
         cp ${self}/qml/kh-cliphist.qml $out/shell.qml
+        cp ${self}/qml/ClipDelegate.qml $out/
         cp ${self}/qml/ClipList.qml $out/
         cp ${self}/qml/ClipPreview.qml $out/
         cp ${self}/qml/MetaStore.qml $out/

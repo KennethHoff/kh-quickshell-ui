@@ -42,7 +42,6 @@ Item {
     // ── Config ────────────────────────────────────────────────────────────────
     NixConfig     { id: cfg }
     NixBins       { id: bin }
-    CliphistEntry { id: clipEntry }
     FuzzyScore    { id: fuzzy }
     SearchParser  { id: searchParser }
 
@@ -90,12 +89,6 @@ Item {
     // Esc pressed while in insert mode — orchestrator calls enterNormalMode()
     // then forceActiveFocus on its own key handler.
     signal searchEscapePressed()
-    // Internal: drives flash animation on list delegates.
-    signal flashRequested(int idx)
-    // Internal: drives fade-out animation on the delegate being deleted.
-    signal deleteAnimRequested(int idx)
-    // Internal: drives fade-out on a range of delegates (visual delete).
-    signal deleteRangeAnimRequested(int lo, int hi)
 
     // ── Public API ─────────────────────────────────────────────────────────────
     // Reset state — call when the window opens (before load).
@@ -145,7 +138,10 @@ Item {
     }
 
     // Trigger the blink animation on the delegate at `idx`.
-    function flash(idx) { flashRequested(idx) }
+    function flash(idx) {
+        const item = list.itemAtIndex(idx)
+        if (item) item.flash()
+    }
 
     // Phase 1 (normal mode): stage entry for deletion and ask for confirmation.
     function _deleteSelected() {
@@ -177,10 +173,15 @@ Item {
     function _confirmDelete() {
         _confirmingDelete = false
         if (_pendingDeleteLines.length === 0) return
-        if (_pendingDeleteAnimLo === _pendingDeleteAnimHi)
-            deleteAnimRequested(_pendingDeleteAnimLo)
-        else
-            deleteRangeAnimRequested(_pendingDeleteAnimLo, _pendingDeleteAnimHi)
+        if (_pendingDeleteAnimLo === _pendingDeleteAnimHi) {
+            const item = list.itemAtIndex(_pendingDeleteAnimLo)
+            if (item) item.startDeleteAnim()
+        } else {
+            for (let i = _pendingDeleteAnimLo; i <= _pendingDeleteAnimHi; i++) {
+                const item = list.itemAtIndex(i)
+                if (item) item.startDeleteAnim()
+            }
+        }
         deleteAnimTimer.restart()
     }
 
@@ -680,148 +681,16 @@ Item {
                 font.pixelSize: cfg.fontSize
             }
 
-            delegate: Item {
-                id: delegateRoot
+            delegate: ClipDelegate {
                 required property var modelData
                 required property int index
-                width: list.width
-                height: isImage ? 64 : 40
-
-                readonly property bool   isCurrent: list.currentIndex === index
-                readonly property string preview:   clipEntry.entryPreview(modelData)
-                readonly property bool   isImage:   preview.startsWith("[[")
-                readonly property string entryId:   clipEntry.entryId(modelData)
-                readonly property string tmpPath:   "/tmp/kh-cliphist-" + entryId
-
-                QtObject {
-                    id: clipDelegateFunctionality
-                    // ui only
-                    function init(): void { if (delegateRoot.isImage) imgDecode.running = true }
-                    // ui only
-                    function onImgDecodeExited(): void { imgThumb.source = "file://" + delegateRoot.tmpPath }
-                    // ui only
-                    function onFlashRequested(idx: int): void {
-                        if (idx === delegateRoot.index) blinkAnim.restart()
-                    }
-                    // ui only
-                    function onDeleteAnimRequested(idx: int): void {
-                        if (idx === delegateRoot.index) fadeOutAnim.start()
-                    }
-                    // ui only
-                    function onDeleteRangeAnimRequested(lo: int, hi: int): void {
-                        if (delegateRoot.index >= lo && delegateRoot.index <= hi) fadeOutAnim.start()
-                    }
-                }
-
-                Process {
-                    id: imgDecode
-                    command: [
-                        bin.bash, "-c",
-                        "[ -f \"$1\" ] || printf '%s\\n' \"$2\" | " + bin.cliphist + " decode > \"$1\"",
-                        "--", delegateRoot.tmpPath, delegateRoot.modelData
-                    ]
-                    onExited: clipDelegateFunctionality.onImgDecodeExited()
-                }
-                Component.onCompleted: clipDelegateFunctionality.init()
-
-                Rectangle {
-                    anchors.fill: parent
-                    anchors.margins: 2
-                    color: {
-                        if (clipList._mode === "visual") {
-                            const lo = Math.min(clipList._visualAnchor, list.currentIndex)
-                            const hi = Math.max(clipList._visualAnchor, list.currentIndex)
-                            if (delegateRoot.index >= lo && delegateRoot.index <= hi)
-                                return delegateRoot.isCurrent ? cfg.color.base03 : cfg.color.base02
-                            return "transparent"
-                        }
-                        return delegateRoot.isCurrent ? cfg.color.base02 : "transparent"
-                    }
-                    radius: 6
-
-                    // Pin indicator — 3 px coloured bar on the left edge
-                    Rectangle {
-                        anchors.left: parent.left
-                        anchors.top: parent.top
-                        anchors.bottom: parent.bottom
-                        anchors.margins: 3
-                        width: 3
-                        radius: 1
-                        color: (pinStore.values, delegateRoot.entryId in pinStore.values)
-                            ? cfg.color.base0A : "transparent"
-                    }
-
-                    Image {
-                        id: imgThumb
-                        visible: delegateRoot.isImage
-                        width: 90
-                        anchors { top: parent.top; bottom: parent.bottom; left: parent.left; margins: 4 }
-                        fillMode: Image.PreserveAspectFit
-                        smooth: true; mipmap: true; asynchronous: true
-                    }
-
-                    Text {
-                        id: tsLabel
-                        anchors.right: parent.right
-                        anchors.rightMargin: 10
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: (tsStore.values, clipList._relTime(tsStore.values[delegateRoot.entryId] || "0"))
-                        color: cfg.color.base03
-                        font.family: cfg.fontFamily
-                        font.pixelSize: cfg.fontSize - 4
-                    }
-
-                    Text {
-                        visible: !delegateRoot.isImage
-                        anchors.top: parent.top
-                        anchors.bottom: parent.bottom
-                        anchors.left: parent.left
-                        anchors.right: tsLabel.left
-                        anchors.leftMargin: 14
-                        anchors.rightMargin: 4
-                        text: delegateRoot.preview
-                        color: cfg.color.base05
-                        font.family: cfg.fontFamily
-                        font.pixelSize: cfg.fontSize
-                        verticalAlignment: Text.AlignVCenter
-                        elide: Text.ElideRight
-                    }
-
-                    Rectangle {
-                        id: flashOverlay
-                        anchors.fill: parent
-                        radius: 6
-                        color: cfg.color.base0D
-                        opacity: 0
-                        SequentialAnimation {
-                            id: blinkAnim
-                            NumberAnimation {
-                                target: flashOverlay; property: "opacity"
-                                to: 0.55; duration: 60; easing.type: Easing.OutQuad
-                            }
-                            NumberAnimation {
-                                target: flashOverlay; property: "opacity"
-                                to: 0; duration: 140; easing.type: Easing.InQuad
-                            }
-                        }
-                    }
-
-                    Connections {
-                        target: clipList
-                        function onFlashRequested(idx) { clipDelegateFunctionality.onFlashRequested(idx) }
-                        function onDeleteAnimRequested(idx) { clipDelegateFunctionality.onDeleteAnimRequested(idx) }
-                        function onDeleteRangeAnimRequested(lo, hi) { clipDelegateFunctionality.onDeleteRangeAnimRequested(lo, hi) }
-                    }
-                }
-
-                NumberAnimation {
-                    id: fadeOutAnim
-                    target: delegateRoot
-                    property: "opacity"
-                    to: 0
-                    duration: 200
-                    easing.type: Easing.InQuad
-                }
+                width:            list.width
+                isCurrent:        list.currentIndex === index
+                mode:             clipList._mode
+                visualAnchor:     clipList._visualAnchor
+                listCurrentIndex: list.currentIndex
+                tsValues:         tsStore.values
+                pinValues:        pinStore.values
             }
         }
     }
