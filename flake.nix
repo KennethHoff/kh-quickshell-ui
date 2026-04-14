@@ -143,7 +143,7 @@
           '');
         };
         # Headless screenshot(s) in a single run.
-        # Usage: nix run .#screenshot -- <app> <name> [<ipc-call>...] [-- <name> [<ipc-call>...]]...
+        # Usage: nix run .#screenshot -- [--run <dir>] <app> <name> [<ipc-call>...] [-- <name> [<ipc-call>...]]...
         # Multiple shots separated by -- share one sway instance and one run directory.
         # Each <ipc-call> is a function name with optional arg, e.g. "setView help" or "type Navigate".
         # The window is opened automatically via toggle before any calls are made.
