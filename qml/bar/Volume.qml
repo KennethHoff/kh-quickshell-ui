@@ -19,21 +19,23 @@ BarWidget {
         readonly property real vol:   valid ? sink.audio.volume : 0
     }
 
-    // Single entry point for all volume changes — clamps to [0, 1.5].
     function applyVolume(v: real): void {
         if (state.valid)
             state.sink.audio.volume = Math.max(0.0, Math.min(1.5, v))
     }
+    function core_toggleMute(): void       { if (state.valid) state.sink.audio.muted = !state.sink.audio.muted }
+    function core_setMuted(m: bool): void  { if (state.valid) state.sink.audio.muted = m }
+    function core_scrollVolume(up: bool): void { applyVolume(state.vol + (up ? 0.05 : -0.05)) }
 
     IpcHandler {
         target: "bar.volume"
 
-        function getVolume(): real         { return state.valid ? Math.round(state.vol * 100) : 0 }
-        function setVolume(v: int): void   { applyVolume(v / 100.0) }
+        function getVolume(): real              { return state.valid ? Math.round(state.vol * 100) : 0 }
+        function setVolume(v: int): void        { applyVolume(v / 100.0) }
         function adjustVolume(delta: int): void { applyVolume(state.vol + delta / 100.0) }
-        function isMuted(): bool           { return state.muted }
-        function setMuted(muted: bool): void  { if (state.valid) state.sink.audio.muted = muted }
-        function toggleMute(): void        { if (state.valid) state.sink.audio.muted = !state.sink.audio.muted }
+        function isMuted(): bool                { return state.muted }
+        function setMuted(muted: bool): void    { core_setMuted(muted) }
+        function toggleMute(): void             { core_toggleMute() }
     }
 
     implicitWidth: label.implicitWidth + 24
@@ -50,10 +52,7 @@ BarWidget {
     MouseArea {
         anchors.fill: parent
         acceptedButtons: Qt.LeftButton
-        onClicked: if (state.valid) state.sink.audio.muted = !state.sink.audio.muted
-        onWheel: wheel => {
-            const step = wheel.angleDelta.y > 0 ? 0.05 : -0.05
-            applyVolume(state.vol + step)
-        }
+        onClicked: core_toggleMute()
+        onWheel: wheel => core_scrollVolume(wheel.angleDelta.y > 0)
     }
 }

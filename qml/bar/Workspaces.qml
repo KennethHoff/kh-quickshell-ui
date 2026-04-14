@@ -19,34 +19,27 @@ BarWidget {
         property real btnX:   0      // button x for popup x-centering
     }
 
+    function core_activateWorkspace(ws): void { ws.activate() }
+
     IpcHandler {
         target: "bar.workspaces"
 
-        // Returns the name of the currently focused workspace.
         function getFocused(): string {
-            for (let i = 0; i < Hyprland.workspaces.values.length; i++) {
+            for (let i = 0; i < Hyprland.workspaces.values.length; i++)
                 if (Hyprland.workspaces.values[i].focused)
                     return Hyprland.workspaces.values[i].name
-            }
             return ""
         }
-
-        // Returns a newline-separated list of all workspace names.
         function list(): string {
             const names = []
             for (let i = 0; i < Hyprland.workspaces.values.length; i++)
                 names.push(Hyprland.workspaces.values[i].name)
             return names.join("\n")
         }
-
-        // Switch to the workspace with the given name.
         function switchTo(name: string): void {
-            for (let i = 0; i < Hyprland.workspaces.values.length; i++) {
-                if (Hyprland.workspaces.values[i].name === name) {
-                    Hyprland.workspaces.values[i].activate()
-                    return
-                }
-            }
+            for (let i = 0; i < Hyprland.workspaces.values.length; i++)
+                if (Hyprland.workspaces.values[i].name === name)
+                    { root.core_activateWorkspace(Hyprland.workspaces.values[i]); return }
         }
     }
 
@@ -94,7 +87,7 @@ BarWidget {
                     anchors.fill: parent
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: modelData.activate()
+                    onClicked: root.core_activateWorkspace(modelData)
                     onEntered: {
                         state.pending = modelData
                         // parent is the delegate Rectangle; map to bar-window coords.

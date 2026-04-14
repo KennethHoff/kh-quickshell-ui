@@ -50,14 +50,18 @@ Item {
     // "bar.<ipcName>" — e.g. `qs ipc call bar.controlcenter toggle`.
     property string ipcName: ""
 
+    function core_toggle(): void { open = !open }
+    function core_open(): void   { open = true }
+    function core_close(): void  { open = false }
+
     IpcHandler {
         target: "bar." + root.ipcName
         enabled: root.ipcName !== ""
 
-        function toggle(): void  { root.open = !root.open }
-        function open(): void    { root.open = true }
-        function close(): void   { root.open = false }
-        function isOpen(): bool  { return root.open }
+        function toggle(): void { root.core_toggle() }
+        function open(): void   { root.core_open() }
+        function close(): void  { root.core_close() }
+        function isOpen(): bool { return root.open }
     }
 
     // Children of BarDropdown are placed into the popup content column.
@@ -81,7 +85,7 @@ Item {
 
     MouseArea {
         anchors.fill: parent
-        onClicked: root.open = !root.open
+        onClicked: root.core_toggle()
     }
 
     // ── Popup panel ────────────────────────────────────────────────────────
