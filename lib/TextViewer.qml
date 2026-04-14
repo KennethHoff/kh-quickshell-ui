@@ -118,7 +118,7 @@ Item {
             edit.select(np, np); impl.scrollIntoView(np); return true
         }
         if (event.text === "W") {
-            const np = impl.WORDForward(edit.cursorPosition)
+            const np = impl.bigWordForward(edit.cursorPosition)
             edit.select(np, np); impl.scrollIntoView(np); return true
         }
         if (event.text === "b") {
@@ -126,7 +126,7 @@ Item {
             edit.select(np, np); impl.scrollIntoView(np); return true
         }
         if (event.text === "B") {
-            const np = impl.WORDBackward(edit.cursorPosition)
+            const np = impl.bigWordBackward(edit.cursorPosition)
             edit.select(np, np); impl.scrollIntoView(np); return true
         }
         if (event.text === "e") {
@@ -134,7 +134,7 @@ Item {
             edit.select(np, np); impl.scrollIntoView(np); return true
         }
         if (event.text === "E") {
-            const np = impl.WORDEnd(edit.cursorPosition)
+            const np = impl.bigWordEnd(edit.cursorPosition)
             edit.select(np, np); impl.scrollIntoView(np); return true
         }
         if (event.text === "0") {
@@ -285,7 +285,7 @@ Item {
             return pos
         }
         // W — forward to start of next WORD (whitespace-delimited)
-        function WORDForward(pos): int {
+        function bigWordForward(pos): int {
             const t = edit.text; const n = t.length
             if (pos >= n) return pos
             while (pos < n && !isSpace(t[pos])) pos++
@@ -305,7 +305,7 @@ Item {
             return pos
         }
         // B — backward to start of current/previous WORD
-        function WORDBackward(pos): int {
+        function bigWordBackward(pos): int {
             const t = edit.text
             if (pos <= 0) return 0
             pos--
@@ -327,7 +327,7 @@ Item {
             return pos
         }
         // E — forward to end of current/next WORD
-        function WORDEnd(pos): int {
+        function bigWordEnd(pos): int {
             const t = edit.text; const n = t.length
             if (pos >= n - 1) return n > 0 ? n - 1 : 0
             pos++
@@ -464,11 +464,11 @@ Item {
                 {
                     let np = -1
                     if      (event.text === "w") np = wordForward(edit.cursorPosition)
-                    else if (event.text === "W") np = WORDForward(edit.cursorPosition)
+                    else if (event.text === "W") np = bigWordForward(edit.cursorPosition)
                     else if (event.text === "b") np = wordBackward(edit.cursorPosition)
-                    else if (event.text === "B") np = WORDBackward(edit.cursorPosition)
+                    else if (event.text === "B") np = bigWordBackward(edit.cursorPosition)
                     else if (event.text === "e") np = wordEnd(edit.cursorPosition)
-                    else if (event.text === "E") np = WORDEnd(edit.cursorPosition)
+                    else if (event.text === "E") np = bigWordEnd(edit.cursorPosition)
                     else if (event.text === "0") np = posLineStart(edit.cursorPosition)
                     else if (event.text === "$") np = posLineEnd(edit.cursorPosition)
                     else if (event.text === "^") np = posFirstNonBlank(edit.cursorPosition)
