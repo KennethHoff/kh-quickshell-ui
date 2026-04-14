@@ -303,6 +303,29 @@ via keybind or IPC.
 Improvements to the Claude skills and agentic development workflow.
 
 - ⬜ `screenshot` skill passes labels to `kh-view` — once kh-view supports optional pane labels, update the skill to supply a name and short description for each shot (what app/state it shows, what to look for); makes review sessions self-documenting without manual annotation *(implement together with File Viewer → optional pane labels)*
+- ⬜ Headless Hyprland for workspace preview screenshots — `kh-bar`'s Workspaces plugin uses
+  `Quickshell.Hyprland` types and `ScreencopyView`, which require a live Hyprland session;
+  Sway headless can't drive them.
+
+  **Blocker:** Hyprland v0.54.3 (Aquamarine backend) has no headless mode. Since ~v0.43,
+  headless is unsupported ([#7917](https://github.com/hyprwm/Hyprland/issues/7917),
+  [#7753](https://github.com/hyprwm/Hyprland/issues/7753)). Aquamarine auto-selects
+  DRM → Wayland → X11; there is no env var to force a backend. Confirmed dead ends:
+  - `WLR_BACKENDS=headless` — ignored by Aquamarine
+  - `AQ_BACKENDS=headless` — not a real env var
+  - `hyprland --headless` — flag does not exist
+
+  **Fix:** add `boot.kernelModules = [ "vkms" ]` to NixOS config. VKMS is a virtual kernel
+  DRM device with no physical output; Hyprland's DRM backend accepts it and Aquamarine
+  initialises fully without a GPU or seat.
+
+  **Implementation sketch** (once VKMS is loaded): add `--compositor hyprland` to
+  `nix run .#screenshot`; launch Hyprland with `WAYLAND_DISPLAY`, `DISPLAY`, and
+  `HYPRLAND_INSTANCE_SIGNATURE` unset (prevents nesting on the real session); detect
+  the Wayland socket at `$XDG_RUNTIME_DIR/wayland-*` and the IPC sig at
+  `$XDG_RUNTIME_DIR/hypr/<sig>/`; seed fake windows via
+  `exec-once = [workspace N] weston-simple-shm` in the generated config so
+  `ScreencopyView` has something to capture.
 
 ---
 
