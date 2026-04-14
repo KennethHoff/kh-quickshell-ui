@@ -56,11 +56,7 @@ let
     mkdir -p $out/lib
     cp ${src}/lib/*.qml $out/lib/
     cp ${src}/apps/kh-cliphist.qml $out/shell.qml
-    cp ${src}/apps/cliphist/ClipDelegate.qml  $out/
-    cp ${src}/apps/cliphist/CliphistEntry.qml $out/
-    cp ${src}/apps/cliphist/ClipList.qml      $out/
-    cp ${src}/apps/cliphist/ClipPreview.qml   $out/
-    cp ${src}/apps/cliphist/MetaStore.qml     $out/
+    cp ${src}/apps/cliphist/*.qml $out/
     cp ${nixConfig} $out/NixConfig.qml
     cp ${nixBins}   $out/NixBins.qml
   '';
@@ -178,7 +174,7 @@ in
                 mkdir -p $out/lib
                 cp ${src}/lib/*.qml $out/lib/
                 cp ${src}/apps/kh-launcher.qml $out/shell.qml
-                cp ${src}/apps/launcher/AppList.qml $out/
+                cp ${src}/apps/launcher/*.qml $out/
                 cp ${nixConfig} $out/NixConfig.qml
                 cp ${nixBins}   $out/NixBins.qml
               '';

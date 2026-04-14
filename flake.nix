@@ -94,7 +94,7 @@
         mkdir -p $out/lib
         cp ${self}/lib/*.qml $out/lib/
         cp ${self}/apps/kh-launcher.qml $out/shell.qml
-        cp ${self}/apps/launcher/AppList.qml $out/
+        cp ${self}/apps/launcher/*.qml $out/
         cp ${nixConfigQml} $out/NixConfig.qml
         cp ${import ./ffi.nix {
           inherit pkgs lib;
@@ -120,11 +120,7 @@
         mkdir -p $out/lib
         cp ${self}/lib/*.qml $out/lib/
         cp ${self}/apps/kh-cliphist.qml $out/shell.qml
-        cp ${self}/apps/cliphist/ClipDelegate.qml $out/
-        cp ${self}/apps/cliphist/CliphistEntry.qml $out/
-        cp ${self}/apps/cliphist/ClipList.qml $out/
-        cp ${self}/apps/cliphist/ClipPreview.qml $out/
-        cp ${self}/apps/cliphist/MetaStore.qml $out/
+        cp ${self}/apps/cliphist/*.qml $out/
         cp ${nixConfigQml} $out/NixConfig.qml
         cp ${import ./ffi.nix {
           inherit pkgs lib;
