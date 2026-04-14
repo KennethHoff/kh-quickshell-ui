@@ -85,6 +85,31 @@ A full status bar built in Quickshell, replacing Waybar.
 
 - ✅ Plugin system — plugins are authored as `.qml` files and wired in via Nix (`structure`/`extraPluginDirs`); `BarRow` + `BarSpacer` replace `BarLeft`/`BarRight` for flexible space-between layout; built at eval time so no runtime module import is needed
 - ✅ IPC support — each plugin exposes its own IPC target (`bar.volume`, `bar.media`, `bar.workspaces`); dropdowns with `ipcName` set expose `bar.<name>` with `toggle`/`open`/`close`/`isOpen`
+- ⬜ `BarGroup` plugin — a container plugin that groups any number of child plugins behind a single dropdown button; children are declared inline in `structure` exactly like top-level plugins; any plugin (Volume, Workspaces, custom) can appear inside a group or directly in the bar — placement is independent of plugin type; the button shows a configurable label or icon; implement before hierarchical IPC
+  ```qml
+  // Network + audio behind one button
+  BarGroup {
+      label: "●●●"
+      EthernetPanel {}
+      TailscalePanel { id: _ts }
+      TailscalePeers { source: _ts }
+      Volume {}
+  }
+
+  // Wrap any existing plugin — no changes to the plugin itself
+  BarGroup {
+      label: "media"
+      MediaPlayer {}
+  }
+
+  // Mix grouped and ungrouped freely in the same bar
+  BarRow {
+      Workspaces {}
+      BarSpacer {}
+      BarGroup { label: "●●●"; EthernetPanel {}; TailscalePanel {} }
+      Clock {}
+  }
+  ```
 - ⬜ Hierarchical IPC prefix — add `ipcPrefix` to `BarPlugin` propagated through the parent chain (same mechanism as `barHeight`/`barWindow`); each container appends its segment so a plugin automatically gets a target like `bar1.grouping1.tailscale` without manually specifying it; the root prefix comes from the bar's Nix config entry (e.g. `Bar { ipcName: "top" }`); implement before multi-bar support
 - ⬜ Multi-bar support — allow N bars at arbitrary screen edges (top, bottom, left, right); `mkBarConfig` accepts a list of `{ edge, structure }` entries; each bar gets its own `PanelWindow` and generated `BarLayout`; `BarDropdown` opens its popup toward the screen interior so it works on any edge
 
@@ -125,15 +150,12 @@ A full status bar built in Quickshell, replacing Waybar.
 - ✅ Taskbar icons — tray icons via StatusNotifierItem protocol; left click activates, right click shows native context menu via `display()`; hidden when no items present
 - ⬜ Overflow bucket — when icon count exceeds a configured limit, least-recently-interacted icons collapse into an expander chip; click expander to reveal the overflow tray
 
-### Control Center
+### Tailscale
 
-> **Scope note:** Control Center currently hosts a WiFi tile and Tailscale tiles. The WiFi tile is laptop-specific and tracked under Future Laptop Support. Notifications has its own bar subsection below.
-
-- ✅ Control Center — macOS-style `●●●` button that opens a panel with `ControlTile` toggle tiles for WiFi (nmcli) and Tailscale; Tailscale tile runs `tailscale up/down` on click; peer list below the tiles; replaces the standalone Tailscale plugin
-- ✅ Tailscale: toggle connected/disconnected — Tailscale tile in Control Center runs `tailscale up` / `tailscale down` on click; status updates reactively after command completes
-- ⬜ Tailscale: exit node selection — list exit-node-capable peers in the panel; click one to run `tailscale set --exit-node=<ip>`; show active exit node highlighted; click again (or a "clear" button) to run `tailscale set --exit-node=` to disable
-- ⬜ Tailscale: advertise exit node toggle — checkbox/button to run `tailscale set --advertise-exit-node` on/off for the local machine
-- ⬜ Tailscale: shields-up toggle — toggle `tailscale set --shields-up` to block incoming connections; reflected in panel UI
+- ✅ Tailscale tile — `TailscalePanel` toggles `tailscale up`/`down` on click; status updates reactively after the command completes; exposes `connected`, `selfIp`, and `peers` for use in `TailscalePeers`
+- ⬜ Exit node selection — list exit-node-capable peers; click one to run `tailscale set --exit-node=<ip>`; highlight active exit node; click again (or a clear button) to disable
+- ⬜ Advertise exit node toggle — button to run `tailscale set --advertise-exit-node` on/off for the local machine
+- ⬜ Shields-up toggle — toggle `tailscale set --shields-up` to block incoming connections; reflected in the tile UI
 
 ### Sonarr
 
@@ -327,6 +349,6 @@ Features deferred until the system runs on a laptop. No implementation timeline.
 
 - **Battery bar module** — percentage + charging indicator via `/sys/class/power_supply`; dropdown with estimated time remaining and power profile selector
 - **WiFi bar module** — connection name and signal strength in the bar; dropdown listing nearby networks with connect support (password prompt for new ones)
-- **WiFi Control Center tile** — toggle WiFi on/off and show connection status as a tile in the Control Center panel (complements the WiFi bar module)
-- **Power profiles** — cycle `power-profiles-daemon` profiles (power-saver / balanced / performance) from Control Center; show active profile as an icon
+- **WiFi tile** — `WifiPanel`; toggle WiFi on/off and show connection status; pairs with the WiFi bar module
+- **Power profiles** — cycle `power-profiles-daemon` profiles (power-saver / balanced / performance); show active profile as an icon
 - **Bluetooth manager** — list paired devices, connect/disconnect, toggle Bluetooth on/off; replaces reaching for `bluetoothctl` or a tray app
