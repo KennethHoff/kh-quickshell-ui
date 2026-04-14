@@ -224,6 +224,7 @@ or stdin; shows all files side-by-side with Tab to cycle focus between panes.
 - ✅ `q`/`Esc` quits
 - ✅ Fullscreen mode — `f` toggles single fullscreen pane; `h`/`l` steps through all loaded files; dot indicators at bottom center show position
 - ✅ IPC support — `target: "viewer"`; `next()`/`prev()`/`seek(n)`/`quit()`/`setFullscreen(bool)`/`key(k)`; readable props `currentIndex`, `count`, `fullscreen`, `hasPrev`, `hasNext`; enables scripted slideshows and library review workflows
+- ⬜ Optional pane labels — `kh-view` accepts label metadata alongside each file (e.g. via a sidecar format or extended list protocol); each pane optionally shows a header bar with a short name and description; used by the `screenshot` skill to annotate review sessions with context about what each shot shows and what to look for *(implement together with Dev Tooling → screenshot skill labels)*
 - ⬜ Monitor selection — `--monitor <name|index>` flag to open the window on a specific monitor; defaults to the monitor containing the active window
 - ⬜ Syntax highlighting — detect language from file extension and apply token-level colouring using Tree-sitter or `bat` themes; code files become significantly easier to read
 - ⬜ Directory and glob input — `kh-view ./images/` opens all recognised media files in a directory; `kh-view ./images/*.png` expands the glob; files sorted by name by default
@@ -272,6 +273,14 @@ via keybind or IPC.
 - ⬜ Save to file — write to `$XDG_PICTURES_DIR/Screenshots/` with a timestamp filename in addition to clipboard copy
 - ⬜ Annotation layer — draw arrows, boxes, and text over the capture before copying/saving
 - ⬜ IPC trigger — `qs ipc call screenshot <region|fullscreen|window>` so any keybind daemon can drive it
+
+---
+
+## Dev Tooling
+
+Improvements to the Claude skills and agentic development workflow.
+
+- ⬜ `screenshot` skill passes labels to `kh-view` — once kh-view supports optional pane labels, update the skill to supply a name and short description for each shot (what app/state it shows, what to look for); makes review sessions self-documenting without manual annotation *(implement together with File Viewer → optional pane labels)*
 
 ---
 
