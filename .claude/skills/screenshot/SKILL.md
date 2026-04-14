@@ -1,10 +1,10 @@
 ---
 name: screenshot
-description: Take one or more headless screenshots of a quickshell app, then display them using kh-view.
+description: Take one or more headless screenshots of a quickshell app.
 allowed-tools: Bash(nix run .#screenshot:*), Bash(nix run .#kh-view:*)
 ---
 
-Take screenshots using the headless screenshot app, then display them with `kh-view`.
+Take screenshots using the headless screenshot app. Output the file paths so the user can see where they landed. Only open kh-view if the user explicitly asks to view the results.
 
 ## Step 1 — Capture
 
@@ -29,9 +29,9 @@ The window is **opened automatically** (toggle is implicit) for each shot.
 | `nav down` / `nav up` | Move selection |
 | `key escape` | Close / go back |
 
-## Step 2 — Display
+## Step 2 — Display (only when asked)
 
-Open the screenshots using the pinned known-good kh-view commit. Pass all paths as arguments — they open side-by-side.
+If the user asks to view the screenshots, open them using the pinned known-good kh-view commit. Pass all paths as arguments — they open side-by-side.
 
 ```bash
 nix run "git+file://$PWD?rev=3724687a0e01b0d60db759ae528e087694353a56#kh-view" -- <path1> [<path2> ...]
@@ -42,11 +42,11 @@ Update the pinned commit hash whenever kh-view reaches a new stable state.
 ## Example (two comparison shots)
 
 ```bash
-# Capture
+# Capture — just print paths, don't open kh-view
 nix run .#screenshot -- kh-launcher shot-a 'type chrm' -- shot-b "type 'chrm"
 # → /tmp/qs-screenshots/20260412-140000/shot-a.png
 # → /tmp/qs-screenshots/20260412-140000/shot-b.png
 
-# Display side-by-side
+# Display side-by-side (only when the user asks)
 nix run "git+file://$PWD?rev=3724687a0e01b0d60db759ae528e087694353a56#kh-view" -- /tmp/qs-screenshots/20260412-140000/shot-a.png /tmp/qs-screenshots/20260412-140000/shot-b.png
 ```
