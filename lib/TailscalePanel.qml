@@ -13,6 +13,12 @@ import QtQuick
 import Quickshell.Io
 
 ControlTile {
+    IpcHandler {
+        target: "bar.tailscale"
+        function isConnected(): bool  { return _state.connected }
+        function getSelfIp(): string  { return _state.selfIp }
+        function toggle(): void       { onTileClicked() }
+    }
     NixConfig { id: _cfg }
 
     // ── State ──────────────────────────────────────────────────────────────

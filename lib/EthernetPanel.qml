@@ -9,6 +9,12 @@ import Quickshell.Io
 ControlTile {
     NixConfig { id: _cfg }
 
+    IpcHandler {
+        target: "bar.ethernet"
+        function isConnected(): bool { return _state.connected }
+        function getIface(): string  { return _state.iface }
+    }
+
     // ── State ──────────────────────────────────────────────────────────────
     readonly property alias connected: _state.connected
     readonly property alias iface:     _state.iface
