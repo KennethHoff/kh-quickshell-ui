@@ -307,24 +307,25 @@ Improvements to the Claude skills and agentic development workflow.
   `Quickshell.Hyprland` types and `ScreencopyView`, which require a live Hyprland session;
   Sway headless can't drive them.
 
-  **Blocker:** Hyprland v0.54.3 (Aquamarine backend) has no headless mode. Since ~v0.43,
-  headless is unsupported ([#7917](https://github.com/hyprwm/Hyprland/issues/7917),
-  [#7753](https://github.com/hyprwm/Hyprland/issues/7753)). Aquamarine auto-selects
-  DRM → Wayland → X11; there is no env var to force a backend. Confirmed dead ends:
+  **Dead ends already tried** (don't bother):
   - `WLR_BACKENDS=headless` — ignored by Aquamarine
   - `AQ_BACKENDS=headless` — not a real env var
   - `hyprland --headless` — flag does not exist
+  - Nesting (leaving `WAYLAND_DISPLAY` set) — renders visibly on the real session
+  - `HYPRLAND_HEADLESS_ONLY=1` — used by Hyprland's own
+    [`hyprtester`](https://github.com/hyprwm/Hyprland/tree/main/hyprtester) CI framework,
+    but creates no Wayland display socket; Hyprland's IPC socket exists but Quickshell
+    can't connect as a Wayland client. Only useful for testing Hyprland internals directly.
 
-  **Fix:** add `boot.kernelModules = [ "vkms" ]` to NixOS config. VKMS is a virtual kernel
-  DRM device with no physical output; Hyprland's DRM backend accepts it and Aquamarine
-  initialises fully without a GPU or seat.
+  **Fix:** `boot.kernelModules = [ "vkms" ]` in NixOS config. VKMS is a virtual kernel DRM
+  device with no physical output; Hyprland's DRM backend accepts it and Aquamarine
+  initialises fully, including creating a Wayland display socket for clients to connect.
 
   **Implementation sketch** (once VKMS is loaded): add `--compositor hyprland` to
-  `nix run .#screenshot`; launch Hyprland with `WAYLAND_DISPLAY`, `DISPLAY`, and
-  `HYPRLAND_INSTANCE_SIGNATURE` unset (prevents nesting on the real session); detect
-  the Wayland socket at `$XDG_RUNTIME_DIR/wayland-*` and the IPC sig at
-  `$XDG_RUNTIME_DIR/hypr/<sig>/`; seed fake windows via
-  `exec-once = [workspace N] weston-simple-shm` in the generated config so
+  `nix run .#screenshot`; launch with `WAYLAND_DISPLAY`, `DISPLAY`, and
+  `HYPRLAND_INSTANCE_SIGNATURE` unset; detect the Wayland socket at
+  `$XDG_RUNTIME_DIR/wayland-*` and IPC sig at `$XDG_RUNTIME_DIR/hypr/<sig>/`;
+  seed fake windows via `exec-once = [workspace N] weston-simple-shm` so
   `ScreencopyView` has something to capture.
 
 ---
