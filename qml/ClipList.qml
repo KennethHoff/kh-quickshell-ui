@@ -143,142 +143,16 @@ Item {
         if (item) item.flash()
     }
 
-    // Phase 1 (normal mode): stage entry for deletion and ask for confirmation.
-    function _deleteSelected() {
-        const rawLine = selectedEntry
-        if (rawLine === "" || _pendingDeleteLines.length > 0) return
-        _pendingDeleteLines     = [rawLine]
-        _pendingDeleteCursorIdx = Math.max(0, list.currentIndex - 1)
-        _pendingDeleteAnimLo    = list.currentIndex
-        _pendingDeleteAnimHi    = list.currentIndex
-        _confirmingDelete       = true
-    }
-
-    // Phase 1 (visual mode): stage range for deletion and ask for confirmation.
-    function _deleteVisualSelection() {
-        if (_pendingDeleteLines.length > 0) return
-        const lo    = Math.min(_visualAnchor, list.currentIndex)
-        const hi    = Math.max(_visualAnchor, list.currentIndex)
-        const lines = filteredEntries.slice(lo, hi + 1)
-        if (lines.length === 0) return
-        _pendingDeleteLines     = lines.slice()
-        _pendingDeleteCursorIdx = Math.max(0, lo - 1)
-        _pendingDeleteAnimLo    = lo
-        _pendingDeleteAnimHi    = hi
-        _confirmingDelete       = true
-        enterNormalMode()
-    }
-
-    // Confirmed: start the fade-out animation; _executePendingDelete fires after it.
-    function _confirmDelete() {
-        _confirmingDelete = false
-        if (_pendingDeleteLines.length === 0) return
-        if (_pendingDeleteAnimLo === _pendingDeleteAnimHi) {
-            const item = list.itemAtIndex(_pendingDeleteAnimLo)
-            if (item) item.startDeleteAnim()
-        } else {
-            for (let i = _pendingDeleteAnimLo; i <= _pendingDeleteAnimHi; i++) {
-                const item = list.itemAtIndex(i)
-                if (item) item.startDeleteAnim()
-            }
-        }
-        deleteAnimTimer.restart()
-    }
-
-    // Cancelled: discard the staged deletion.
-    function _cancelDelete() {
-        _confirmingDelete       = false
-        _pendingDeleteLines     = []
-        _pendingDeleteCursorIdx = -1
-        _pendingDeleteAnimLo    = -1
-        _pendingDeleteAnimHi    = -1
-    }
-
     // ── Metadata stores ───────────────────────────────────────────────────────
     MetaStore { id: pinStore;  bash: bin.bash; storeKey: "pins" }
     MetaStore { id: tsStore;   bash: bin.bash; storeKey: "timestamps" }
-
-    function _entryId(rawLine) {
-        const t = rawLine.indexOf("\t")
-        return t >= 0 ? rawLine.substring(0, t) : rawLine
-    }
-
-    // Toggle pin on the currently selected entry; cursor position stays stable.
-    function _togglePin() {
-        const rawLine = selectedEntry
-        if (rawLine === "") return
-        const id = _entryId(rawLine)
-        if (id in pinStore.values)
-            pinStore.remove(id)
-        else
-            pinStore.set(id, "1")
-        const savedIdx = list.currentIndex
-        _runFilter()
-        list.currentIndex = Math.min(savedIdx, filteredEntries.length - 1)
-    }
-
-    // ── Timestamps ────────────────────────────────────────────────────────────
-    // Returns a human-readable relative time string for a unix timestamp string.
-    // Returns "" for missing / zero.
-    function _relTime(tsVal) {
-        const ts = parseInt(tsVal) || 0
-        if (!ts) return ""
-        const diff = Math.floor(Date.now() / 1000) - ts
-        if (diff < 60)     return "just now"
-        if (diff < 3600)   return Math.floor(diff / 60) + "m ago"
-        if (diff < 86400)  return Math.floor(diff / 3600) + "h ago"
-        if (diff < 604800) return Math.floor(diff / 86400) + "d ago"
-        return Math.floor(diff / 604800) + "w ago"
-    }
-
-    // Phase 2: called by deleteAnimTimer after the fade-out completes.
-    function _executePendingDelete() {
-        const lines = _pendingDeleteLines
-        const targetIdx = _pendingDeleteCursorIdx
-        _pendingDeleteLines     = []
-        _pendingDeleteCursorIdx = -1
-        if (lines.length === 0) return
-
-        // Run cliphist delete for each line
-        const args = [bin.bash, "-c",
-            "for i in \"$@\"; do printf '%s\\n' \"$i\" | " + bin.cliphist + " delete; done",
-            "--"]
-        for (const l of lines) args.push(l)
-        deleteProcess.command = args
-        deleteProcess.running = true
-
-        // Remove from local state in one pass
-        const idsToDelete = new Set()
-        for (const rawLine of lines) {
-            const tab = rawLine.indexOf("\t")
-            idsToDelete.add(tab >= 0 ? rawLine.substring(0, tab) : rawLine)
-        }
-        const newAll  = allEntries.filter(l => { const t = l.indexOf("\t"); return !idsToDelete.has(t >= 0 ? l.substring(0, t) : l) })
-        const newProc = _processed.filter(p => { const t = p.line.indexOf("\t"); return !idsToDelete.has(t >= 0 ? p.line.substring(0, t) : p.line) })
-        allEntries = newAll
-        _processed = newProc
-        const newIdx = {}
-        for (let i = 0; i < newProc.length; i++) {
-            const l   = newProc[i].line
-            const t   = l.indexOf("\t")
-            newIdx[t >= 0 ? l.substring(0, t) : l] = i
-        }
-        _processedIdx = newIdx
-
-        pinStore.removeMany(idsToDelete)
-
-        _runFilter()
-
-        const newLen = filteredEntries.length
-        if (newLen > 0) list.currentIndex = Math.min(targetIdx, newLen - 1)
-    }
 
     // Append `text` to the search field (IPC use only — not for key events).
     function typeText(text) {
         if (_mode === "insert") {
             searchField.text += text
             searchDebounce.stop()
-            _runFilter()
+            impl.runFilter()
         }
     }
 
@@ -300,20 +174,20 @@ Item {
         if (event.key === Qt.Key_Shift || event.key === Qt.Key_Control ||
             event.key === Qt.Key_Alt   || event.key === Qt.Key_Meta) return false
         if (_confirmingDelete) {
-            if (event.text === "y") _confirmDelete()
-            else                    _cancelDelete()
+            if (event.text === "y") impl.confirmDelete()
+            else                    impl.cancelDelete()
             return true
         }
-        if (_mode === "visual") return _handleVisualKey(event)
-        if (_mode === "normal") return _handleNormalKey(event)
+        if (_mode === "visual") return impl.handleVisualKey(event)
+        if (_mode === "normal") return impl.handleNormalKey(event)
         return false
     }
 
     function handleIpcKey(k) {
         const lk = k.toLowerCase()
         if (_confirmingDelete) {
-            if (lk === "y") _confirmDelete()
-            else            _cancelDelete()
+            if (lk === "y") impl.confirmDelete()
+            else            impl.cancelDelete()
             return true
         }
         if (lk === "escape" || lk === "esc") {
@@ -330,11 +204,11 @@ Item {
             return true
         }
         if (lk === "d") {
-            if (_mode === "visual") _deleteVisualSelection()
-            else _deleteSelected()
+            if (_mode === "visual") impl.deleteVisualSelection()
+            else impl.deleteSelected()
             return true
         }
-        if (lk === "p") { _togglePin(); return true }
+        if (lk === "p") { impl.togglePin(); return true }
         if (lk === "tab") { openDetail(); return true }
         return false
     }
@@ -353,123 +227,238 @@ Item {
         list.currentIndex = Math.max(0, list.currentIndex - step)
     }
 
-    // ── Private key handlers ──────────────────────────────────────────────────
-    function _handleNormalKey(event) {
-        if (event.text === "?") return false   // propagate → orchestrator opens help
-        if (event.key === Qt.Key_Escape || event.text === "q") {
-            closeRequested(); return true
-        }
-        if (event.key === Qt.Key_J || event.key === Qt.Key_Down) {
-            navDown(); return true
-        }
-        if (event.key === Qt.Key_K || event.key === Qt.Key_Up) {
-            navUp(); return true
-        }
-        if (event.key === Qt.Key_G && (event.modifiers & Qt.ShiftModifier)) {
-            navBottom(); return true
-        }
-        if (event.key === Qt.Key_G) {
-            if (_pendingG) { gTimer.stop(); navTop(); _pendingG = false }
-            else           { _pendingG = true; gTimer.restart() }
-            return true
-        }
-        if (event.key === Qt.Key_D && (event.modifiers & Qt.ControlModifier)) {
-            navHalfDown(); return true
-        }
-        if (event.key === Qt.Key_D) {
-            _deleteSelected(); return true
-        }
-        if (event.key === Qt.Key_U && (event.modifiers & Qt.ControlModifier)) {
-            navHalfUp(); return true
-        }
-        if (event.text === "y") {
-            if (selectedEntry !== "") { flash(selectedIndex); yankEntryRequested(selectedEntry) }
-            return true
-        }
-        if (event.text === "v") {
-            enterVisualMode(); return true
-        }
-        if (event.text === "p") {
-            _togglePin(); return true
-        }
-        if (event.key === Qt.Key_Tab) {
-            openDetail(); return true
-        }
-        if (event.key === Qt.Key_Slash) {
-            enterInsertMode(); return true
-        }
-        return false
-    }
+    // ── Impl ──────────────────────────────────────────────────────────────────
+    QtObject {
+        id: impl
 
-    function _handleVisualKey(event) {
-        if (event.key === Qt.Key_Escape || event.text === "v" || event.text === "q") {
-            enterNormalMode(); return true
+        function entryId(rawLine): string {
+            const t = rawLine.indexOf("\t")
+            return t >= 0 ? rawLine.substring(0, t) : rawLine
         }
-        if (event.key === Qt.Key_J || event.key === Qt.Key_Down) {
-            navDown(); return true
-        }
-        if (event.key === Qt.Key_K || event.key === Qt.Key_Up) {
-            navUp(); return true
-        }
-        if (event.key === Qt.Key_G && (event.modifiers & Qt.ShiftModifier)) {
-            navBottom(); return true
-        }
-        if (event.key === Qt.Key_G) {
-            if (_pendingG) { gTimer.stop(); navTop(); _pendingG = false }
-            else           { _pendingG = true; gTimer.restart() }
-            return true
-        }
-        if (event.key === Qt.Key_D && (event.modifiers & Qt.ControlModifier)) {
-            navHalfDown(); return true
-        }
-        if (event.key === Qt.Key_D) {
-            _deleteVisualSelection(); return true
-        }
-        if (event.key === Qt.Key_U && (event.modifiers & Qt.ControlModifier)) {
-            navHalfUp(); return true
-        }
-        return false
-    }
 
-    // ── Filtering ─────────────────────────────────────────────────────────────
-    function _runFilter() {
-        const parsed  = searchParser.parseSearch(searchField.text)
-        const pins    = pinStore.values
-        const hasPins = Object.keys(pins).length > 0
+        // Phase 1 (normal mode): stage entry for deletion and ask for confirmation.
+        function deleteSelected(): void {
+            const rawLine = clipList.selectedEntry
+            if (rawLine === "" || clipList._pendingDeleteLines.length > 0) return
+            clipList._pendingDeleteLines     = [rawLine]
+            clipList._pendingDeleteCursorIdx = Math.max(0, list.currentIndex - 1)
+            clipList._pendingDeleteAnimLo    = list.currentIndex
+            clipList._pendingDeleteAnimHi    = list.currentIndex
+            clipList._confirmingDelete       = true
+        }
 
-        if (parsed.type === "all" && !parsed.needle) {
-            if (!hasPins) {
-                filteredEntries = allEntries
+        // Phase 1 (visual mode): stage range for deletion and ask for confirmation.
+        function deleteVisualSelection(): void {
+            if (clipList._pendingDeleteLines.length > 0) return
+            const lo    = Math.min(clipList._visualAnchor, list.currentIndex)
+            const hi    = Math.max(clipList._visualAnchor, list.currentIndex)
+            const lines = clipList.filteredEntries.slice(lo, hi + 1)
+            if (lines.length === 0) return
+            clipList._pendingDeleteLines     = lines.slice()
+            clipList._pendingDeleteCursorIdx = Math.max(0, lo - 1)
+            clipList._pendingDeleteAnimLo    = lo
+            clipList._pendingDeleteAnimHi    = hi
+            clipList._confirmingDelete       = true
+            enterNormalMode()
+        }
+
+        // Confirmed: start the fade-out animation; executePendingDelete fires after it.
+        function confirmDelete(): void {
+            clipList._confirmingDelete = false
+            if (clipList._pendingDeleteLines.length === 0) return
+            if (clipList._pendingDeleteAnimLo === clipList._pendingDeleteAnimHi) {
+                const item = list.itemAtIndex(clipList._pendingDeleteAnimLo)
+                if (item) item.startDeleteAnim()
             } else {
-                const pinned = [], rest = []
-                for (const e of allEntries)
-                    (_entryId(e) in pins ? pinned : rest).push(e)
-                filteredEntries = pinned.concat(rest)
+                for (let i = clipList._pendingDeleteAnimLo; i <= clipList._pendingDeleteAnimHi; i++) {
+                    const item = list.itemAtIndex(i)
+                    if (item) item.startDeleteAnim()
+                }
             }
-            return
+            deleteAnimTimer.restart()
         }
 
-        const scored = []
-        for (const e of _processed) {
-            if (parsed.type === "image" && !e.isImage) continue
-            if (parsed.type === "text"  &&  e.isImage) continue
-            if (!parsed.needle) { scored.push({ line: e.line, score: 0 }); continue }
-            if (parsed.exact) {
-                if (e.haystack.includes(parsed.needle)) scored.push({ line: e.line, score: 0 })
-            } else {
-                const score = fuzzy.fuzzyScore(parsed.needle, e.haystack)
-                if (score >= 0) scored.push({ line: e.line, score })
-            }
+        // Cancelled: discard the staged deletion.
+        function cancelDelete(): void {
+            clipList._confirmingDelete       = false
+            clipList._pendingDeleteLines     = []
+            clipList._pendingDeleteCursorIdx = -1
+            clipList._pendingDeleteAnimLo    = -1
+            clipList._pendingDeleteAnimHi    = -1
         }
-        scored.sort((a, b) => {
-            if (hasPins) {
-                const pa = _entryId(a.line) in pins
-                const pb = _entryId(b.line) in pins
-                if (pa !== pb) return pa ? -1 : 1
+
+        // Toggle pin on the currently selected entry; cursor position stays stable.
+        function togglePin(): void {
+            const rawLine = clipList.selectedEntry
+            if (rawLine === "") return
+            const id = entryId(rawLine)
+            if (id in pinStore.values)
+                pinStore.remove(id)
+            else
+                pinStore.set(id, "1")
+            const savedIdx = list.currentIndex
+            runFilter()
+            list.currentIndex = Math.min(savedIdx, clipList.filteredEntries.length - 1)
+        }
+
+        // Phase 2: called by deleteAnimTimer after the fade-out completes.
+        function executePendingDelete(): void {
+            const lines = clipList._pendingDeleteLines
+            const targetIdx = clipList._pendingDeleteCursorIdx
+            clipList._pendingDeleteLines     = []
+            clipList._pendingDeleteCursorIdx = -1
+            if (lines.length === 0) return
+
+            // Run cliphist delete for each line
+            const args = [bin.bash, "-c",
+                "for i in \"$@\"; do printf '%s\\n' \"$i\" | " + bin.cliphist + " delete; done",
+                "--"]
+            for (const l of lines) args.push(l)
+            deleteProcess.command = args
+            deleteProcess.running = true
+
+            // Remove from local state in one pass
+            const idsToDelete = new Set()
+            for (const rawLine of lines) {
+                const tab = rawLine.indexOf("\t")
+                idsToDelete.add(tab >= 0 ? rawLine.substring(0, tab) : rawLine)
             }
-            return b.score - a.score
-        })
-        filteredEntries = scored.map(s => s.line)
+            const newAll  = clipList.allEntries.filter(l => { const t = l.indexOf("\t"); return !idsToDelete.has(t >= 0 ? l.substring(0, t) : l) })
+            const newProc = clipList._processed.filter(p => { const t = p.line.indexOf("\t"); return !idsToDelete.has(t >= 0 ? p.line.substring(0, t) : p.line) })
+            clipList.allEntries = newAll
+            clipList._processed = newProc
+            const newIdx = {}
+            for (let i = 0; i < newProc.length; i++) {
+                const l   = newProc[i].line
+                const t   = l.indexOf("\t")
+                newIdx[t >= 0 ? l.substring(0, t) : l] = i
+            }
+            clipList._processedIdx = newIdx
+
+            pinStore.removeMany(idsToDelete)
+
+            runFilter()
+
+            const newLen = clipList.filteredEntries.length
+            if (newLen > 0) list.currentIndex = Math.min(targetIdx, newLen - 1)
+        }
+
+        function handleNormalKey(event): bool {
+            if (event.text === "?") return false   // propagate → orchestrator opens help
+            if (event.key === Qt.Key_Escape || event.text === "q") {
+                closeRequested(); return true
+            }
+            if (event.key === Qt.Key_J || event.key === Qt.Key_Down) {
+                navDown(); return true
+            }
+            if (event.key === Qt.Key_K || event.key === Qt.Key_Up) {
+                navUp(); return true
+            }
+            if (event.key === Qt.Key_G && (event.modifiers & Qt.ShiftModifier)) {
+                navBottom(); return true
+            }
+            if (event.key === Qt.Key_G) {
+                if (clipList._pendingG) { gTimer.stop(); navTop(); clipList._pendingG = false }
+                else                    { clipList._pendingG = true; gTimer.restart() }
+                return true
+            }
+            if (event.key === Qt.Key_D && (event.modifiers & Qt.ControlModifier)) {
+                navHalfDown(); return true
+            }
+            if (event.key === Qt.Key_D) {
+                deleteSelected(); return true
+            }
+            if (event.key === Qt.Key_U && (event.modifiers & Qt.ControlModifier)) {
+                navHalfUp(); return true
+            }
+            if (event.text === "y") {
+                if (clipList.selectedEntry !== "") { flash(clipList.selectedIndex); yankEntryRequested(clipList.selectedEntry) }
+                return true
+            }
+            if (event.text === "v") {
+                enterVisualMode(); return true
+            }
+            if (event.text === "p") {
+                togglePin(); return true
+            }
+            if (event.key === Qt.Key_Tab) {
+                openDetail(); return true
+            }
+            if (event.key === Qt.Key_Slash) {
+                enterInsertMode(); return true
+            }
+            return false
+        }
+
+        function handleVisualKey(event): bool {
+            if (event.key === Qt.Key_Escape || event.text === "v" || event.text === "q") {
+                enterNormalMode(); return true
+            }
+            if (event.key === Qt.Key_J || event.key === Qt.Key_Down) {
+                navDown(); return true
+            }
+            if (event.key === Qt.Key_K || event.key === Qt.Key_Up) {
+                navUp(); return true
+            }
+            if (event.key === Qt.Key_G && (event.modifiers & Qt.ShiftModifier)) {
+                navBottom(); return true
+            }
+            if (event.key === Qt.Key_G) {
+                if (clipList._pendingG) { gTimer.stop(); navTop(); clipList._pendingG = false }
+                else                    { clipList._pendingG = true; gTimer.restart() }
+                return true
+            }
+            if (event.key === Qt.Key_D && (event.modifiers & Qt.ControlModifier)) {
+                navHalfDown(); return true
+            }
+            if (event.key === Qt.Key_D) {
+                deleteVisualSelection(); return true
+            }
+            if (event.key === Qt.Key_U && (event.modifiers & Qt.ControlModifier)) {
+                navHalfUp(); return true
+            }
+            return false
+        }
+
+        function runFilter(): void {
+            const parsed  = searchParser.parseSearch(searchField.text)
+            const pins    = pinStore.values
+            const hasPins = Object.keys(pins).length > 0
+
+            if (parsed.type === "all" && !parsed.needle) {
+                if (!hasPins) {
+                    clipList.filteredEntries = clipList.allEntries
+                } else {
+                    const pinned = [], rest = []
+                    for (const e of clipList.allEntries)
+                        (entryId(e) in pins ? pinned : rest).push(e)
+                    clipList.filteredEntries = pinned.concat(rest)
+                }
+                return
+            }
+
+            const scored = []
+            for (const e of clipList._processed) {
+                if (parsed.type === "image" && !e.isImage) continue
+                if (parsed.type === "text"  &&  e.isImage) continue
+                if (!parsed.needle) { scored.push({ line: e.line, score: 0 }); continue }
+                if (parsed.exact) {
+                    if (e.haystack.includes(parsed.needle)) scored.push({ line: e.line, score: 0 })
+                } else {
+                    const score = fuzzy.fuzzyScore(parsed.needle, e.haystack)
+                    if (score >= 0) scored.push({ line: e.line, score })
+                }
+            }
+            scored.sort((a, b) => {
+                if (hasPins) {
+                    const pa = entryId(a.line) in pins
+                    const pb = entryId(b.line) in pins
+                    if (pa !== pb) return pa ? -1 : 1
+                }
+                return b.score - a.score
+            })
+            clipList.filteredEntries = scored.map(s => s.line)
+        }
     }
 
     // ── Processes ─────────────────────────────────────────────────────────────
@@ -566,7 +555,7 @@ Item {
             }
             clipList._processed    = processed
             clipList._processedIdx = idx
-            clipList._runFilter()
+            impl.runFilter()
 
             // Prune stale entries + first-seen timestamps for new ones.
             tsStore.pruneAndFill(idx, String(Math.floor(Date.now() / 1000)))
@@ -589,11 +578,11 @@ Item {
             } catch (_) {}
         }
         // ui only — run the filter (called by debounce timer)
-        function runFilter(): void { clipList._runFilter() }
+        function runFilter(): void { impl.runFilter() }
         // ui only — clear the pending-G double-tap flag
         function clearPendingG(): void { clipList._pendingG = false }
         // ui only — commit the pending delete after animation
-        function executePendingDelete(): void { clipList._executePendingDelete() }
+        function executePendingDelete(): void { impl.executePendingDelete() }
     }
 
     // ── UI ────────────────────────────────────────────────────────────────────

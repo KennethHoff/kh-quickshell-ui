@@ -100,7 +100,7 @@ Item {
         if (_mode !== "insert") enterInsertMode()
         searchField.text += text
         searchDebounce.stop()
-        _runFilter()
+        impl.runFilter()
     }
 
     function enterActionsMode() {
@@ -164,29 +164,12 @@ Item {
         else list.currentIndex = Math.max(0, list.currentIndex - step)
     }
 
-    // ── Launch helpers ────────────────────────────────────────────────────────
-    function _launchApp(workspace) {
-        const app = selectedApp
-        if (!app) return
-        const terminal = (app.terminal === "true" || app.terminal === "True")
-        flash(list.currentIndex)
-        launchRequested(app.exec.trim(), terminal, workspace)
-    }
-
-    function _launchAction(workspace) {
-        const idx = actionList.currentIndex
-        if (idx < 0 || idx >= _actions.length) return
-        const action = _actions[idx]
-        flash(actionList.currentIndex)
-        launchRequested(action.exec.trim(), false, workspace)
-    }
-
     // ── Key handlers ──────────────────────────────────────────────────────────
     function handleKey(event) {
         if (event.key === Qt.Key_Shift || event.key === Qt.Key_Control ||
             event.key === Qt.Key_Alt   || event.key === Qt.Key_Meta) return false
-        if (_mode === "actions") return _handleActionsKey(event)
-        if (_mode === "normal")  return _handleNormalKey(event)
+        if (_mode === "actions") return impl.handleActionsKey(event)
+        if (_mode === "normal")  return impl.handleNormalKey(event)
         return false
     }
 
@@ -198,143 +181,163 @@ Item {
             closeRequested(); return true
         }
         if (lk === "enter" || lk === "return") {
-            if (_mode === "actions") { _launchAction(0); return true }
-            _launchApp(0); return true
+            if (_mode === "actions") { impl.launchAction(0); return true }
+            impl.launchApp(0); return true
         }
         return false
     }
 
-    function _handleNormalKey(event) {
-        if (event.text === "?") return false   // propagate → orchestrator opens help
-        if (event.key === Qt.Key_Escape || event.text === "q") {
-            closeRequested(); return true
-        }
-        if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-            _launchApp(0); return true
-        }
-        if (event.key === Qt.Key_J || event.key === Qt.Key_Down) {
-            navDown(); return true
-        }
-        if (event.key === Qt.Key_K || event.key === Qt.Key_Up) {
-            navUp(); return true
-        }
-        if (event.key === Qt.Key_G && (event.modifiers & Qt.ShiftModifier)) {
-            navBottom(); return true
-        }
-        if (event.key === Qt.Key_G) {
-            if (_pendingG) { gTimer.stop(); navTop(); _pendingG = false }
-            else           { _pendingG = true; gTimer.restart() }
-            return true
-        }
-        if (event.key === Qt.Key_D && (event.modifiers & Qt.ControlModifier)) {
-            navHalfDown(); return true
-        }
-        if (event.key === Qt.Key_U && (event.modifiers & Qt.ControlModifier)) {
-            navHalfUp(); return true
-        }
-        if (event.key === Qt.Key_Tab || event.text === "l") {
-            enterActionsMode(); return true
-        }
-        if (event.key === Qt.Key_Slash) {
-            enterInsertMode(); return true
-        }
-        // Ctrl+1–9: launch on workspace N
-        if (event.modifiers & Qt.ControlModifier) {
-            const n = event.key - Qt.Key_1 + 1
-            if (n >= 1 && n <= 9) { _launchApp(n); return true }
-        }
-        return false
-    }
+    // ── Impl ──────────────────────────────────────────────────────────────────
+    QtObject {
+        id: impl
 
-    function _handleActionsKey(event) {
-        if (event.text === "?") return false
-        if (event.key === Qt.Key_Escape || event.text === "h" || event.text === "q") {
-            enterNormalMode(); return true
-        }
-        if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-            _launchAction(0); return true
-        }
-        if (event.key === Qt.Key_J || event.key === Qt.Key_Down) {
-            navDown(); return true
-        }
-        if (event.key === Qt.Key_K || event.key === Qt.Key_Up) {
-            navUp(); return true
-        }
-        if (event.key === Qt.Key_G && (event.modifiers & Qt.ShiftModifier)) {
-            navBottom(); return true
-        }
-        if (event.key === Qt.Key_G) {
-            if (_pendingG) { gTimer.stop(); navTop(); _pendingG = false }
-            else           { _pendingG = true; gTimer.restart() }
-            return true
-        }
-        if (event.key === Qt.Key_D && (event.modifiers & Qt.ControlModifier)) {
-            navHalfDown(); return true
-        }
-        if (event.key === Qt.Key_U && (event.modifiers & Qt.ControlModifier)) {
-            navHalfUp(); return true
-        }
-        // Ctrl+1–9: launch action on workspace N
-        if (event.modifiers & Qt.ControlModifier) {
-            const n = event.key - Qt.Key_1 + 1
-            if (n >= 1 && n <= 9) { _launchAction(n); return true }
-        }
-        return false
-    }
-
-    // ── Filtering ─────────────────────────────────────────────────────────────
-    // Supports: fuzzy (default), ' exact, ^ prefix, $ suffix, ! negation.
-    // Space-separated tokens combine with AND.
-    function _runFilter() {
-        const q = searchField.text.trim().toLowerCase()
-        if (!q) {
-            _filteredApps = _allApps.slice()
-            list.currentIndex = 0
-            return
+        function launchApp(workspace): void {
+            const app = selectedApp
+            if (!app) return
+            const terminal = (app.terminal === "true" || app.terminal === "True")
+            flash(list.currentIndex)
+            launchRequested(app.exec.trim(), terminal, workspace)
         }
 
-        const tokens = q.split(/\s+/).filter(t => t.length > 0)
-        const scored = []
+        function launchAction(workspace): void {
+            const idx = actionList.currentIndex
+            if (idx < 0 || idx >= appList._actions.length) return
+            const action = appList._actions[idx]
+            flash(actionList.currentIndex)
+            launchRequested(action.exec.trim(), false, workspace)
+        }
 
-        for (const app of _allApps) {
-            const nameLow = app.name.toLowerCase()
-            const haystack = nameLow + " " + app.comment.toLowerCase()
-            let totalScore = 0
-            let matched = true
+        function handleNormalKey(event): bool {
+            if (event.text === "?") return false   // propagate → orchestrator opens help
+            if (event.key === Qt.Key_Escape || event.text === "q") {
+                closeRequested(); return true
+            }
+            if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                launchApp(0); return true
+            }
+            if (event.key === Qt.Key_J || event.key === Qt.Key_Down) {
+                navDown(); return true
+            }
+            if (event.key === Qt.Key_K || event.key === Qt.Key_Up) {
+                navUp(); return true
+            }
+            if (event.key === Qt.Key_G && (event.modifiers & Qt.ShiftModifier)) {
+                navBottom(); return true
+            }
+            if (event.key === Qt.Key_G) {
+                if (appList._pendingG) { gTimer.stop(); navTop(); appList._pendingG = false }
+                else                   { appList._pendingG = true; gTimer.restart() }
+                return true
+            }
+            if (event.key === Qt.Key_D && (event.modifiers & Qt.ControlModifier)) {
+                navHalfDown(); return true
+            }
+            if (event.key === Qt.Key_U && (event.modifiers & Qt.ControlModifier)) {
+                navHalfUp(); return true
+            }
+            if (event.key === Qt.Key_Tab || event.text === "l") {
+                enterActionsMode(); return true
+            }
+            if (event.key === Qt.Key_Slash) {
+                enterInsertMode(); return true
+            }
+            // Ctrl+1–9: launch on workspace N
+            if (event.modifiers & Qt.ControlModifier) {
+                const n = event.key - Qt.Key_1 + 1
+                if (n >= 1 && n <= 9) { launchApp(n); return true }
+            }
+            return false
+        }
 
-            for (const token of tokens) {
-                if (token.startsWith("!")) {
-                    const neg = token.slice(1)
-                    if (!neg) continue
-                    const negScore = token.startsWith("!'")
-                        ? haystack.includes(neg.slice(1))
-                        : fuzzy.fuzzyScore(neg, haystack) >= 0
-                    if (negScore) { matched = false; break }
-                } else if (token.startsWith("'")) {
-                    const needle = token.slice(1)
-                    if (!needle) continue
-                    if (!haystack.includes(needle)) { matched = false; break }
-                } else if (token.startsWith("^")) {
-                    const needle = token.slice(1)
-                    if (!needle) continue
-                    if (!nameLow.startsWith(needle)) { matched = false; break }
-                } else if (token.startsWith("$")) {
-                    const needle = token.slice(1)
-                    if (!needle) continue
-                    if (!nameLow.endsWith(needle)) { matched = false; break }
-                } else {
-                    const score = fuzzy.fuzzyScore(token, haystack)
-                    if (score < 0) { matched = false; break }
-                    totalScore += score
-                }
+        function handleActionsKey(event): bool {
+            if (event.text === "?") return false
+            if (event.key === Qt.Key_Escape || event.text === "h" || event.text === "q") {
+                enterNormalMode(); return true
+            }
+            if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                launchAction(0); return true
+            }
+            if (event.key === Qt.Key_J || event.key === Qt.Key_Down) {
+                navDown(); return true
+            }
+            if (event.key === Qt.Key_K || event.key === Qt.Key_Up) {
+                navUp(); return true
+            }
+            if (event.key === Qt.Key_G && (event.modifiers & Qt.ShiftModifier)) {
+                navBottom(); return true
+            }
+            if (event.key === Qt.Key_G) {
+                if (appList._pendingG) { gTimer.stop(); navTop(); appList._pendingG = false }
+                else                   { appList._pendingG = true; gTimer.restart() }
+                return true
+            }
+            if (event.key === Qt.Key_D && (event.modifiers & Qt.ControlModifier)) {
+                navHalfDown(); return true
+            }
+            if (event.key === Qt.Key_U && (event.modifiers & Qt.ControlModifier)) {
+                navHalfUp(); return true
+            }
+            // Ctrl+1–9: launch action on workspace N
+            if (event.modifiers & Qt.ControlModifier) {
+                const n = event.key - Qt.Key_1 + 1
+                if (n >= 1 && n <= 9) { launchAction(n); return true }
+            }
+            return false
+        }
+
+        // Supports: fuzzy (default), ' exact, ^ prefix, $ suffix, ! negation.
+        // Space-separated tokens combine with AND.
+        function runFilter(): void {
+            const q = searchField.text.trim().toLowerCase()
+            if (!q) {
+                appList._filteredApps = appList._allApps.slice()
+                list.currentIndex = 0
+                return
             }
 
-            if (matched) scored.push({ app, score: totalScore })
-        }
+            const tokens = q.split(/\s+/).filter(t => t.length > 0)
+            const scored = []
 
-        scored.sort((a, b) => b.score - a.score)
-        _filteredApps = scored.map(s => s.app)
-        list.currentIndex = 0
+            for (const app of appList._allApps) {
+                const nameLow = app.name.toLowerCase()
+                const haystack = nameLow + " " + app.comment.toLowerCase()
+                let totalScore = 0
+                let matched = true
+
+                for (const token of tokens) {
+                    if (token.startsWith("!")) {
+                        const neg = token.slice(1)
+                        if (!neg) continue
+                        const negScore = token.startsWith("!'")
+                            ? haystack.includes(neg.slice(1))
+                            : fuzzy.fuzzyScore(neg, haystack) >= 0
+                        if (negScore) { matched = false; break }
+                    } else if (token.startsWith("'")) {
+                        const needle = token.slice(1)
+                        if (!needle) continue
+                        if (!haystack.includes(needle)) { matched = false; break }
+                    } else if (token.startsWith("^")) {
+                        const needle = token.slice(1)
+                        if (!needle) continue
+                        if (!nameLow.startsWith(needle)) { matched = false; break }
+                    } else if (token.startsWith("$")) {
+                        const needle = token.slice(1)
+                        if (!needle) continue
+                        if (!nameLow.endsWith(needle)) { matched = false; break }
+                    } else {
+                        const score = fuzzy.fuzzyScore(token, haystack)
+                        if (score < 0) { matched = false; break }
+                        totalScore += score
+                    }
+                }
+
+                if (matched) scored.push({ app, score: totalScore })
+            }
+
+            scored.sort((a, b) => b.score - a.score)
+            appList._filteredApps = scored.map(s => s.app)
+            list.currentIndex = 0
+        }
     }
 
     // ── Processes ─────────────────────────────────────────────────────────────
@@ -412,11 +415,11 @@ Item {
             }
             appList._allApps = apps
             appList._appBuf  = []
-            appList._runFilter()
+            impl.runFilter()
             if (appList._mode === "insert") searchField.forceActiveFocus()
         }
         // ui only — run the filter (called by debounce timer)
-        function runFilter(): void { appList._runFilter() }
+        function runFilter(): void { impl.runFilter() }
         // ui only — clear the pending-G double-tap flag
         function clearPendingG(): void { appList._pendingG = false }
     }

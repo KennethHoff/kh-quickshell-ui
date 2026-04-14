@@ -19,25 +19,28 @@ ShellRoot {
 
     property bool showing: false
 
-    // ── Launch ────────────────────────────────────────────────────────────────
-    function launchApp(exec, terminal, workspace) {
-        let cmd = exec
-        if (terminal) cmd = bin.kitty + " -- bash -c " + JSON.stringify(cmd)
-
-        if (workspace > 0) {
-            launchProcess.command = [
-                bin.hyprctl, "dispatch", "exec",
-                "[workspace " + workspace + "] " + cmd
-            ]
-        } else {
-            launchProcess.command = [bin.bash, "-c", cmd + " &>/dev/null &"]
-        }
-        launchProcess.running = true
-        closeTimer.restart()
-    }
-
     Process { id: launchProcess }
     Timer   { id: closeTimer; interval: 120; onTriggered: functionality.close() }
+
+    // ── Launch ────────────────────────────────────────────────────────────────
+    QtObject {
+        id: impl
+        function launchApp(exec, terminal, workspace): void {
+            let cmd = exec
+            if (terminal) cmd = bin.kitty + " -- bash -c " + JSON.stringify(cmd)
+
+            if (workspace > 0) {
+                launchProcess.command = [
+                    bin.hyprctl, "dispatch", "exec",
+                    "[workspace " + workspace + "] " + cmd
+                ]
+            } else {
+                launchProcess.command = [bin.bash, "-c", cmd + " &>/dev/null &"]
+            }
+            launchProcess.running = true
+            closeTimer.restart()
+        }
+    }
 
     // ── Functionality ─────────────────────────────────────────────────────────
     QtObject {
@@ -50,9 +53,9 @@ ShellRoot {
         // ui+ipc
         function close(): void                   { root.showing = false }
         // ipc only
-        function launch(): void                  { if (list.selectedApp) root.launchApp(list.selectedApp.exec, list.selectedApp.terminal, 0) }
+        function launch(): void                  { if (list.selectedApp) impl.launchApp(list.selectedApp.exec, list.selectedApp.terminal, 0) }
         // ipc only
-        function launchOnWorkspace(n: int): void { if (list.selectedApp) root.launchApp(list.selectedApp.exec, list.selectedApp.terminal, n) }
+        function launchOnWorkspace(n: int): void { if (list.selectedApp) impl.launchApp(list.selectedApp.exec, list.selectedApp.terminal, n) }
         // ipc only
         function enterActionsMode(): void        { list.enterActionsMode() }
         // ui+ipc (via setMode / handleKeyEvent)
@@ -93,7 +96,7 @@ ShellRoot {
         // ui only
         function onVisibleChanged(): void { if (root.showing) onShow() }
         // ui only
-        function onLaunchRequested(exec, terminal, workspace): void { root.launchApp(exec, terminal, workspace) }
+        function onLaunchRequested(exec, terminal, workspace): void { impl.launchApp(exec, terminal, workspace) }
         // ui only
         function handleKeyEvent(event): void {
             if (event.key === Qt.Key_Shift || event.key === Qt.Key_Control ||

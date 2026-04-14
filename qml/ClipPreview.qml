@@ -103,43 +103,47 @@ Item {
     property string _imgSrc:  ""
     property string _imgSize: ""
 
-    function _refresh() {
-        decodeProcess.running = false
-        sizeProcess.running   = false
-        _text    = ""
-        _lines   = []
-        _imgPath = ""
-        _imgSrc  = ""
-        _imgSize = ""
+    // ── Impl ─────────────────────────────────────────────────────────────────
+    QtObject {
+        id: impl
+        function refresh(): void {
+            decodeProcess.running = false
+            sizeProcess.running   = false
+            preview._text    = ""
+            preview._lines   = []
+            preview._imgPath = ""
+            preview._imgSrc  = ""
+            preview._imgSize = ""
 
-        if (entry === "") {
-            _isImage = false
-            _loading = false
+            if (preview.entry === "") {
+                preview._isImage = false
+                preview._loading = false
+                viewer.reset()
+                return
+            }
+
+            preview._isImage = clipEntry.entryPreview(preview.entry).startsWith("[[")
+            preview._loading = true
             viewer.reset()
-            return
+
+            const eid = clipEntry.entryId(preview.entry)
+            preview._imgPath  = "/tmp/kh-cliphist-" + eid
+
+            if (preview._isImage) {
+                decodeProcess.command = [
+                    bin.bash, "-c",
+                    "[ -f \"$1\" ] || printf '%s\\n' \"$2\" | " + bin.cliphist + " decode > \"$1\"",
+                    "--", preview._imgPath, preview.entry
+                ]
+            } else {
+                decodeProcess.command = [
+                    bin.bash, "-c",
+                    "printf '%s\\n' \"$1\" | " + bin.cliphist + " decode",
+                    "--", preview.entry
+                ]
+            }
+            decodeProcess.running = true
         }
-
-        _isImage = clipEntry.entryPreview(entry).startsWith("[[")
-        _loading = true
-        viewer.reset()
-
-        const eid = clipEntry.entryId(entry)
-        _imgPath  = "/tmp/kh-cliphist-" + eid
-
-        if (_isImage) {
-            decodeProcess.command = [
-                bin.bash, "-c",
-                "[ -f \"$1\" ] || printf '%s\\n' \"$2\" | " + bin.cliphist + " decode > \"$1\"",
-                "--", _imgPath, entry
-            ]
-        } else {
-            decodeProcess.command = [
-                bin.bash, "-c",
-                "printf '%s\\n' \"$1\" | " + bin.cliphist + " decode",
-                "--", entry
-            ]
-        }
-        decodeProcess.running = true
     }
 
     // ── Functionality ─────────────────────────────────────────────────────────
@@ -148,7 +152,7 @@ Item {
         // ui only
         function onEntryChanged(): void { refreshTimer.restart() }
         // ui only
-        function onRefreshTimer(): void { preview._refresh() }
+        function onRefreshTimer(): void { impl.refresh() }
         // ui only
         function onDecodeRead(line: string): void { if (!preview._isImage) preview._lines.push(line) }
         // ui only

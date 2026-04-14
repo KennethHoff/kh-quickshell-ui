@@ -22,28 +22,30 @@ ShellRoot {
     property bool detailFocused:     false
     property bool fullscreenShowing: false
 
-    // ── Paste / yank ─────────────────────────────────────────────────────────
-    function pasteEntry(rawLine) {
-        pasteProcess.command = [
-            bin.bash, "-c",
-            "printf '%s\\n' \"$1\" | " + bin.cliphist + " decode | " + bin.wlCopy,
-            "--", rawLine
-        ]
-        pasteProcess.running = true
-        closeTimer.restart()
-    }
-
-    function yankText(text) {
-        yankTextProcess.command = [
-            bin.bash, "-c",
-            "printf '%s' \"$1\" | " + bin.wlCopy, "--", text
-        ]
-        yankTextProcess.running = true
-        closeTimer.restart()
-    }
-
     Process { id: pasteProcess }
     Process { id: yankTextProcess }
+
+    // ── Paste / yank ─────────────────────────────────────────────────────────
+    QtObject {
+        id: impl
+        function pasteEntry(rawLine: string): void {
+            pasteProcess.command = [
+                bin.bash, "-c",
+                "printf '%s\\n' \"$1\" | " + bin.cliphist + " decode | " + bin.wlCopy,
+                "--", rawLine
+            ]
+            pasteProcess.running = true
+            closeTimer.restart()
+        }
+        function yankText(text: string): void {
+            yankTextProcess.command = [
+                bin.bash, "-c",
+                "printf '%s' \"$1\" | " + bin.wlCopy, "--", text
+            ]
+            yankTextProcess.running = true
+            closeTimer.restart()
+        }
+    }
     Timer   { id: closeTimer; interval: 200; onTriggered: functionality.close() }
 
     // ── Functionality ─────────────────────────────────────────────────────────
@@ -124,9 +126,9 @@ ShellRoot {
         // ui only
         function onVisibleChanged(): void { if (root.showing) onShow() }
         // ui only
-        function onYankEntryRequested(rawLine: string): void { root.pasteEntry(rawLine) }
+        function onYankEntryRequested(rawLine: string): void { impl.pasteEntry(rawLine) }
         // ui only
-        function onYankTextRequested(text: string): void { root.yankText(text) }
+        function onYankTextRequested(text: string): void { impl.yankText(text) }
         // ui only
         function handleKeyEvent(event): void {
             if (event.key === Qt.Key_Shift || event.key === Qt.Key_Control ||

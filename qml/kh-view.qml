@@ -87,7 +87,7 @@ ShellRoot {
         // ui only
         function onShow(): void { keyHandler.forceActiveFocus() }
         // ui only
-        function onYankTextRequested(t: string): void { root._yank(t) }
+        function onYankTextRequested(t: string): void { impl.yank(t) }
         // ui only
         function handleKeyEvent(event): void {
             if (event.key === Qt.Key_Shift   || event.key === Qt.Key_Control ||
@@ -123,9 +123,13 @@ ShellRoot {
 
     // ── Yank ──────────────────────────────────────────────────────────────────
     Process { id: yankProcess }
-    function _yank(text) {
-        yankProcess.command = [bin.bash, "-c", "printf '%s' \"$1\" | " + bin.wlCopy, "--", text]
-        yankProcess.running = true
+
+    QtObject {
+        id: impl
+        function yank(text: string): void {
+            yankProcess.command = [bin.bash, "-c", "printf '%s' \"$1\" | " + bin.wlCopy, "--", text]
+            yankProcess.running = true
+        }
     }
 
     // ── Window ────────────────────────────────────────────────────────────────

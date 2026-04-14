@@ -39,7 +39,7 @@ Item {
 
     function set(id, val) {
         values = Object.assign({}, values, { [id]: val })
-        _write()
+        impl.write()
     }
 
     function remove(id) {
@@ -47,7 +47,7 @@ Item {
         const v = Object.assign({}, values)
         delete v[id]
         values = v
-        _write()
+        impl.write()
     }
 
     function removeMany(idsSet) {
@@ -56,7 +56,7 @@ Item {
         for (const id of idsSet) {
             if (id in v) { delete v[id]; changed = true }
         }
-        if (changed) { values = v; _write() }
+        if (changed) { values = v; impl.write() }
     }
 
     function prune(knownIdsObj) {
@@ -66,7 +66,7 @@ Item {
             if (id in knownIdsObj) v[id] = val
             else changed = true
         }
-        if (changed) { values = v; _write() }
+        if (changed) { values = v; impl.write() }
     }
 
     // Prune stale IDs, and add knownIdsObj entries that have no value yet.
@@ -80,7 +80,7 @@ Item {
         for (const id of Object.keys(knownIdsObj)) {
             if (!(id in v)) { v[id] = defaultVal; changed = true }
         }
-        if (changed) { values = v; _write() }
+        if (changed) { values = v; impl.write() }
     }
 
     // ── Private ────────────────────────────────────────────────────────────────
@@ -110,14 +110,17 @@ Item {
         }
     }
 
-    function _write() {
-        if (!_path || !bash) return
-        const pairs = []
-        for (const [id, val] of Object.entries(values)) pairs.push(id, val)
-        writeProcess.command = [bash, "-c",
-            'f="$1"; shift; { while [[ $# -ge 2 ]]; do printf "%s\\t%s\\n" "$1" "$2"; shift 2; done; } > "$f"',
-            "--", _path].concat(pairs)
-        writeProcess.running = true
+    QtObject {
+        id: impl
+        function write(): void {
+            if (!store._path || !store.bash) return
+            const pairs = []
+            for (const [id, val] of Object.entries(store.values)) pairs.push(id, val)
+            writeProcess.command = [store.bash, "-c",
+                'f="$1"; shift; { while [[ $# -ge 2 ]]; do printf "%s\\t%s\\n" "$1" "$2"; shift 2; done; } > "$f"',
+                "--", store._path].concat(pairs)
+            writeProcess.running = true
+        }
     }
 
     Process {
