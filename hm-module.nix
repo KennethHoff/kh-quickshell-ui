@@ -26,45 +26,36 @@ let
     fontSize = config.stylix.fonts.sizes.applications;
   };
 
-  nixBins = import (src + "/ffi.nix") {
-    inherit pkgs lib;
-    extraBins.cliphistDecodeAll = toString cliphistDecodeAll;
-  };
-
-  mkBarConfig =
-    { structure, extraPluginDirs }:
+  mkAppConfig =
+    { name
+    , extraBins ? {}
+    , generatedFiles ? {}
+    , extraPluginDirs ? []
+    }:
     let
-      barLayoutQml = import (src + "/bar-config.nix") { inherit pkgs structure; };
-    in
-    pkgs.runCommandLocal "qs-kh-bar" { } ''
-      mkdir -p $out
-      cp ${src}/apps/kh-bar.qml $out/shell.qml
-      cp ${barLayoutQml} $out/BarLayout.qml
-      cp ${nixConfig} $out/NixConfig.qml
-      cp ${nixBins}   $out/NixBins.qml
-      # All lib components — auto-discovered by Quickshell.
-      cp ${src}/lib/*.qml $out/
-      # Bar infrastructure components — auto-discovered by Quickshell.
-      cp ${src}/apps/bar/*.qml $out/
-      # All built-in bar plugins — auto-discovered by Quickshell.
-      cp ${src}/apps/bar/plugins/*.qml $out/
-      # Extra plugin dirs (user-supplied types).
-      ${lib.concatMapStrings (d: "cp ${toString d}/*.qml $out/\n") extraPluginDirs}
-    '';
-
-  mkAppConfig = { name, extraBins ? {} }:
-    let
-      appDir = src + "/apps/${name}";
-      nixBins' = import (src + "/ffi.nix") { inherit pkgs lib extraBins; };
+      appDir     = src + "/apps/${name}";
+      pluginsDir = src + "/apps/${name}/plugins";
+      nixBins    = import (src + "/ffi.nix") { inherit pkgs lib extraBins; };
     in
     pkgs.runCommandLocal "qs-kh-${name}" { } ''
       mkdir -p $out/lib
       cp ${src}/lib/*.qml $out/lib/
       cp ${src}/apps/kh-${name}.qml $out/shell.qml
-      ${lib.optionalString (builtins.pathExists appDir) "cp ${appDir}/*.qml $out/"}
-      cp ${nixConfig}  $out/NixConfig.qml
-      cp ${nixBins'}   $out/NixBins.qml
+      ${lib.optionalString (builtins.pathExists appDir)     "cp ${appDir}/*.qml $out/"}
+      ${lib.optionalString (builtins.pathExists pluginsDir) "cp ${pluginsDir}/*.qml $out/"}
+      ${lib.concatStrings (lib.mapAttrsToList (dest: path: "cp ${path} $out/${dest}\n") generatedFiles)}
+      ${lib.concatMapStrings (d: "cp ${toString d}/*.qml $out/\n") extraPluginDirs}
+      cp ${nixConfig} $out/NixConfig.qml
+      cp ${nixBins}   $out/NixBins.qml
     '';
+
+  mkBarConfig =
+    { structure, extraPluginDirs ? [] }:
+    mkAppConfig {
+      name = "bar";
+      generatedFiles = { "BarLayout.qml" = import (src + "/bar-config.nix") { inherit pkgs structure; }; };
+      inherit extraPluginDirs;
+    };
 in
 {
   options.programs.kh-ui = {

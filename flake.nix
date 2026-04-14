@@ -52,55 +52,47 @@
         fontSize = 14;
       };
 
-      nixBinsQml = import ./ffi.nix { inherit pkgs lib; };
-
-      # mkBarConfig builds the kh-bar derivation from a QML structure string.
-      # structure: QML snippet; its top-level items are children of BarLayout's
-      #            root Item (which exposes barHeight and barWindow).
-      # extraPluginDirs: list of paths; all *.qml files are copied into $out/
-      #            making them auto-discoverable as additional bar types.
-      mkBarConfig =
-        { structure
-        , extraPluginDirs ? []
-        }:
-        let
-          barLayoutQml = import ./bar-config.nix { inherit pkgs structure; };
-        in
-        pkgs.runCommand "kh-bar-config" { } ''
-          mkdir -p $out
-          cp ${self}/apps/kh-bar.qml $out/shell.qml
-          cp ${barLayoutQml} $out/BarLayout.qml
-          cp ${nixConfigQml} $out/NixConfig.qml
-          cp ${nixBinsQml} $out/NixBins.qml
-          # All lib components — auto-discovered by Quickshell.
-          cp ${self}/lib/*.qml $out/
-          # Bar infrastructure components — auto-discovered by Quickshell.
-          cp ${self}/apps/bar/*.qml $out/
-          # All built-in bar plugins — auto-discovered by Quickshell.
-          cp ${self}/apps/bar/plugins/*.qml $out/
-          # Extra plugin dirs (user-supplied types).
-          ${lib.concatMapStrings (d: "cp ${toString d}/*.qml $out/\n") extraPluginDirs}
-        '';
-
-      # mkAppConfig builds a standard app derivation.
-      # name: app name — resolves apps/kh-{name}.qml and apps/{name}/ if present.
-      # extraBins: attr set of extra binaries passed to ffi.nix.
+      # mkAppConfig builds a kh-{name} app derivation following the static layout:
+      #   apps/kh-{name}.qml        → $out/shell.qml
+      #   apps/{name}/*.qml         → $out/          (if the directory exists)
+      #   apps/{name}/plugins/*.qml → $out/          (if the directory exists)
+      #   lib/*.qml                 → $out/lib/
+      # generatedFiles: { "Dest.qml" = <store-path>; } for eval-time generated files.
+      # extraPluginDirs: list of paths whose *.qml files are copied into $out/.
       mkAppConfig =
         { name
         , extraBins ? {}
+        , generatedFiles ? {}
+        , extraPluginDirs ? []
         }:
         let
-          appDir = "${self}/apps/${name}";
-          nixBins = import ./ffi.nix { inherit pkgs lib extraBins; };
+          appDir     = "${self}/apps/${name}";
+          pluginsDir = "${self}/apps/${name}/plugins";
+          nixBins    = import ./ffi.nix { inherit pkgs lib extraBins; };
         in
         pkgs.runCommand "kh-${name}-config" { } ''
           mkdir -p $out/lib
           cp ${self}/lib/*.qml $out/lib/
           cp ${self}/apps/kh-${name}.qml $out/shell.qml
-          ${lib.optionalString (builtins.pathExists appDir) "cp ${appDir}/*.qml $out/"}
+          ${lib.optionalString (builtins.pathExists appDir)     "cp ${appDir}/*.qml $out/"}
+          ${lib.optionalString (builtins.pathExists pluginsDir) "cp ${pluginsDir}/*.qml $out/"}
+          ${lib.concatStrings (lib.mapAttrsToList (dest: src: "cp ${src} $out/${dest}\n") generatedFiles)}
+          ${lib.concatMapStrings (d: "cp ${toString d}/*.qml $out/\n") extraPluginDirs}
           cp ${nixConfigQml} $out/NixConfig.qml
-          cp ${nixBins} $out/NixBins.qml
+          cp ${nixBins}      $out/NixBins.qml
         '';
+
+      # mkBarConfig wraps mkAppConfig for the bar, which needs a generated
+      # BarLayout.qml and supports user-supplied extraPluginDirs.
+      mkBarConfig =
+        { structure
+        , extraPluginDirs ? []
+        }:
+        mkAppConfig {
+          name = "bar";
+          generatedFiles = { "BarLayout.qml" = import ./bar-config.nix { inherit pkgs structure; }; };
+          inherit extraPluginDirs;
+        };
 
       viewConfig     = mkAppConfig { name = "view"; };
       launcherConfig = mkAppConfig { name = "launcher"; extraBins = { scanApps = toString scanAppsScript; }; };
