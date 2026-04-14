@@ -45,15 +45,52 @@ ShellRoot {
         }
     }
 
-    // ── IPC ───────────────────────────────────────────────────────────────────
-    function core_next(): void             { _focusedPane = _wrap ? (_focusedPane + 1) % _paths.length : Math.min(_paths.length - 1, _focusedPane + 1) }
-    function core_prev(): void             { _focusedPane = _wrap ? (_focusedPane - 1 + _paths.length) % _paths.length : Math.max(0, _focusedPane - 1) }
-    function core_seek(n: int): void       { _focusedPane = Math.max(0, Math.min(_paths.length - 1, n)) }
-    function core_cyclePanes(): void       { _focusedPane = (_focusedPane + 1) % _paths.length }
-    function core_toggleFullscreen(): void { _fullscreen = !_fullscreen }
-    function core_setFullscreen(on: bool): void { _fullscreen = on }
-    function core_setWrap(on: bool): void  { _wrap = on }
-    function core_quit(): void             { Qt.quit() }
+    // ── Functionality ─────────────────────────────────────────────────────────
+    QtObject {
+        id: functionality
+
+        // ui+ipc
+        function next(): void             { root._focusedPane = root._wrap ? (root._focusedPane + 1) % root._paths.length : Math.min(root._paths.length - 1, root._focusedPane + 1) }
+        // ui+ipc
+        function prev(): void             { root._focusedPane = root._wrap ? (root._focusedPane - 1 + root._paths.length) % root._paths.length : Math.max(0, root._focusedPane - 1) }
+        // ipc only
+        function seek(n: int): void       { root._focusedPane = Math.max(0, Math.min(root._paths.length - 1, n)) }
+        // ui only
+        function cyclePanes(): void       { root._focusedPane = (root._focusedPane + 1) % root._paths.length }
+        // ui+ipc
+        function toggleFullscreen(): void { root._fullscreen = !root._fullscreen }
+        // ipc only
+        function setFullscreen(on: bool): void { root._fullscreen = on }
+        // ipc only
+        function setWrap(on: bool): void  { root._wrap = on }
+        // ui+ipc
+        function quit(): void             { Qt.quit() }
+        // ipc only
+        function key(k: string): void {
+            const lk = k.toLowerCase()
+            if      (lk === "f")                    toggleFullscreen()
+            else if (lk === "q" || lk === "escape") quit()
+            else if (lk === "tab" && !root._fullscreen) cyclePanes()
+            else if (root._fullscreen && (lk === "h" || lk === "left"))  prev()
+            else if (root._fullscreen && (lk === "l" || lk === "right")) next()
+            else {
+                const pane = paneRepeater.itemAt(root._focusedPane)
+                if (pane) pane.handleViewerIpcKey(k)
+            }
+        }
+        // ui only
+        function handleKeyEvent(event): bool {
+            if (event.key === Qt.Key_Shift   || event.key === Qt.Key_Control ||
+                event.key === Qt.Key_Alt     || event.key === Qt.Key_Meta) return false
+            if (event.text === "q" || event.key === Qt.Key_Escape)            { quit();            return true }
+            if (event.text === "f" && root._paths.length > 1)                 { toggleFullscreen(); return true }
+            if (root._fullscreen && (event.key === Qt.Key_H || event.key === Qt.Key_Left))  { prev(); return true }
+            if (root._fullscreen && (event.key === Qt.Key_L || event.key === Qt.Key_Right)) { next(); return true }
+            if (!root._fullscreen && event.key === Qt.Key_Tab && root._paths.length > 1) { cyclePanes(); return true }
+            const pane = paneRepeater.itemAt(root._focusedPane)
+            return pane ? pane.handleViewerKey(event) : false
+        }
+    }
 
     IpcHandler {
         target: "viewer"
@@ -65,27 +102,13 @@ ShellRoot {
         readonly property bool hasPrev:      root._wrap || root._focusedPane > 0
         readonly property bool hasNext:      root._wrap || root._focusedPane < root._paths.length - 1
 
-        function quit()                  { root.core_quit() }
-        function next()                  { root.core_next() }
-        function prev()                  { root.core_prev() }
-        function seek(n: int)            { root.core_seek(n) }
-        function setFullscreen(on: bool) { root.core_setFullscreen(on) }
-        function setWrap(on: bool)       { root.core_setWrap(on) }
-        function key(k: string) {
-            const lk = k.toLowerCase()
-            if      (lk === "f")                    root.core_toggleFullscreen()
-            else if (lk === "q" || lk === "escape") root.core_quit()
-            else if (lk === "tab" && !root._fullscreen)
-                root.core_cyclePanes()
-            else if (root._fullscreen && (lk === "h" || lk === "left"))
-                root.core_prev()
-            else if (root._fullscreen && (lk === "l" || lk === "right"))
-                root.core_next()
-            else {
-                const pane = paneRepeater.itemAt(root._focusedPane)
-                if (pane) pane.handleViewerIpcKey(k)
-            }
-        }
+        function quit()                  { functionality.quit() }
+        function next()                  { functionality.next() }
+        function prev()                  { functionality.prev() }
+        function seek(n: int)            { functionality.seek(n) }
+        function setFullscreen(on: bool) { functionality.setFullscreen(on) }
+        function setWrap(on: bool)       { functionality.setWrap(on) }
+        function key(k: string)          { functionality.key(k) }
     }
 
     // ── Yank ──────────────────────────────────────────────────────────────────
@@ -115,36 +138,7 @@ ShellRoot {
             readonly property int _paneWidth: root._paths.length > 0
                 ? Math.floor(width / root._paths.length) : width
 
-            Keys.onPressed: (event) => {
-                if (event.key === Qt.Key_Shift   || event.key === Qt.Key_Control ||
-                    event.key === Qt.Key_Alt     || event.key === Qt.Key_Meta) return
-                if (event.text === "q" || event.key === Qt.Key_Escape) {
-                    root.core_quit(); event.accepted = true; return
-                }
-
-                // Toggle fullscreen mode
-                if (event.text === "f" && root._paths.length > 1) {
-                    root.core_toggleFullscreen(); event.accepted = true; return
-                }
-
-                if (root._fullscreen) {
-                    // h/l navigate between files
-                    if (event.key === Qt.Key_H || event.key === Qt.Key_Left) {
-                        root.core_prev(); event.accepted = true; return
-                    }
-                    if (event.key === Qt.Key_L || event.key === Qt.Key_Right) {
-                        root.core_next(); event.accepted = true; return
-                    }
-                } else {
-                    // Tab cycles focus in split mode
-                    if (event.key === Qt.Key_Tab && root._paths.length > 1) {
-                        root.core_cyclePanes(); event.accepted = true; return
-                    }
-                }
-
-                const pane = paneRepeater.itemAt(root._focusedPane)
-                if (pane && pane.handleViewerKey(event)) event.accepted = true
-            }
+            Keys.onPressed: (event) => { if (functionality.handleKeyEvent(event)) event.accepted = true }
 
             Repeater {
                 id: paneRepeater

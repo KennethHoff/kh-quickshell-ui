@@ -19,23 +19,28 @@ BarWidget {
         readonly property real vol:   valid ? sink.audio.volume : 0
     }
 
-    function applyVolume(v: real): void {
-        if (state.valid)
-            state.sink.audio.volume = Math.max(0.0, Math.min(1.5, v))
+    QtObject {
+        id: functionality
+
+        // ui+ipc
+        function apply(v: real): void         { if (state.valid) state.sink.audio.volume = Math.max(0.0, Math.min(1.5, v)) }
+        // ui+ipc
+        function toggleMute(): void           { if (state.valid) state.sink.audio.muted = !state.sink.audio.muted }
+        // ipc only
+        function setMuted(m: bool): void      { if (state.valid) state.sink.audio.muted = m }
+        // ui+ipc
+        function scrollVolume(up: bool): void { apply(state.vol + (up ? 0.05 : -0.05)) }
     }
-    function core_toggleMute(): void       { if (state.valid) state.sink.audio.muted = !state.sink.audio.muted }
-    function core_setMuted(m: bool): void  { if (state.valid) state.sink.audio.muted = m }
-    function core_scrollVolume(up: bool): void { applyVolume(state.vol + (up ? 0.05 : -0.05)) }
 
     IpcHandler {
         target: "bar.volume"
 
         function getVolume(): real              { return state.valid ? Math.round(state.vol * 100) : 0 }
-        function setVolume(v: int): void        { applyVolume(v / 100.0) }
-        function adjustVolume(delta: int): void { applyVolume(state.vol + delta / 100.0) }
+        function setVolume(v: int): void        { functionality.apply(v / 100.0) }
+        function adjustVolume(delta: int): void { functionality.apply(state.vol + delta / 100.0) }
         function isMuted(): bool                { return state.muted }
-        function setMuted(muted: bool): void    { core_setMuted(muted) }
-        function toggleMute(): void             { core_toggleMute() }
+        function setMuted(muted: bool): void    { functionality.setMuted(muted) }
+        function toggleMute(): void             { functionality.toggleMute() }
     }
 
     implicitWidth: label.implicitWidth + 24
@@ -52,7 +57,7 @@ BarWidget {
     MouseArea {
         anchors.fill: parent
         acceptedButtons: Qt.LeftButton
-        onClicked: core_toggleMute()
-        onWheel: wheel => core_scrollVolume(wheel.angleDelta.y > 0)
+        onClicked: functionality.toggleMute()
+        onWheel: wheel => functionality.scrollVolume(wheel.angleDelta.y > 0)
     }
 }

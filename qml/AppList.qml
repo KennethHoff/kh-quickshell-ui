@@ -379,6 +379,40 @@ Item {
         onTriggered: appList._pendingG = false
     }
 
+    // ── Functionality ─────────────────────────────────────────────────────────
+    QtObject {
+        id: functionality
+
+        // ui only — search field text change
+        function onSearchTextChanged(): void { list.currentIndex = 0; searchDebounce.restart() }
+        // ui only — Esc/Return in insert mode
+        function searchEscape(): void        { appList._mode = "normal"; appList.searchEscapePressed() }
+        // ui only — Ctrl+* emacs bindings in search field
+        function handleSearchCtrlKey(event): bool {
+            if (!(event.modifiers & Qt.ControlModifier)) return false
+            const pos = searchField.cursorPosition; const len = searchField.text.length
+            if      (event.key === Qt.Key_A) { searchField.cursorPosition = 0 }
+            else if (event.key === Qt.Key_E) { searchField.cursorPosition = len }
+            else if (event.key === Qt.Key_F) { searchField.cursorPosition = Math.min(len, pos + 1) }
+            else if (event.key === Qt.Key_B) { searchField.cursorPosition = Math.max(0, pos - 1) }
+            else if (event.key === Qt.Key_D) { if (pos < len) searchField.remove(pos, pos + 1) }
+            else if (event.key === Qt.Key_K) { if (pos < len) searchField.remove(pos, len) }
+            else if (event.key === Qt.Key_W) {
+                let i = pos
+                while (i > 0 && searchField.text[i - 1] === " ") i--
+                while (i > 0 && searchField.text[i - 1] !== " ") i--
+                if (i !== pos) searchField.remove(i, pos)
+            }
+            else if (event.key === Qt.Key_U) { if (pos > 0) searchField.remove(0, pos) }
+            else return false
+            return true
+        }
+        // ui only — clamp list currentIndex on model count change
+        function clampListIndex(): void    { if (list.count > 0 && list.currentIndex < 0) list.currentIndex = 0 }
+        // ui only — clamp actionList currentIndex on model count change
+        function clampActionIndex(): void  { if (actionList.count > 0 && actionList.currentIndex < 0) actionList.currentIndex = 0 }
+    }
+
     // ── UI ────────────────────────────────────────────────────────────────────
     Column {
         anchors.fill: parent
@@ -450,46 +484,10 @@ Item {
                     elide: Text.ElideRight
                 }
 
-                onTextChanged: { list.currentIndex = 0; searchDebounce.restart() }
-
-                Keys.onEscapePressed: {
-                    appList._mode = "normal"
-                    appList.searchEscapePressed()
-                }
-
-                Keys.onReturnPressed: {
-                    appList._mode = "normal"
-                    appList.searchEscapePressed()
-                }
-
-                Keys.onPressed: (event) => {
-                    if (!(event.modifiers & Qt.ControlModifier)) return
-                    const pos = searchField.cursorPosition
-                    const len = searchField.text.length
-                    if (event.key === Qt.Key_A) {
-                        searchField.cursorPosition = 0
-                    } else if (event.key === Qt.Key_E) {
-                        searchField.cursorPosition = len
-                    } else if (event.key === Qt.Key_F) {
-                        searchField.cursorPosition = Math.min(len, pos + 1)
-                    } else if (event.key === Qt.Key_B) {
-                        searchField.cursorPosition = Math.max(0, pos - 1)
-                    } else if (event.key === Qt.Key_D) {
-                        if (pos < len) searchField.remove(pos, pos + 1)
-                    } else if (event.key === Qt.Key_K) {
-                        if (pos < len) searchField.remove(pos, len)
-                    } else if (event.key === Qt.Key_W) {
-                        let i = pos
-                        while (i > 0 && searchField.text[i - 1] === " ") i--
-                        while (i > 0 && searchField.text[i - 1] !== " ") i--
-                        if (i !== pos) searchField.remove(i, pos)
-                    } else if (event.key === Qt.Key_U) {
-                        if (pos > 0) searchField.remove(0, pos)
-                    } else {
-                        return
-                    }
-                    event.accepted = true
-                }
+                onTextChanged:        functionality.onSearchTextChanged()
+                Keys.onEscapePressed: functionality.searchEscape()
+                Keys.onReturnPressed: functionality.searchEscape()
+                Keys.onPressed: (event) => { if (functionality.handleSearchCtrlKey(event)) event.accepted = true }
             }
         }
 
@@ -504,7 +502,7 @@ Item {
             visible: appList._mode !== "actions"
             highlightMoveDuration: 0
 
-            onCountChanged: if (count > 0 && currentIndex < 0) currentIndex = 0
+            onCountChanged: functionality.clampListIndex()
 
             Text {
                 anchors.centerIn: parent
@@ -634,7 +632,7 @@ Item {
             visible: appList._mode === "actions"
             highlightMoveDuration: 0
 
-            onCountChanged: if (count > 0 && currentIndex < 0) currentIndex = 0
+            onCountChanged: functionality.clampActionIndex()
 
             delegate: Item {
                 id: actionDelegate

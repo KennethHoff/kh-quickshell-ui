@@ -19,7 +19,16 @@ BarWidget {
         property real btnX:   0      // button x for popup x-centering
     }
 
-    function core_activateWorkspace(ws): void { ws.activate() }
+    QtObject {
+        id: functionality
+
+        // ui+ipc
+        function activateWorkspace(ws): void { ws.activate() }
+        // ui only
+        function hoverEnter(ws, btnX: real): void { state.pending = ws; state.btnX = btnX; timer.restart() }
+        // ui only
+        function hoverExit(): void { timer.stop(); state.pending = null; state.preview = null }
+    }
 
     IpcHandler {
         target: "bar.workspaces"
@@ -39,7 +48,7 @@ BarWidget {
         function switchTo(name: string): void {
             for (let i = 0; i < Hyprland.workspaces.values.length; i++)
                 if (Hyprland.workspaces.values[i].name === name)
-                    { root.core_activateWorkspace(Hyprland.workspaces.values[i]); return }
+                    { functionality.activateWorkspace(Hyprland.workspaces.values[i]); return }
         }
     }
 
@@ -87,18 +96,10 @@ BarWidget {
                     anchors.fill: parent
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: root.core_activateWorkspace(modelData)
-                    onEntered: {
-                        state.pending = modelData
-                        // parent is the delegate Rectangle; map to bar-window coords.
-                        state.btnX = parent.mapToItem(null, 0, 0).x
-                        timer.restart()
-                    }
-                    onExited: {
-                        timer.stop()
-                        state.pending = null
-                        state.preview = null
-                    }
+                    onClicked: functionality.activateWorkspace(modelData)
+                    // parent is the delegate Rectangle; map to bar-window coords.
+                    onEntered: functionality.hoverEnter(modelData, parent.mapToItem(null, 0, 0).x)
+                    onExited:  functionality.hoverExit()
                 }
             }
         }

@@ -13,16 +13,21 @@ import QtQuick
 import Quickshell.Io
 
 ControlTile {
-    function core_toggle(): void {
-        _toggle.command = _state.connected ? ["tailscale", "down"] : ["tailscale", "up"]
-        _toggle.running = true
+    QtObject {
+        id: functionality
+
+        // ui+ipc
+        function toggle(): void {
+            _toggle.command = _state.connected ? ["tailscale", "down"] : ["tailscale", "up"]
+            _toggle.running = true
+        }
     }
 
     IpcHandler {
         target: "bar.tailscale"
         function isConnected(): bool { return _state.connected }
         function getSelfIp(): string { return _state.selfIp }
-        function toggle(): void      { core_toggle() }
+        function toggle(): void      { functionality.toggle() }
     }
     NixConfig { id: _cfg }
 
@@ -50,7 +55,7 @@ ControlTile {
     fontFamily:         _cfg.fontFamily
     fontSize:           _cfg.fontSize
 
-    onTileClicked: core_toggle()
+    onTileClicked: functionality.toggle()
 
     // ── Processes ──────────────────────────────────────────────────────────
     Process {

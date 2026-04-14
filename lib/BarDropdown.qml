@@ -50,17 +50,24 @@ Item {
     // "bar.<ipcName>" — e.g. `qs ipc call bar.controlcenter toggle`.
     property string ipcName: ""
 
-    function core_toggle(): void { open = !open }
-    function core_open(): void   { open = true }
-    function core_close(): void  { open = false }
+    QtObject {
+        id: functionality
+
+        // ui+ipc
+        function toggle(): void { root.open = !root.open }
+        // ipc only
+        function open(): void   { root.open = true }
+        // ipc only
+        function close(): void  { root.open = false }
+    }
 
     IpcHandler {
         target: "bar." + root.ipcName
         enabled: root.ipcName !== ""
 
-        function toggle(): void { root.core_toggle() }
-        function open(): void   { root.core_open() }
-        function close(): void  { root.core_close() }
+        function toggle(): void { functionality.toggle() }
+        function open(): void   { functionality.open() }
+        function close(): void  { functionality.close() }
         function isOpen(): bool { return root.open }
     }
 
@@ -85,7 +92,7 @@ Item {
 
     MouseArea {
         anchors.fill: parent
-        onClicked: root.core_toggle()
+        onClicked: functionality.toggle()
     }
 
     // ── Popup panel ────────────────────────────────────────────────────────

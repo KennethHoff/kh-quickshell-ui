@@ -15,24 +15,33 @@ BarWidget {
         readonly property bool active: player !== null
     }
 
-    function core_prev(): void          { if (state.active && state.player.canGoPrevious) state.player.previous() }
-    function core_togglePlaying(): void { if (state.active && state.player.canControl)   state.player.togglePlaying() }
-    function core_next(): void          { if (state.active && state.player.canGoNext)     state.player.next() }
-    function core_play(): void          { if (state.active && !state.player.isPlaying)   core_togglePlaying() }
-    function core_pause(): void         { if (state.active && state.player.isPlaying)    core_togglePlaying() }
+    QtObject {
+        id: functionality
+
+        // ui+ipc
+        function prev(): void          { if (state.active && state.player.canGoPrevious) state.player.previous() }
+        // ui+ipc
+        function togglePlaying(): void { if (state.active && state.player.canControl)   state.player.togglePlaying() }
+        // ui+ipc
+        function next(): void          { if (state.active && state.player.canGoNext)     state.player.next() }
+        // ipc only
+        function play(): void          { if (state.active && !state.player.isPlaying)   togglePlaying() }
+        // ipc only
+        function pause(): void         { if (state.active && state.player.isPlaying)    togglePlaying() }
+    }
 
     IpcHandler {
         target: "bar.media"
 
-        function isActive(): bool    { return state.active }
-        function isPlaying(): bool   { return state.active && state.player.isPlaying }
-        function getTitle(): string  { return state.active ? (state.player.trackTitle  || "") : "" }
-        function getArtist(): string { return state.active ? (state.player.trackArtist || "") : "" }
-        function togglePlaying(): void { core_togglePlaying() }
-        function play(): void          { core_play() }
-        function pause(): void         { core_pause() }
-        function next(): void          { core_next() }
-        function prev(): void          { core_prev() }
+        function isActive(): bool      { return state.active }
+        function isPlaying(): bool     { return state.active && state.player.isPlaying }
+        function getTitle(): string    { return state.active ? (state.player.trackTitle  || "") : "" }
+        function getArtist(): string   { return state.active ? (state.player.trackArtist || "") : "" }
+        function togglePlaying(): void { functionality.togglePlaying() }
+        function play(): void          { functionality.play() }
+        function pause(): void         { functionality.pause() }
+        function next(): void          { functionality.next() }
+        function prev(): void          { functionality.prev() }
     }
 
     implicitWidth: state.active ? row.implicitWidth + 16 : 0
@@ -51,7 +60,7 @@ BarWidget {
             font.pixelSize: cfg.fontSize
             MouseArea {
                 anchors.fill: parent
-                onClicked: core_prev()
+                onClicked: functionality.prev()
             }
         }
 
@@ -63,7 +72,7 @@ BarWidget {
             font.pixelSize: cfg.fontSize
             MouseArea {
                 anchors.fill: parent
-                onClicked: core_togglePlaying()
+                onClicked: functionality.togglePlaying()
             }
         }
 
@@ -75,7 +84,7 @@ BarWidget {
             font.pixelSize: cfg.fontSize
             MouseArea {
                 anchors.fill: parent
-                onClicked: core_next()
+                onClicked: functionality.next()
             }
         }
 

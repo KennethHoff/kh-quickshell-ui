@@ -37,51 +37,71 @@ ShellRoot {
     }
 
     Process { id: launchProcess }
-    Timer   { id: closeTimer; interval: 120; onTriggered: root.core_close() }
+    Timer   { id: closeTimer; interval: 120; onTriggered: functionality.close() }
 
-    // ── Core actions ──────────────────────────────────────────────────────────
-    function core_toggle(): void                  { showing = !showing }
-    function core_open(): void                    { showing = true }
-    function core_close(): void                   { showing = false }
-    function core_launch(): void                  { if (list.selectedApp) launchApp(list.selectedApp.exec, list.selectedApp.terminal, 0) }
-    function core_launchOnWorkspace(n: int): void { if (list.selectedApp) launchApp(list.selectedApp.exec, list.selectedApp.terminal, n) }
-    function core_enterActionsMode(): void        { list.enterActionsMode() }
-    function core_enterInsertMode(): void         { list.enterInsertMode() }
-    function core_enterNormalMode(): void         { list.enterNormalMode(); normalModeHandler.forceActiveFocus() }
-    function core_setMode(m: string): void        { if (m === "insert") core_enterInsertMode(); else core_enterNormalMode() }
-    function core_navDown(): void                 { list.navDown() }
-    function core_navUp(): void                   { list.navUp() }
-    function core_navTop(): void                  { list.navTop() }
-    function core_navBottom(): void               { list.navBottom() }
-    function core_nav(dir: string): void {
-        const d = dir.toLowerCase()
-        if      (d === "down")   core_navDown()
-        else if (d === "up")     core_navUp()
-        else if (d === "top")    core_navTop()
-        else if (d === "bottom") core_navBottom()
-    }
-    function core_openHelp(): void                { helpOverlay.open() }
-    function core_closeHelp(): void               { helpOverlay.close() }
-    function core_toggleHelp(): void              { helpOverlay.showing ? helpOverlay.close() : helpOverlay.open() }
-    function core_type(text: string): void {
-        if (helpOverlay.showing) { helpOverlay._filtering = true; helpOverlay._filterText += text }
-        else                     list.typeText(text)
-    }
-    function core_key(k: string): void {
-        const lk = k.toLowerCase()
-        if      (lk === "?")                      core_toggleHelp()
-        else if (lk === "/" && helpOverlay.showing) { helpOverlay._filtering = true; helpOverlay._filterText = "" }
-        else if (lk === "escape" || lk === "esc") { if (helpOverlay.showing) core_closeHelp(); else list.handleIpcKey(k) }
-        else                                       list.handleIpcKey(k)
-    }
-    function core_handleKeyEvent(event): bool {
-        if (event.key === Qt.Key_Shift || event.key === Qt.Key_Control ||
-            event.key === Qt.Key_Alt   || event.key === Qt.Key_Meta) return false
-        if (helpOverlay.showing)        return helpOverlay.handleKey(event)
-        if (list.handleKey(event))      return true
-        if (event.text === "?")         { core_openHelp();        return true }
-        if (event.key === Qt.Key_Slash) { core_enterInsertMode(); return true }
-        return false
+    // ── Functionality ─────────────────────────────────────────────────────────
+    QtObject {
+        id: functionality
+
+        // ui+ipc
+        function toggle(): void                  { root.showing = !root.showing }
+        // ipc only
+        function open(): void                    { root.showing = true }
+        // ui+ipc
+        function close(): void                   { root.showing = false }
+        // ipc only
+        function launch(): void                  { if (list.selectedApp) root.launchApp(list.selectedApp.exec, list.selectedApp.terminal, 0) }
+        // ipc only
+        function launchOnWorkspace(n: int): void { if (list.selectedApp) root.launchApp(list.selectedApp.exec, list.selectedApp.terminal, n) }
+        // ipc only
+        function enterActionsMode(): void        { list.enterActionsMode() }
+        // ui+ipc (via setMode / handleKeyEvent)
+        function enterInsertMode(): void         { list.enterInsertMode() }
+        // ui+ipc (via setMode / handleKeyEvent)
+        function enterNormalMode(): void         { list.enterNormalMode(); normalModeHandler.forceActiveFocus() }
+        // ipc only
+        function setMode(m: string): void        { if (m === "insert") enterInsertMode(); else enterNormalMode() }
+        // ipc only
+        function nav(dir: string): void {
+            const d = dir.toLowerCase()
+            if      (d === "down")   list.navDown()
+            else if (d === "up")     list.navUp()
+            else if (d === "top")    list.navTop()
+            else if (d === "bottom") list.navBottom()
+        }
+        // ui+ipc (via key / handleKeyEvent)
+        function openHelp(): void                { helpOverlay.open() }
+        // ui+ipc (via key / handleKeyEvent)
+        function closeHelp(): void               { helpOverlay.close() }
+        // ipc only (via key)
+        function toggleHelp(): void              { helpOverlay.showing ? helpOverlay.close() : helpOverlay.open() }
+        // ipc only
+        function type(text: string): void {
+            if (helpOverlay.showing) { helpOverlay._filtering = true; helpOverlay._filterText += text }
+            else                     list.typeText(text)
+        }
+        // ipc only
+        function key(k: string): void {
+            const lk = k.toLowerCase()
+            if      (lk === "?")                       toggleHelp()
+            else if (lk === "/" && helpOverlay.showing) { helpOverlay._filtering = true; helpOverlay._filterText = "" }
+            else if (lk === "escape" || lk === "esc")  { if (helpOverlay.showing) closeHelp(); else list.handleIpcKey(k) }
+            else                                        list.handleIpcKey(k)
+        }
+        // ui only
+        function onShow(): void           { list.reset(); list.load(); helpOverlay.close(); normalModeHandler.forceActiveFocus() }
+        // ui only
+        function onVisibleChanged(): void { if (root.showing) onShow() }
+        // ui only
+        function handleKeyEvent(event): bool {
+            if (event.key === Qt.Key_Shift || event.key === Qt.Key_Control ||
+                event.key === Qt.Key_Alt   || event.key === Qt.Key_Meta) return false
+            if (helpOverlay.showing)        return helpOverlay.handleKey(event)
+            if (list.handleKey(event))      return true
+            if (event.text === "?")         { openHelp();        return true }
+            if (event.key === Qt.Key_Slash) { enterInsertMode(); return true }
+            return false
+        }
     }
 
     // ── IPC ───────────────────────────────────────────────────────────────────
@@ -92,16 +112,16 @@ ShellRoot {
         readonly property var    selectedApp: list.selectedApp
         readonly property var    actions:     list._actions
 
-        function toggle(): void                  { root.core_toggle() }
-        function open(): void                    { root.core_open() }
-        function close(): void                   { root.core_close() }
-        function launch(): void                  { root.core_launch() }
-        function launchOnWorkspace(n: int): void { root.core_launchOnWorkspace(n) }
-        function enterActionsMode(): void        { root.core_enterActionsMode() }
-        function setMode(m: string): void        { root.core_setMode(m) }
-        function nav(dir: string): void          { root.core_nav(dir) }
-        function key(k: string): void            { root.core_key(k) }
-        function type(text: string): void        { root.core_type(text) }
+        function toggle(): void                  { functionality.toggle() }
+        function open(): void                    { functionality.open() }
+        function close(): void                   { functionality.close() }
+        function launch(): void                  { functionality.launch() }
+        function launchOnWorkspace(n: int): void { functionality.launchOnWorkspace(n) }
+        function enterActionsMode(): void        { functionality.enterActionsMode() }
+        function setMode(m: string): void        { functionality.setMode(m) }
+        function nav(dir: string): void          { functionality.nav(dir) }
+        function key(k: string): void            { functionality.key(k) }
+        function type(text: string): void        { functionality.type(text) }
     }
 
     // ── Window ────────────────────────────────────────────────────────────────
@@ -115,20 +135,14 @@ ShellRoot {
         namespace: "kh-launcher"
         anchors { top: true; bottom: true; left: true; right: true }
 
-        onVisibleChanged: {
-            if (!visible) return
-            list.reset()
-            list.load()
-            helpOverlay.close()
-            normalModeHandler.forceActiveFocus()
-            // insert mode is set in reset(); focus is given after load completes
-        }
+        // insert mode is set in reset(); focus is given after load completes
+        onVisibleChanged: functionality.onVisibleChanged()
 
         // Backdrop
         Rectangle {
             anchors.fill: parent
             color: "#99000000"
-            MouseArea { anchors.fill: parent; onClicked: root.core_close() }
+            MouseArea { anchors.fill: parent; onClicked: functionality.close() }
         }
 
         // Panel
@@ -150,7 +164,7 @@ ShellRoot {
                 id: normalModeHandler
                 anchors.fill: parent
 
-                Keys.onPressed: (event) => { if (root.core_handleKeyEvent(event)) event.accepted = true }
+                Keys.onPressed: (event) => { if (functionality.handleKeyEvent(event)) event.accepted = true }
             }
 
             // Footer
@@ -189,8 +203,8 @@ ShellRoot {
                 anchors.right: parent.right
                 anchors.bottom: footer.top
 
-                onSearchEscapePressed: root.core_enterNormalMode()
-                onCloseRequested:      root.core_close()
+                onSearchEscapePressed: functionality.enterNormalMode()
+                onCloseRequested:      functionality.close()
                 onLaunchRequested:     (exec, terminal, workspace) => root.launchApp(exec, terminal, workspace)
             }
 
