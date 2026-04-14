@@ -2,7 +2,7 @@
 // Children are laid out left-to-right. Use BarSpacer to push items apart
 // (CSS space-between equivalent). Multiple BarRows can coexist in BarLayout.
 //
-// barHeight and barWindow propagate to child BarWidget types via the
+// barHeight and barWindow propagate to child BarPlugin types via the
 // inner RowLayout's own properties (it is the direct parent of plugin items).
 import QtQuick
 import QtQuick.Layouts
@@ -24,7 +24,7 @@ Item {
         }
         spacing: 4
 
-        // Expose context to direct children (BarWidget reads parent.barHeight / parent.barWindow).
+        // Expose context to direct children (BarPlugin reads parent.barHeight / parent.barWindow).
         property int barHeight: root.barHeight
         property var barWindow: root.barWindow
     }

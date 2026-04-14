@@ -38,31 +38,32 @@ let
     in
     pkgs.runCommandLocal "qs-kh-bar" { } ''
       mkdir -p $out
-      cp ${src}/qml/kh-bar.qml $out/shell.qml
+      cp ${src}/apps/kh-bar.qml $out/shell.qml
       cp ${barLayoutQml} $out/BarLayout.qml
       cp ${nixConfig} $out/NixConfig.qml
       cp ${nixBins}   $out/NixBins.qml
       # All lib components — auto-discovered by Quickshell.
       cp ${src}/lib/*.qml $out/
+      # Bar infrastructure components — auto-discovered by Quickshell.
+      cp ${src}/apps/bar/*.qml $out/
       # All built-in bar plugins — auto-discovered by Quickshell.
-      cp ${src}/qml/bar/*.qml $out/
+      cp ${src}/apps/bar/plugins/*.qml $out/
       # Extra plugin dirs (user-supplied types).
       ${lib.concatMapStrings (d: "cp ${toString d}/*.qml $out/\n") extraPluginDirs}
     '';
 
-  mkConfig =
-    {
-      name,
-      qml,
-      extraQml ? [ ],
-    }:
-    pkgs.runCommandLocal "qs-${name}" { } ''
-      mkdir -p $out/lib
-      cp ${src}/lib/*.qml $out/lib/
-      cp ${src}/qml/${qml} $out/shell.qml
-      ${lib.concatMapStrings (f: "cp ${src}/qml/${f} $out/\n") extraQml}cp ${nixConfig} $out/NixConfig.qml
-      cp ${nixBins}   $out/NixBins.qml
-    '';
+  cliphistConfig = pkgs.runCommandLocal "qs-kh-cliphist" { } ''
+    mkdir -p $out/lib
+    cp ${src}/lib/*.qml $out/lib/
+    cp ${src}/apps/kh-cliphist.qml $out/shell.qml
+    cp ${src}/apps/cliphist/ClipDelegate.qml  $out/
+    cp ${src}/apps/cliphist/CliphistEntry.qml $out/
+    cp ${src}/apps/cliphist/ClipList.qml      $out/
+    cp ${src}/apps/cliphist/ClipPreview.qml   $out/
+    cp ${src}/apps/cliphist/MetaStore.qml     $out/
+    cp ${nixConfig} $out/NixConfig.qml
+    cp ${nixBins}   $out/NixBins.qml
+  '';
 in
 {
   options.programs.kh-ui = {
@@ -156,11 +157,7 @@ in
         enable = lib.mkDefault true;
         configs =
           lib.optionalAttrs config.programs.kh-ui.clipboard-history.enable {
-            kh-cliphist = mkConfig {
-              name = "kh-cliphist";
-              qml = "kh-cliphist.qml";
-              extraQml = [ "ClipList.qml" "ClipPreview.qml" "MetaStore.qml" ];
-            };
+            kh-cliphist = cliphistConfig;
           } //
           lib.optionalAttrs config.programs.kh-ui.bar.enable {
             kh-bar = mkBarConfig {
@@ -180,8 +177,8 @@ in
               pkgs.runCommandLocal "qs-kh-launcher" { } ''
                 mkdir -p $out/lib
                 cp ${src}/lib/*.qml $out/lib/
-                cp ${src}/qml/kh-launcher.qml $out/shell.qml
-                cp ${src}/qml/AppList.qml $out/
+                cp ${src}/apps/kh-launcher.qml $out/shell.qml
+                cp ${src}/apps/launcher/AppList.qml $out/
                 cp ${nixConfig} $out/NixConfig.qml
                 cp ${nixBins}   $out/NixBins.qml
               '';

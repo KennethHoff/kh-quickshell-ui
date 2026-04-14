@@ -5,7 +5,7 @@
 // All state, polling, and theming live inside the respective panel components.
 import QtQuick
 
-BarWidget {
+BarPlugin {
     implicitWidth: _panel.implicitWidth
 
     ControlPanel {

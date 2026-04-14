@@ -1,7 +1,7 @@
 // Bar plugin: live clock (HH:mm, updates every second).
 import QtQuick
 
-BarWidget {
+BarPlugin {
     NixConfig { id: cfg }
 
     implicitWidth: label.implicitWidth + 24

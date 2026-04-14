@@ -5,7 +5,7 @@ import QtQuick
 import Quickshell.Io
 import Quickshell.Services.SystemTray
 
-BarWidget {
+BarPlugin {
     NixConfig { id: cfg }
 
     IpcHandler {

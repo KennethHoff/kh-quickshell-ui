@@ -7,7 +7,7 @@ import Quickshell.Hyprland
 import Quickshell.Io
 import Quickshell.Wayland
 
-BarWidget {
+BarPlugin {
     id: root
     NixConfig { id: cfg }
 

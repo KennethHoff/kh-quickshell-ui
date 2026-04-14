@@ -5,7 +5,7 @@ import QtQuick
 import Quickshell.Io
 import Quickshell.Services.Mpris
 
-BarWidget {
+BarPlugin {
     NixConfig { id: cfg }
 
     // State in a QtObject so its id is globally accessible from nested children.

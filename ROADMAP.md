@@ -85,7 +85,7 @@ A full status bar built in Quickshell, replacing Waybar.
 
 - ✅ Plugin system — plugins are authored as `.qml` files and wired in via Nix (`structure`/`extraPluginDirs`); `BarRow` + `BarSpacer` replace `BarLeft`/`BarRight` for flexible space-between layout; built at eval time so no runtime module import is needed
 - ✅ IPC support — each plugin exposes its own IPC target (`bar.volume`, `bar.media`, `bar.workspaces`); dropdowns with `ipcName` set expose `bar.<name>` with `toggle`/`open`/`close`/`isOpen`
-- ⬜ Hierarchical IPC prefix — add `ipcPrefix` to `BarWidget` propagated through the parent chain (same mechanism as `barHeight`/`barWindow`); each container appends its segment so a plugin automatically gets a target like `bar1.grouping1.tailscale` without manually specifying it; the root prefix comes from the bar's Nix config entry (e.g. `Bar { ipcName: "top" }`); implement before multi-bar support
+- ⬜ Hierarchical IPC prefix — add `ipcPrefix` to `BarPlugin` propagated through the parent chain (same mechanism as `barHeight`/`barWindow`); each container appends its segment so a plugin automatically gets a target like `bar1.grouping1.tailscale` without manually specifying it; the root prefix comes from the bar's Nix config entry (e.g. `Bar { ipcName: "top" }`); implement before multi-bar support
 - ⬜ Multi-bar support — allow N bars at arbitrary screen edges (top, bottom, left, right); `mkBarConfig` accepts a list of `{ edge, structure }` entries; each bar gets its own `PanelWindow` and generated `BarLayout`; `BarDropdown` opens its popup toward the screen interior so it works on any edge
 
 ### Workspaces

@@ -4,7 +4,7 @@ import QtQuick
 import Quickshell.Io
 import Quickshell.Services.Pipewire
 
-BarWidget {
+BarPlugin {
     NixConfig { id: cfg }
 
     // Bind the default sink so its audio properties stay live.

@@ -137,14 +137,14 @@ Available composition types (no import statement needed):
 
 #### Writing a custom plugin
 
-A plugin is a `BarWidget` subtype. `BarWidget` handles the sizing boilerplate; you only need to set `implicitWidth`.
+A plugin is a `BarPlugin` subtype. `BarPlugin` handles the sizing boilerplate; you only need to set `implicitWidth`.
 
 Example `MyWidget.qml`:
 
 ```qml
 import QtQuick
 
-BarWidget {
+BarPlugin {
     NixConfig { id: cfg }
 
     implicitWidth: _label.implicitWidth + 16

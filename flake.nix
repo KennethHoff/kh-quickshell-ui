@@ -68,14 +68,16 @@
         in
         pkgs.runCommand "kh-bar-config" { } ''
           mkdir -p $out
-          cp ${self}/qml/kh-bar.qml $out/shell.qml
+          cp ${self}/apps/kh-bar.qml $out/shell.qml
           cp ${barLayoutQml} $out/BarLayout.qml
           cp ${nixConfigQml} $out/NixConfig.qml
           cp ${nixBinsQml} $out/NixBins.qml
           # All lib components — auto-discovered by Quickshell.
           cp ${self}/lib/*.qml $out/
+          # Bar infrastructure components — auto-discovered by Quickshell.
+          cp ${self}/apps/bar/*.qml $out/
           # All built-in bar plugins — auto-discovered by Quickshell.
-          cp ${self}/qml/bar/*.qml $out/
+          cp ${self}/apps/bar/plugins/*.qml $out/
           # Extra plugin dirs (user-supplied types).
           ${lib.concatMapStrings (d: "cp ${toString d}/*.qml $out/\n") extraPluginDirs}
         '';
@@ -83,7 +85,7 @@
       viewConfig = pkgs.runCommand "kh-view-config" { } ''
         mkdir -p $out/lib
         cp ${self}/lib/*.qml $out/lib/
-        cp ${self}/qml/kh-view.qml $out/shell.qml
+        cp ${self}/apps/kh-view.qml $out/shell.qml
         cp ${nixConfigQml} $out/NixConfig.qml
         cp ${nixBinsQml} $out/NixBins.qml
       '';
@@ -91,8 +93,8 @@
       launcherConfig = pkgs.runCommand "kh-launcher-config" { } ''
         mkdir -p $out/lib
         cp ${self}/lib/*.qml $out/lib/
-        cp ${self}/qml/kh-launcher.qml $out/shell.qml
-        cp ${self}/qml/AppList.qml $out/
+        cp ${self}/apps/kh-launcher.qml $out/shell.qml
+        cp ${self}/apps/launcher/AppList.qml $out/
         cp ${nixConfigQml} $out/NixConfig.qml
         cp ${import ./ffi.nix {
           inherit pkgs lib;
@@ -117,11 +119,12 @@
       cliphistConfig = pkgs.runCommand "kh-cliphist-config" { } ''
         mkdir -p $out/lib
         cp ${self}/lib/*.qml $out/lib/
-        cp ${self}/qml/kh-cliphist.qml $out/shell.qml
-        cp ${self}/qml/ClipDelegate.qml $out/
-        cp ${self}/qml/ClipList.qml $out/
-        cp ${self}/qml/ClipPreview.qml $out/
-        cp ${self}/qml/MetaStore.qml $out/
+        cp ${self}/apps/kh-cliphist.qml $out/shell.qml
+        cp ${self}/apps/cliphist/ClipDelegate.qml $out/
+        cp ${self}/apps/cliphist/CliphistEntry.qml $out/
+        cp ${self}/apps/cliphist/ClipList.qml $out/
+        cp ${self}/apps/cliphist/ClipPreview.qml $out/
+        cp ${self}/apps/cliphist/MetaStore.qml $out/
         cp ${nixConfigQml} $out/NixConfig.qml
         cp ${import ./ffi.nix {
           inherit pkgs lib;
