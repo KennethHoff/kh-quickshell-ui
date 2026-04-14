@@ -178,7 +178,44 @@ programs.kh-ui.bar = {
 };
 ```
 
-### 5. Autostart and keybinds (Hyprland)
+### 5. Bar IPC
+
+Each bar plugin exposes its own IPC target — no single bottleneck. Targets follow the pattern `bar.<plugin>`:
+
+| Target | Functions |
+|---|---|
+| `bar.workspaces` | `getFocused()` → string, `list()` → newline-separated names, `switchTo(name)` |
+| `bar.volume` | `getVolume()` → int (0–150), `setVolume(v)`, `adjustVolume(delta)`, `isMuted()` → bool, `setMuted(muted)`, `toggleMute()` |
+| `bar.media` | `isActive()` → bool, `isPlaying()` → bool, `getTitle()`, `getArtist()`, `togglePlaying()`, `play()`, `pause()`, `next()`, `prev()` |
+| `bar.controlcenter` | `toggle()`, `open()`, `close()`, `isOpen()` → bool |
+
+```bash
+# Examples
+qs ipc call bar.workspaces switchTo 2
+qs ipc call bar.volume setVolume 50
+qs ipc call bar.media togglePlaying
+qs ipc call bar.controlcenter toggle
+qs ipc prop get bar.volume isMuted
+```
+
+#### Dropdown IPC for custom plugins
+
+Any `BarDropdown` (or `ControlPanel`) with `ipcName` set gets `toggle`/`open`/`close`/`isOpen` automatically:
+
+```qml
+BarDropdown {
+    ipcName: "mypanel"
+    label: "my panel"
+    // ...
+}
+```
+
+```bash
+qs ipc call bar.mypanel toggle
+qs ipc call bar.mypanel isOpen
+```
+
+### 6. Autostart and keybinds (Hyprland)
 
 When `wayland.windowManager.hyprland.enable` is true the module automatically adds `exec-once` entries for all enabled components. You only need to add keybinds:
 
