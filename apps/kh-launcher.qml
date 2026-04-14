@@ -111,10 +111,10 @@ ShellRoot {
     // ── IPC ───────────────────────────────────────────────────────────────────
     IpcHandler {
         target: "launcher"
-        readonly property bool   showing:     root.showing
-        readonly property string mode:        list.mode
-        readonly property var    selectedApp: list.selectedApp
-        readonly property var    actions:     list._actions
+        readonly property bool   showing:         root.showing
+        readonly property string mode:           list.mode
+        readonly property string selectedAppName: list.selectedApp ? list.selectedApp.name : ""
+        readonly property string selectedAppExec: list.selectedApp ? list.selectedApp.exec : ""
 
         function toggle(): void                  { functionality.toggle() }
         function open(): void                    { functionality.open() }
