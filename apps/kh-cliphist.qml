@@ -148,7 +148,7 @@ ShellRoot {
 
     // ── IPC ───────────────────────────────────────────────────────────────────
     IpcHandler {
-        target: "viewer"
+        target: "cliphist"
         readonly property bool   showing: root.showing
         readonly property string mode:    list.mode
 

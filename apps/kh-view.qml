@@ -103,7 +103,7 @@ ShellRoot {
     }
 
     IpcHandler {
-        target: "viewer"
+        target: "view"
 
         readonly property int  currentIndex: root._focusedPane
         readonly property int  count:        root._paths.length
