@@ -671,8 +671,6 @@ Item {
             }
 
             delegate: ClipDelegate {
-                required property var modelData
-                required property int index
                 width:            list.width
                 isCurrent:        list.currentIndex === index
                 mode:             clipList._mode
