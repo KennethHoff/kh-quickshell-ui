@@ -21,6 +21,29 @@ ControlTile {
             _toggle.command = _state.connected ? ["tailscale", "down"] : ["tailscale", "up"]
             _toggle.running = true
         }
+        // ui only
+        function onStreamFinished(text: string): void {
+            try {
+                const d = JSON.parse(text)
+                _state.connected = (d.BackendState === "Running")
+                _state.selfIp    = (d.TailscaleIPs ?? [])[0] ?? ""
+                const peerMap    = d.Peer ?? {}
+                _state.peers = Object.values(peerMap)
+                    .map(p => ({
+                        hostname: p.HostName  ?? "",
+                        ip:       (p.TailscaleIPs ?? [])[0] ?? "",
+                        online:   p.Online ?? false,
+                    }))
+                    .sort((a, b) => Number(b.online) - Number(a.online))
+            } catch (_) {
+                _state.connected = false
+                _state.peers     = []
+            }
+        }
+        // ui only
+        function onToggleExited(): void { _proc.running = true }
+        // ui only
+        function pollIfIdle(): void { if (!_proc.running) _proc.running = true }
     }
 
     IpcHandler {
@@ -63,30 +86,13 @@ ControlTile {
         running: true
         command: ["tailscale", "status", "--json"]
         stdout: StdioCollector {
-            onStreamFinished: {
-                try {
-                    const d = JSON.parse(text)
-                    _state.connected = (d.BackendState === "Running")
-                    _state.selfIp    = (d.TailscaleIPs ?? [])[0] ?? ""
-                    const peerMap    = d.Peer ?? {}
-                    _state.peers = Object.values(peerMap)
-                        .map(p => ({
-                            hostname: p.HostName  ?? "",
-                            ip:       (p.TailscaleIPs ?? [])[0] ?? "",
-                            online:   p.Online ?? false,
-                        }))
-                        .sort((a, b) => Number(b.online) - Number(a.online))
-                } catch (_) {
-                    _state.connected = false
-                    _state.peers     = []
-                }
-            }
+            onStreamFinished: functionality.onStreamFinished(text)
         }
     }
 
     Process {
         id: _toggle
-        onExited: { _proc.running = true }
+        onExited: functionality.onToggleExited()
     }
 
     Timer {
@@ -94,6 +100,6 @@ ControlTile {
         interval: 10000
         running: true
         repeat: true
-        onTriggered: if (!_proc.running) _proc.running = true
+        onTriggered: functionality.pollIfIdle()
     }
 }

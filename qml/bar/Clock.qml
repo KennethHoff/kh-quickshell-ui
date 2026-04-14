@@ -6,21 +6,25 @@ BarWidget {
 
     implicitWidth: label.implicitWidth + 24
 
+    QtObject {
+        id: functionality
+        // ui only
+        function refresh(): void { label.text = Qt.formatTime(new Date(), "HH:mm:ss") }
+    }
+
     Text {
         id: label
         anchors.centerIn: parent
         color: cfg.color.base05
         font.family:    cfg.fontFamily
         font.pixelSize: cfg.fontSize - 1
-
-        function refresh() { text = Qt.formatTime(new Date(), "HH:mm:ss") }
-        Component.onCompleted: refresh()
+        Component.onCompleted: functionality.refresh()
     }
 
     Timer {
         interval: 1000
         running:  true
         repeat:   true
-        onTriggered: label.refresh()
+        onTriggered: functionality.refresh()
     }
 }

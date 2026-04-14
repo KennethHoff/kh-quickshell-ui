@@ -342,9 +342,61 @@ Item {
         id: listProcess
         command: [bin.scanApps]
         stdout: SplitParser {
-            onRead: (line) => { if (line !== "") appList._appBuf.push(line) }
+            onRead: (line) => functionality.onAppRead(line)
         }
-        onExited: {
+        onExited: functionality.onAppsLoaded()
+    }
+
+    Timer {
+        id: searchDebounce
+        interval: 80
+        repeat: false
+        onTriggered: functionality.runFilter()
+    }
+
+    Timer {
+        id: gTimer
+        interval: 300
+        repeat: false
+        onTriggered: functionality.clearPendingG()
+    }
+
+    // ── Functionality ─────────────────────────────────────────────────────────
+    QtObject {
+        id: functionality
+
+        // ui only — search field text change
+        function onSearchTextChanged(): void { list.currentIndex = 0; searchDebounce.restart() }
+        // ui only — Esc/Return in insert mode
+        function searchEscape(): void        { appList._mode = "normal"; appList.searchEscapePressed() }
+        // ui only — Ctrl+* emacs bindings in search field
+        function handleSearchCtrlKey(event): void {
+            if (!(event.modifiers & Qt.ControlModifier)) return
+            const pos = searchField.cursorPosition; const len = searchField.text.length
+            if      (event.key === Qt.Key_A) { searchField.cursorPosition = 0 }
+            else if (event.key === Qt.Key_E) { searchField.cursorPosition = len }
+            else if (event.key === Qt.Key_F) { searchField.cursorPosition = Math.min(len, pos + 1) }
+            else if (event.key === Qt.Key_B) { searchField.cursorPosition = Math.max(0, pos - 1) }
+            else if (event.key === Qt.Key_D) { if (pos < len) searchField.remove(pos, pos + 1) }
+            else if (event.key === Qt.Key_K) { if (pos < len) searchField.remove(pos, len) }
+            else if (event.key === Qt.Key_W) {
+                let i = pos
+                while (i > 0 && searchField.text[i - 1] === " ") i--
+                while (i > 0 && searchField.text[i - 1] !== " ") i--
+                if (i !== pos) searchField.remove(i, pos)
+            }
+            else if (event.key === Qt.Key_U) { if (pos > 0) searchField.remove(0, pos) }
+            else return
+            event.accepted = true
+        }
+        // ui only — clamp list currentIndex on model count change
+        function clampListIndex(): void    { if (list.count > 0 && list.currentIndex < 0) list.currentIndex = 0 }
+        // ui only — clamp actionList currentIndex on model count change
+        function clampActionIndex(): void  { if (actionList.count > 0 && actionList.currentIndex < 0) actionList.currentIndex = 0 }
+        // ui only — accumulate one line from the app list process
+        function onAppRead(line: string): void { if (line !== "") appList._appBuf.push(line) }
+        // ui only — parse buffered app lines and populate the app list
+        function onAppsLoaded(): void {
             const apps = []
             for (const line of appList._appBuf) {
                 const parts = line.split("\t")
@@ -363,54 +415,10 @@ Item {
             appList._runFilter()
             if (appList._mode === "insert") searchField.forceActiveFocus()
         }
-    }
-
-    Timer {
-        id: searchDebounce
-        interval: 80
-        repeat: false
-        onTriggered: appList._runFilter()
-    }
-
-    Timer {
-        id: gTimer
-        interval: 300
-        repeat: false
-        onTriggered: appList._pendingG = false
-    }
-
-    // ── Functionality ─────────────────────────────────────────────────────────
-    QtObject {
-        id: functionality
-
-        // ui only — search field text change
-        function onSearchTextChanged(): void { list.currentIndex = 0; searchDebounce.restart() }
-        // ui only — Esc/Return in insert mode
-        function searchEscape(): void        { appList._mode = "normal"; appList.searchEscapePressed() }
-        // ui only — Ctrl+* emacs bindings in search field
-        function handleSearchCtrlKey(event): bool {
-            if (!(event.modifiers & Qt.ControlModifier)) return false
-            const pos = searchField.cursorPosition; const len = searchField.text.length
-            if      (event.key === Qt.Key_A) { searchField.cursorPosition = 0 }
-            else if (event.key === Qt.Key_E) { searchField.cursorPosition = len }
-            else if (event.key === Qt.Key_F) { searchField.cursorPosition = Math.min(len, pos + 1) }
-            else if (event.key === Qt.Key_B) { searchField.cursorPosition = Math.max(0, pos - 1) }
-            else if (event.key === Qt.Key_D) { if (pos < len) searchField.remove(pos, pos + 1) }
-            else if (event.key === Qt.Key_K) { if (pos < len) searchField.remove(pos, len) }
-            else if (event.key === Qt.Key_W) {
-                let i = pos
-                while (i > 0 && searchField.text[i - 1] === " ") i--
-                while (i > 0 && searchField.text[i - 1] !== " ") i--
-                if (i !== pos) searchField.remove(i, pos)
-            }
-            else if (event.key === Qt.Key_U) { if (pos > 0) searchField.remove(0, pos) }
-            else return false
-            return true
-        }
-        // ui only — clamp list currentIndex on model count change
-        function clampListIndex(): void    { if (list.count > 0 && list.currentIndex < 0) list.currentIndex = 0 }
-        // ui only — clamp actionList currentIndex on model count change
-        function clampActionIndex(): void  { if (actionList.count > 0 && actionList.currentIndex < 0) actionList.currentIndex = 0 }
+        // ui only — run the filter (called by debounce timer)
+        function runFilter(): void { appList._runFilter() }
+        // ui only — clear the pending-G double-tap flag
+        function clearPendingG(): void { appList._pendingG = false }
     }
 
     // ── UI ────────────────────────────────────────────────────────────────────
@@ -487,7 +495,7 @@ Item {
                 onTextChanged:        functionality.onSearchTextChanged()
                 Keys.onEscapePressed: functionality.searchEscape()
                 Keys.onReturnPressed: functionality.searchEscape()
-                Keys.onPressed: (event) => { if (functionality.handleSearchCtrlKey(event)) event.accepted = true }
+                Keys.onPressed: (event) => functionality.handleSearchCtrlKey(event)
             }
         }
 
@@ -610,12 +618,18 @@ Item {
                         }
                     }
 
-                    Connections {
-                        target: appList
-                        function onFlashRequested(idx) {
+                    QtObject {
+                        id: appDelegateFunctionality
+                        // ui only
+                        function onFlashRequested(idx: int): void {
                             if (appList._mode !== "actions" && idx === appDelegate.index)
                                 blinkAnim.restart()
                         }
+                    }
+
+                    Connections {
+                        target: appList
+                        function onFlashRequested(idx) { appDelegateFunctionality.onFlashRequested(idx) }
                     }
                 }
             }
@@ -718,12 +732,18 @@ Item {
                         }
                     }
 
-                    Connections {
-                        target: appList
-                        function onFlashRequested(idx) {
+                    QtObject {
+                        id: actionDelegateFunctionality
+                        // ui only
+                        function onFlashRequested(idx: int): void {
                             if (appList._mode === "actions" && idx === actionDelegate.index)
                                 actionBlinkAnim.restart()
                         }
+                    }
+
+                    Connections {
+                        target: appList
+                        function onFlashRequested(idx) { actionDelegateFunctionality.onFlashRequested(idx) }
                     }
                 }
             }

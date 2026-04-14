@@ -220,7 +220,13 @@ Item {
     property int    _visualCurCol:    0
     property bool   _pendingGg:       false
 
-    Timer { id: ggTimer; interval: 300; onTriggered: viewer._pendingGg = false }
+    QtObject {
+        id: functionality
+        // ui only
+        function clearPendingGg(): void { viewer._pendingGg = false }
+    }
+
+    Timer { id: ggTimer; interval: 300; onTriggered: functionality.clearPendingGg() }
 
     // ── Private text helpers ──────────────────────────────────────────────────
     function _logicalLineAt(pos) {

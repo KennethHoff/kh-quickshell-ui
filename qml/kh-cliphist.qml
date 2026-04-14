@@ -124,20 +124,23 @@ ShellRoot {
         // ui only
         function onVisibleChanged(): void { if (root.showing) onShow() }
         // ui only
-        function handleKeyEvent(event): bool {
+        function onYankEntryRequested(rawLine: string): void { root.pasteEntry(rawLine) }
+        // ui only
+        function onYankTextRequested(text: string): void { root.yankText(text) }
+        // ui only
+        function handleKeyEvent(event): void {
             if (event.key === Qt.Key_Shift || event.key === Qt.Key_Control ||
-                event.key === Qt.Key_Alt   || event.key === Qt.Key_Meta) return false
-            if (helpOverlay.showing) return helpOverlay.handleKey(event)
+                event.key === Qt.Key_Alt   || event.key === Qt.Key_Meta) return
+            if (helpOverlay.showing) { event.accepted = helpOverlay.handleKey(event); return }
             if (root.fullscreenShowing) {
-                if (fsViewer.handleKey(event))                             return true
-                if (event.text === "y")                                    { pasteSelected(); return true }
-                if (event.key === Qt.Key_Escape || event.text === "q")     { exitFullscreen(); return true }
-                return false
+                if (fsViewer.handleKey(event))                             { event.accepted = true; return }
+                if (event.text === "y")                                    { pasteSelected(); event.accepted = true; return }
+                if (event.key === Qt.Key_Escape || event.text === "q")     { exitFullscreen(); event.accepted = true; return }
+                return
             }
-            if (root.detailFocused) return preview.handleKey(event)
-            if (list.handleKey(event)) return true
-            if (event.text === "?") { openHelp(); return true }
-            return false
+            if (root.detailFocused) { event.accepted = preview.handleKey(event); return }
+            if (list.handleKey(event)) { event.accepted = true; return }
+            if (event.text === "?") { openHelp(); event.accepted = true; return }
         }
     }
 
@@ -196,7 +199,7 @@ ShellRoot {
                 id: normalModeHandler
                 anchors.fill: parent
 
-                Keys.onPressed: (event) => { if (functionality.handleKeyEvent(event)) event.accepted = true }
+                Keys.onPressed: (event) => functionality.handleKeyEvent(event)
             }
 
             // Footer (anchored to bottom)
@@ -254,7 +257,7 @@ ShellRoot {
                     onSearchEscapePressed: functionality.enterNormalMode()
                     onOpenDetail:          functionality.focusDetail()
                     onCloseRequested:      functionality.close()
-                    onYankEntryRequested:  (rawLine) => pasteEntry(rawLine)
+                    onYankEntryRequested:  (rawLine) => functionality.onYankEntryRequested(rawLine)
                 }
 
                 // Focus divider
@@ -276,8 +279,8 @@ ShellRoot {
 
                     onExitFocus:           functionality.unfocusDetail()
                     onFullscreenRequested: functionality.enterFullscreen()
-                    onYankEntryRequested:  (rawLine) => pasteEntry(rawLine)
-                    onYankTextRequested:   (text)    => yankText(text)
+                    onYankEntryRequested:  (rawLine) => functionality.onYankEntryRequested(rawLine)
+                    onYankTextRequested:   (text)    => functionality.onYankTextRequested(text)
                 }
 
                 // Fullscreen overlay (z:5, feeds from preview content)
@@ -305,7 +308,7 @@ ShellRoot {
                         fontFamily:         cfg.fontFamily
                         fontSize:           cfg.fontSize
 
-                        onYankTextRequested: (t) => root.yankText(t)
+                        onYankTextRequested: (t) => functionality.onYankTextRequested(t)
                     }
                 }
             }

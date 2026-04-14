@@ -38,7 +38,7 @@ Item {
     property string entry:   ""
     property bool   focused: false
 
-    onEntryChanged: refreshTimer.restart()
+    onEntryChanged: functionality.onEntryChanged()
 
     // ── Properties out ────────────────────────────────────────────────────────
     readonly property string text:        _text
@@ -142,20 +142,17 @@ Item {
         decodeProcess.running = true
     }
 
-    // ── Timers / Processes ────────────────────────────────────────────────────
-    Timer {
-        id: refreshTimer
-        interval: 120
-        repeat: false
-        onTriggered: preview._refresh()
-    }
-
-    Process {
-        id: decodeProcess
-        stdout: SplitParser {
-            onRead: (line) => { if (!preview._isImage) preview._lines.push(line) }
-        }
-        onExited: {
+    // ── Functionality ─────────────────────────────────────────────────────────
+    QtObject {
+        id: functionality
+        // ui only
+        function onEntryChanged(): void { refreshTimer.restart() }
+        // ui only
+        function onRefreshTimer(): void { preview._refresh() }
+        // ui only
+        function onDecodeRead(line: string): void { if (!preview._isImage) preview._lines.push(line) }
+        // ui only
+        function onDecodeExited(): void {
             if (preview._isImage) {
                 preview._imgSrc = "file://" + preview._imgPath
                 sizeProcess.command = [
@@ -168,20 +165,42 @@ Item {
                 preview._loading = false
             }
         }
+        // ui only
+        function onSizeRead(line: string): void {
+            const bytes = parseInt(line.trim())
+            if (isNaN(bytes)) return
+            if (bytes < 1024)         preview._imgSize = bytes + " B"
+            else if (bytes < 1048576) preview._imgSize = (bytes / 1024).toFixed(1) + " KB"
+            else                      preview._imgSize = (bytes / 1048576).toFixed(1) + " MB"
+        }
+        // ui only
+        function onSizeExited(): void { preview._loading = false }
+        // ui only
+        function onYankTextRequested(t: string): void { preview.yankTextRequested(t) }
+    }
+
+    // ── Timers / Processes ────────────────────────────────────────────────────
+    Timer {
+        id: refreshTimer
+        interval: 120
+        repeat: false
+        onTriggered: functionality.onRefreshTimer()
+    }
+
+    Process {
+        id: decodeProcess
+        stdout: SplitParser {
+            onRead: (line) => functionality.onDecodeRead(line)
+        }
+        onExited: functionality.onDecodeExited()
     }
 
     Process {
         id: sizeProcess
         stdout: SplitParser {
-            onRead: (line) => {
-                const bytes = parseInt(line.trim())
-                if (isNaN(bytes)) return
-                if (bytes < 1024)         preview._imgSize = bytes + " B"
-                else if (bytes < 1048576) preview._imgSize = (bytes / 1024).toFixed(1) + " KB"
-                else                      preview._imgSize = (bytes / 1048576).toFixed(1) + " MB"
-            }
+            onRead: (line) => functionality.onSizeRead(line)
         }
-        onExited: { preview._loading = false }
+        onExited: functionality.onSizeExited()
     }
 
     // ── UI ────────────────────────────────────────────────────────────────────
@@ -280,6 +299,6 @@ Item {
         fontFamily:         cfg.fontFamily
         fontSize:           cfg.fontSize
 
-        onYankTextRequested: (t) => preview.yankTextRequested(t)
+        onYankTextRequested: (t) => functionality.onYankTextRequested(t)
     }
 }

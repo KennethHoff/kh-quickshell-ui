@@ -93,14 +93,15 @@ ShellRoot {
         // ui only
         function onVisibleChanged(): void { if (root.showing) onShow() }
         // ui only
-        function handleKeyEvent(event): bool {
+        function onLaunchRequested(exec, terminal, workspace): void { root.launchApp(exec, terminal, workspace) }
+        // ui only
+        function handleKeyEvent(event): void {
             if (event.key === Qt.Key_Shift || event.key === Qt.Key_Control ||
-                event.key === Qt.Key_Alt   || event.key === Qt.Key_Meta) return false
-            if (helpOverlay.showing)        return helpOverlay.handleKey(event)
-            if (list.handleKey(event))      return true
-            if (event.text === "?")         { openHelp();        return true }
-            if (event.key === Qt.Key_Slash) { enterInsertMode(); return true }
-            return false
+                event.key === Qt.Key_Alt   || event.key === Qt.Key_Meta) return
+            if (helpOverlay.showing)        { event.accepted = helpOverlay.handleKey(event); return }
+            if (list.handleKey(event))      { event.accepted = true; return }
+            if (event.text === "?")         { openHelp();        event.accepted = true; return }
+            if (event.key === Qt.Key_Slash) { enterInsertMode(); event.accepted = true; return }
         }
     }
 
@@ -164,7 +165,7 @@ ShellRoot {
                 id: normalModeHandler
                 anchors.fill: parent
 
-                Keys.onPressed: (event) => { if (functionality.handleKeyEvent(event)) event.accepted = true }
+                Keys.onPressed: (event) => functionality.handleKeyEvent(event)
             }
 
             // Footer
@@ -205,7 +206,7 @@ ShellRoot {
 
                 onSearchEscapePressed: functionality.enterNormalMode()
                 onCloseRequested:      functionality.close()
-                onLaunchRequested:     (exec, terminal, workspace) => root.launchApp(exec, terminal, workspace)
+                onLaunchRequested:     (exec, terminal, workspace) => functionality.onLaunchRequested(exec, terminal, workspace)
             }
 
             // Help overlay

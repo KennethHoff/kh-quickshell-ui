@@ -28,21 +28,16 @@ ShellRoot {
     property bool _fullscreen:  false
     property bool _wrap:        true
 
-    Component.onCompleted: listProcess.running = true
+    Component.onCompleted: functionality.init()
 
     // ── Read path list from KH_VIEW_LIST ──────────────────────────────────────
     Process {
         id: listProcess
         command: [bin.bash, "-c", "cat -- \"$KH_VIEW_LIST\""]
         stdout: SplitParser {
-            onRead: (line) => { if (line.trim() !== "") root._listLines.push(line) }
+            onRead: (line) => functionality.onListRead(line)
         }
-        onExited: {
-            if (root._listLines.length === 0) { Qt.quit(); return }
-            root._paths     = root._listLines.slice()
-            root._listLines = []
-            root._ready     = true
-        }
+        onExited: functionality.onListExited()
     }
 
     // ── Functionality ─────────────────────────────────────────────────────────
@@ -79,16 +74,31 @@ ShellRoot {
             }
         }
         // ui only
-        function handleKeyEvent(event): bool {
+        function init(): void { listProcess.running = true }
+        // ui only
+        function onListRead(line: string): void { if (line.trim() !== "") root._listLines.push(line) }
+        // ui only
+        function onListExited(): void {
+            if (root._listLines.length === 0) { Qt.quit(); return }
+            root._paths     = root._listLines.slice()
+            root._listLines = []
+            root._ready     = true
+        }
+        // ui only
+        function onShow(): void { keyHandler.forceActiveFocus() }
+        // ui only
+        function onYankTextRequested(t: string): void { root._yank(t) }
+        // ui only
+        function handleKeyEvent(event): void {
             if (event.key === Qt.Key_Shift   || event.key === Qt.Key_Control ||
-                event.key === Qt.Key_Alt     || event.key === Qt.Key_Meta) return false
-            if (event.text === "q" || event.key === Qt.Key_Escape)            { quit();            return true }
-            if (event.text === "f" && root._paths.length > 1)                 { toggleFullscreen(); return true }
-            if (root._fullscreen && (event.key === Qt.Key_H || event.key === Qt.Key_Left))  { prev(); return true }
-            if (root._fullscreen && (event.key === Qt.Key_L || event.key === Qt.Key_Right)) { next(); return true }
-            if (!root._fullscreen && event.key === Qt.Key_Tab && root._paths.length > 1) { cyclePanes(); return true }
+                event.key === Qt.Key_Alt     || event.key === Qt.Key_Meta) return
+            if (event.text === "q" || event.key === Qt.Key_Escape)            { quit();             event.accepted = true; return }
+            if (event.text === "f" && root._paths.length > 1)                 { toggleFullscreen(); event.accepted = true; return }
+            if (root._fullscreen && (event.key === Qt.Key_H || event.key === Qt.Key_Left))  { prev(); event.accepted = true; return }
+            if (root._fullscreen && (event.key === Qt.Key_L || event.key === Qt.Key_Right)) { next(); event.accepted = true; return }
+            if (!root._fullscreen && event.key === Qt.Key_Tab && root._paths.length > 1) { cyclePanes(); event.accepted = true; return }
             const pane = paneRepeater.itemAt(root._focusedPane)
-            return pane ? pane.handleViewerKey(event) : false
+            if (pane) event.accepted = pane.handleViewerKey(event)
         }
     }
 
@@ -133,12 +143,12 @@ ShellRoot {
             id: keyHandler
             anchors.fill: parent
             focus: true
-            Component.onCompleted: forceActiveFocus()
+            Component.onCompleted: functionality.onShow()
 
             readonly property int _paneWidth: root._paths.length > 0
                 ? Math.floor(width / root._paths.length) : width
 
-            Keys.onPressed: (event) => { if (functionality.handleKeyEvent(event)) event.accepted = true }
+            Keys.onPressed: (event) => functionality.handleKeyEvent(event)
 
             Repeater {
                 id: paneRepeater
@@ -166,24 +176,34 @@ ShellRoot {
                     function handleViewerKey(event)      { return paneViewer.handleKey(event) }
                     function handleViewerIpcKey(k: string) { return paneViewer.handleIpcKey(k) }
 
-                    Component.onCompleted: {
-                        const ext = modelData.split(".").pop().toLowerCase()
-                        _isImage = ["png","jpg","jpeg","gif","webp","bmp","svg"].includes(ext)
-                        if (_isImage) { _imgSrc = "file://" + modelData; _loading = false }
-                        else           readProc.running = true
+                    QtObject {
+                        id: paneFunctionality
+                        // ui only
+                        function init(): void {
+                            const ext = pane.modelData.split(".").pop().toLowerCase()
+                            pane._isImage = ["png","jpg","jpeg","gif","webp","bmp","svg"].includes(ext)
+                            if (pane._isImage) { pane._imgSrc = "file://" + pane.modelData; pane._loading = false }
+                            else               readProc.running = true
+                        }
+                        // ui only
+                        function onReadLine(line: string): void { pane._lines.push(line) }
+                        // ui only
+                        function onReadExited(): void {
+                            pane._text    = pane._lines.join("\n")
+                            pane._lines   = []
+                            pane._loading = false
+                        }
                     }
+
+                    Component.onCompleted: paneFunctionality.init()
 
                     Process {
                         id: readProc
                         command: [bin.bash, "-c", "cat -- \"$1\"", "--", pane.modelData]
                         stdout: SplitParser {
-                            onRead: (line) => { pane._lines.push(line) }
+                            onRead: (line) => paneFunctionality.onReadLine(line)
                         }
-                        onExited: {
-                            pane._text    = pane._lines.join("\n")
-                            pane._lines   = []
-                            pane._loading = false
-                        }
+                        onExited: paneFunctionality.onReadExited()
                     }
 
                     // Divider on the left edge (split mode only, not first pane)
@@ -211,7 +231,7 @@ ShellRoot {
                         fontFamily:         cfg.fontFamily
                         fontSize:           cfg.fontSize
 
-                        onYankTextRequested: (t) => root._yank(t)
+                        onYankTextRequested: (t) => functionality.onYankTextRequested(t)
                     }
                 }
             }

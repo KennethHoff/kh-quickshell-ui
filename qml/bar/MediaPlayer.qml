@@ -28,15 +28,21 @@ BarWidget {
         function play(): void          { if (state.active && !state.player.isPlaying)   togglePlaying() }
         // ipc only
         function pause(): void         { if (state.active && state.player.isPlaying)    togglePlaying() }
+        // ipc only
+        function isPlaying(): bool     { return state.active && state.player.isPlaying }
+        // ipc only
+        function getTitle(): string    { return state.active ? (state.player.trackTitle  || "") : "" }
+        // ipc only
+        function getArtist(): string   { return state.active ? (state.player.trackArtist || "") : "" }
     }
 
     IpcHandler {
         target: "bar.media"
 
         function isActive(): bool      { return state.active }
-        function isPlaying(): bool     { return state.active && state.player.isPlaying }
-        function getTitle(): string    { return state.active ? (state.player.trackTitle  || "") : "" }
-        function getArtist(): string   { return state.active ? (state.player.trackArtist || "") : "" }
+        function isPlaying(): bool     { return functionality.isPlaying() }
+        function getTitle(): string    { return functionality.getTitle() }
+        function getArtist(): string   { return functionality.getArtist() }
         function togglePlaying(): void { functionality.togglePlaying() }
         function play(): void          { functionality.play() }
         function pause(): void         { functionality.pause() }

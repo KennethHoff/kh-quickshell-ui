@@ -87,6 +87,29 @@ Item {
     property string _path: ""
     property var    _buf:  []
 
+    QtObject {
+        id: functionality
+
+        // ui only
+        function onPathRead(line: string): void { if (line) store._path = line }
+        // ui only
+        function onPathExited(): void { if (store._path) readProcess.running = true }
+        // ui only
+        function onDataRead(line: string): void { if (line) store._buf.push(line) }
+        // ui only
+        function onDataExited(): void {
+            const v = {}
+            for (const line of store._buf) {
+                const tab = line.indexOf("\t")
+                if (tab > 0)
+                    v[line.substring(0, tab)] = line.substring(tab + 1)
+            }
+            store.values = v
+            store._buf   = []
+            store.loaded()
+        }
+    }
+
     function _write() {
         if (!_path || !bash) return
         const pairs = []
@@ -104,28 +127,18 @@ Item {
             '; mkdir -p "$(dirname "$f")"' +
             '; printf "%s\\n" "$f"']
         stdout: SplitParser {
-            onRead: (line) => { if (line) store._path = line }
+            onRead: (line) => functionality.onPathRead(line)
         }
-        onExited: { if (store._path) readProcess.running = true }
+        onExited: functionality.onPathExited()
     }
 
     Process {
         id: readProcess
         command: [store.bash, "-c", '[ -f "$1" ] && cat "$1" || true', "--", store._path]
         stdout: SplitParser {
-            onRead: (line) => { if (line) store._buf.push(line) }
+            onRead: (line) => functionality.onDataRead(line)
         }
-        onExited: {
-            const v = {}
-            for (const line of store._buf) {
-                const tab = line.indexOf("\t")
-                if (tab > 0)
-                    v[line.substring(0, tab)] = line.substring(tab + 1)
-            }
-            store.values = v
-            store._buf   = []
-            store.loaded()
-        }
+        onExited: functionality.onDataExited()
     }
 
     Process { id: writeProcess }

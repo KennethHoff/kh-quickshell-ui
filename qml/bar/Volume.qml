@@ -30,14 +30,22 @@ BarWidget {
         function setMuted(m: bool): void      { if (state.valid) state.sink.audio.muted = m }
         // ui+ipc
         function scrollVolume(up: bool): void { apply(state.vol + (up ? 0.05 : -0.05)) }
+        // ui only
+        function onWheel(angleDelta: real): void { scrollVolume(angleDelta > 0) }
+        // ipc only
+        function getVolume(): real { return state.valid ? Math.round(state.vol * 100) : 0 }
+        // ipc only
+        function setVolume(v: int): void { apply(v / 100.0) }
+        // ipc only
+        function adjustVolume(delta: int): void { apply(state.vol + delta / 100.0) }
     }
 
     IpcHandler {
         target: "bar.volume"
 
-        function getVolume(): real              { return state.valid ? Math.round(state.vol * 100) : 0 }
-        function setVolume(v: int): void        { functionality.apply(v / 100.0) }
-        function adjustVolume(delta: int): void { functionality.apply(state.vol + delta / 100.0) }
+        function getVolume(): real              { return functionality.getVolume() }
+        function setVolume(v: int): void        { functionality.setVolume(v) }
+        function adjustVolume(delta: int): void { functionality.adjustVolume(delta) }
         function isMuted(): bool                { return state.muted }
         function setMuted(muted: bool): void    { functionality.setMuted(muted) }
         function toggleMute(): void             { functionality.toggleMute() }
@@ -58,6 +66,6 @@ BarWidget {
         anchors.fill: parent
         acceptedButtons: Qt.LeftButton
         onClicked: functionality.toggleMute()
-        onWheel: wheel => functionality.scrollVolume(wheel.angleDelta.y > 0)
+        onWheel: wheel => functionality.onWheel(wheel.angleDelta.y)
     }
 }

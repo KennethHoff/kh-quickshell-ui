@@ -9,6 +9,28 @@ import Quickshell.Io
 ControlTile {
     NixConfig { id: _cfg }
 
+    QtObject {
+        id: functionality
+
+        // ui only
+        function onStreamFinished(text: string): void {
+            const lines = text.trim().split("\n")
+            const active = lines.find(l => {
+                const parts = l.split(":")
+                return parts[1] === "ethernet" && parts[2] === "connected"
+            })
+            if (active) {
+                _state.connected = true
+                _state.iface = active.split(":")[0]
+            } else {
+                _state.connected = false
+                _state.iface = ""
+            }
+        }
+        // ui only
+        function pollIfIdle(): void { if (!_proc.running) _proc.running = true }
+    }
+
     IpcHandler {
         target: "bar.ethernet"
         function isConnected(): bool { return _state.connected }
@@ -43,20 +65,7 @@ ControlTile {
         running: true
         command: ["nmcli", "-t", "-f", "DEVICE,TYPE,STATE", "dev"]
         stdout: StdioCollector {
-            onStreamFinished: {
-                const lines = text.trim().split("\n")
-                const active = lines.find(l => {
-                    const parts = l.split(":")
-                    return parts[1] === "ethernet" && parts[2] === "connected"
-                })
-                if (active) {
-                    _state.connected = true
-                    _state.iface = active.split(":")[0]
-                } else {
-                    _state.connected = false
-                    _state.iface = ""
-                }
-            }
+            onStreamFinished: functionality.onStreamFinished(text)
         }
     }
 
@@ -65,6 +74,6 @@ ControlTile {
         interval: 10000
         running: true
         repeat: true
-        onTriggered: if (!_proc.running) _proc.running = true
+        onTriggered: functionality.pollIfIdle()
     }
 }

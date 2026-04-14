@@ -25,31 +25,39 @@ BarWidget {
         // ui+ipc
         function activateWorkspace(ws): void { ws.activate() }
         // ui only
-        function hoverEnter(ws, btnX: real): void { state.pending = ws; state.btnX = btnX; timer.restart() }
+        function hoverEnter(ws, btn): void { state.pending = ws; state.btnX = btn.mapToItem(null, 0, 0).x; timer.restart() }
         // ui only
         function hoverExit(): void { timer.stop(); state.pending = null; state.preview = null }
-    }
-
-    IpcHandler {
-        target: "bar.workspaces"
-
+        // ui only
+        function applyPendingPreview(): void { state.preview = state.pending }
+        // ipc only
         function getFocused(): string {
             for (let i = 0; i < Hyprland.workspaces.values.length; i++)
                 if (Hyprland.workspaces.values[i].focused)
                     return Hyprland.workspaces.values[i].name
             return ""
         }
+        // ipc only
         function list(): string {
             const names = []
             for (let i = 0; i < Hyprland.workspaces.values.length; i++)
                 names.push(Hyprland.workspaces.values[i].name)
             return names.join("\n")
         }
+        // ipc only
         function switchTo(name: string): void {
             for (let i = 0; i < Hyprland.workspaces.values.length; i++)
                 if (Hyprland.workspaces.values[i].name === name)
-                    { functionality.activateWorkspace(Hyprland.workspaces.values[i]); return }
+                    { activateWorkspace(Hyprland.workspaces.values[i]); return }
         }
+    }
+
+    IpcHandler {
+        target: "bar.workspaces"
+
+        function getFocused(): string          { return functionality.getFocused() }
+        function list(): string                { return functionality.list() }
+        function switchTo(name: string): void  { functionality.switchTo(name) }
     }
 
     // 300 ms hover delay before the preview appears.
@@ -57,7 +65,7 @@ BarWidget {
         id: timer
         interval: 300
         repeat: false
-        onTriggered: state.preview = state.pending
+        onTriggered: functionality.applyPendingPreview()
     }
 
     implicitWidth: row.implicitWidth
@@ -98,7 +106,7 @@ BarWidget {
                     cursorShape: Qt.PointingHandCursor
                     onClicked: functionality.activateWorkspace(modelData)
                     // parent is the delegate Rectangle; map to bar-window coords.
-                    onEntered: functionality.hoverEnter(modelData, parent.mapToItem(null, 0, 0).x)
+                    onEntered: functionality.hoverEnter(modelData, parent)
                     onExited:  functionality.hoverExit()
                 }
             }

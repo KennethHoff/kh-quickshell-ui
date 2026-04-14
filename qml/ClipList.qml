@@ -476,9 +476,80 @@ Item {
         id: listProcess
         command: [bin.cliphist, "list"]
         stdout: SplitParser {
-            onRead: (line) => { if (line !== "") clipList._buf.push(line) }
+            onRead: (line) => functionality.onEntryRead(line)
         }
-        onExited: {
+        onExited: functionality.onEntriesLoaded()
+    }
+
+    Process {
+        id: fullTextDecodeProcess
+        stdout: SplitParser {
+            onRead: (line) => functionality.onFullTextRead(line)
+        }
+    }
+
+    Timer {
+        id: searchDebounce
+        interval: 80
+        repeat: false
+        onTriggered: functionality.runFilter()
+    }
+
+    Timer {
+        id: gTimer
+        interval: 300
+        repeat: false
+        onTriggered: functionality.clearPendingG()
+    }
+
+    Timer {
+        id: deleteAnimTimer
+        interval: 220
+        repeat: false
+        onTriggered: functionality.executePendingDelete()
+    }
+
+    Process { id: deleteProcess }
+
+    // ── Metadata store startup ────────────────────────────────────────────────
+    Component.onCompleted: functionality.init()
+
+    // ── Functionality ─────────────────────────────────────────────────────────
+    QtObject {
+        id: functionality
+
+        // ui only — search field text change
+        function onSearchTextChanged(): void { list.currentIndex = 0; searchDebounce.restart() }
+        // ui only — Esc in insert mode
+        function searchEscape(): void        { clipList._mode = "normal"; clipList.searchEscapePressed() }
+        // ui only — Ctrl+* emacs bindings in search field
+        function handleSearchCtrlKey(event): void {
+            if (!(event.modifiers & Qt.ControlModifier)) return
+            const pos = searchField.cursorPosition; const len = searchField.text.length
+            if      (event.key === Qt.Key_A) { searchField.cursorPosition = 0 }
+            else if (event.key === Qt.Key_E) { searchField.cursorPosition = len }
+            else if (event.key === Qt.Key_F) { searchField.cursorPosition = Math.min(len, pos + 1) }
+            else if (event.key === Qt.Key_B) { searchField.cursorPosition = Math.max(0, pos - 1) }
+            else if (event.key === Qt.Key_D) { if (pos < len) searchField.remove(pos, pos + 1) }
+            else if (event.key === Qt.Key_K) { if (pos < len) searchField.remove(pos, len) }
+            else if (event.key === Qt.Key_W) {
+                let i = pos
+                while (i > 0 && searchField.text[i - 1] === " ") i--
+                while (i > 0 && searchField.text[i - 1] !== " ") i--
+                if (i !== pos) searchField.remove(i, pos)
+            }
+            else if (event.key === Qt.Key_U) { if (pos > 0) searchField.remove(0, pos) }
+            else return
+            event.accepted = true
+        }
+        // ui only — clamp list currentIndex on model count change
+        function clampListIndex(): void { if (list.count > 0 && list.currentIndex < 0) list.currentIndex = 0 }
+        // ui only — initialise metadata stores on startup
+        function init(): void { pinStore.load(); tsStore.load() }
+        // ui only — accumulate one line from the clipboard list process
+        function onEntryRead(line: string): void { if (line !== "") clipList._buf.push(line) }
+        // ui only — parse buffered entries and rebuild the processed list
+        function onEntriesLoaded(): void {
             clipList.allEntries = clipList._buf.slice()
             clipList._buf = []
             const processed = [], idx = {}
@@ -503,85 +574,25 @@ Item {
 
             fullTextDecodeProcess.exec([bin.cliphistDecodeAll])
         }
-    }
-
-    Process {
-        id: fullTextDecodeProcess
-        stdout: SplitParser {
-            onRead: (line) => {
-                const tab = line.indexOf("\t")
-                if (tab < 0) return
-                const id = line.substring(0, tab)
-                try {
-                    const fullText = JSON.parse(line.substring(tab + 1))
-                    const i = clipList._processedIdx[id]
-                    if (i !== undefined)
-                        clipList._processed[i].haystack = fullText.toLowerCase().replace(/\s+/g, "")
-                    searchDebounce.restart()
-                } catch (_) {}
-            }
+        // ui only — handle one decoded full-text line
+        function onFullTextRead(line: string): void {
+            const tab = line.indexOf("\t")
+            if (tab < 0) return
+            const id = line.substring(0, tab)
+            try {
+                const fullText = JSON.parse(line.substring(tab + 1))
+                const i = clipList._processedIdx[id]
+                if (i !== undefined)
+                    clipList._processed[i].haystack = fullText.toLowerCase().replace(/\s+/g, "")
+                searchDebounce.restart()
+            } catch (_) {}
         }
-    }
-
-    Timer {
-        id: searchDebounce
-        interval: 80
-        repeat: false
-        onTriggered: clipList._runFilter()
-    }
-
-    Timer {
-        id: gTimer
-        interval: 300
-        repeat: false
-        onTriggered: clipList._pendingG = false
-    }
-
-    Timer {
-        id: deleteAnimTimer
-        interval: 220
-        repeat: false
-        onTriggered: clipList._executePendingDelete()
-    }
-
-    Process { id: deleteProcess }
-
-    // ── Metadata store startup ────────────────────────────────────────────────
-    Component.onCompleted: {
-        pinStore.load()
-        tsStore.load()
-    }
-
-    // ── Functionality ─────────────────────────────────────────────────────────
-    QtObject {
-        id: functionality
-
-        // ui only — search field text change
-        function onSearchTextChanged(): void { list.currentIndex = 0; searchDebounce.restart() }
-        // ui only — Esc in insert mode
-        function searchEscape(): void        { clipList._mode = "normal"; clipList.searchEscapePressed() }
-        // ui only — Ctrl+* emacs bindings in search field
-        function handleSearchCtrlKey(event): bool {
-            if (!(event.modifiers & Qt.ControlModifier)) return false
-            const pos = searchField.cursorPosition; const len = searchField.text.length
-            if      (event.key === Qt.Key_A) { searchField.cursorPosition = 0 }
-            else if (event.key === Qt.Key_E) { searchField.cursorPosition = len }
-            else if (event.key === Qt.Key_F) { searchField.cursorPosition = Math.min(len, pos + 1) }
-            else if (event.key === Qt.Key_B) { searchField.cursorPosition = Math.max(0, pos - 1) }
-            else if (event.key === Qt.Key_D) { if (pos < len) searchField.remove(pos, pos + 1) }
-            else if (event.key === Qt.Key_K) { if (pos < len) searchField.remove(pos, len) }
-            else if (event.key === Qt.Key_W) {
-                let i = pos
-                while (i > 0 && searchField.text[i - 1] === " ") i--
-                while (i > 0 && searchField.text[i - 1] !== " ") i--
-                if (i !== pos) searchField.remove(i, pos)
-            }
-            else if (event.key === Qt.Key_U) { if (pos > 0) searchField.remove(0, pos) }
-            else return false
-            return true
-        }
-        // ui only — clamp list currentIndex on model count change
-        function clampListIndex(): void { if (list.count > 0 && list.currentIndex < 0) list.currentIndex = 0 }
+        // ui only — run the filter (called by debounce timer)
+        function runFilter(): void { clipList._runFilter() }
+        // ui only — clear the pending-G double-tap flag
+        function clearPendingG(): void { clipList._pendingG = false }
+        // ui only — commit the pending delete after animation
+        function executePendingDelete(): void { clipList._executePendingDelete() }
     }
 
     // ── UI ────────────────────────────────────────────────────────────────────
@@ -644,7 +655,7 @@ Item {
 
                 onTextChanged:        functionality.onSearchTextChanged()
                 Keys.onEscapePressed: functionality.searchEscape()
-                Keys.onPressed: (event) => { if (functionality.handleSearchCtrlKey(event)) event.accepted = true }
+                Keys.onPressed: (event) => functionality.handleSearchCtrlKey(event)
             }
         }
 
@@ -682,6 +693,26 @@ Item {
                 readonly property string entryId:   clipEntry.entryId(modelData)
                 readonly property string tmpPath:   "/tmp/kh-cliphist-" + entryId
 
+                QtObject {
+                    id: clipDelegateFunctionality
+                    // ui only
+                    function init(): void { if (delegateRoot.isImage) imgDecode.running = true }
+                    // ui only
+                    function onImgDecodeExited(): void { imgThumb.source = "file://" + delegateRoot.tmpPath }
+                    // ui only
+                    function onFlashRequested(idx: int): void {
+                        if (idx === delegateRoot.index) blinkAnim.restart()
+                    }
+                    // ui only
+                    function onDeleteAnimRequested(idx: int): void {
+                        if (idx === delegateRoot.index) fadeOutAnim.start()
+                    }
+                    // ui only
+                    function onDeleteRangeAnimRequested(lo: int, hi: int): void {
+                        if (delegateRoot.index >= lo && delegateRoot.index <= hi) fadeOutAnim.start()
+                    }
+                }
+
                 Process {
                     id: imgDecode
                     command: [
@@ -689,9 +720,9 @@ Item {
                         "[ -f \"$1\" ] || printf '%s\\n' \"$2\" | " + bin.cliphist + " decode > \"$1\"",
                         "--", delegateRoot.tmpPath, delegateRoot.modelData
                     ]
-                    onExited: imgThumb.source = "file://" + delegateRoot.tmpPath
+                    onExited: clipDelegateFunctionality.onImgDecodeExited()
                 }
-                Component.onCompleted: { if (isImage) imgDecode.running = true }
+                Component.onCompleted: clipDelegateFunctionality.init()
 
                 Rectangle {
                     anchors.fill: parent
@@ -777,15 +808,9 @@ Item {
 
                     Connections {
                         target: clipList
-                        function onFlashRequested(idx) {
-                            if (idx === delegateRoot.index) blinkAnim.restart()
-                        }
-                        function onDeleteAnimRequested(idx) {
-                            if (idx === delegateRoot.index) fadeOutAnim.start()
-                        }
-                        function onDeleteRangeAnimRequested(lo, hi) {
-                            if (delegateRoot.index >= lo && delegateRoot.index <= hi) fadeOutAnim.start()
-                        }
+                        function onFlashRequested(idx) { clipDelegateFunctionality.onFlashRequested(idx) }
+                        function onDeleteAnimRequested(idx) { clipDelegateFunctionality.onDeleteAnimRequested(idx) }
+                        function onDeleteRangeAnimRequested(lo, hi) { clipDelegateFunctionality.onDeleteRangeAnimRequested(lo, hi) }
                     }
                 }
 

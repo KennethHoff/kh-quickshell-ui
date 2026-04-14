@@ -21,6 +21,12 @@ Rectangle {
 
     signal tileClicked()
 
+    QtObject {
+        id: functionality
+        // ui only
+        function click(): void { root.tileClicked() }
+    }
+
     implicitWidth:  90
     implicitHeight: 44
     radius: 8
@@ -53,6 +59,6 @@ Rectangle {
 
     MouseArea {
         anchors.fill: parent
-        onClicked: root.tileClicked()
+        onClicked: functionality.click()
     }
 }

@@ -13,29 +13,38 @@ BarWidget {
         property var    peers:     []
     }
 
+    QtObject {
+        id: functionality
+
+        // ui only
+        function onStreamFinished(text: string): void {
+            try {
+                const d         = JSON.parse(text)
+                state.connected = (d.BackendState === "Running")
+                state.selfIp    = (d.TailscaleIPs ?? [])[0] ?? ""
+                const peerMap   = d.Peer ?? {}
+                state.peers = Object.values(peerMap)
+                    .map(p => ({
+                        hostname: p.HostName  ?? "",
+                        ip:       (p.TailscaleIPs ?? [])[0] ?? "",
+                        online:   p.Online ?? false,
+                    }))
+                    .sort((a, b) => Number(b.online) - Number(a.online))
+            } catch (_) {
+                state.connected = false
+                state.peers     = []
+            }
+        }
+        // ui only
+        function pollIfIdle(): void { if (!proc.running) proc.running = true }
+    }
+
     Process {
         id: proc
         running: true
         command: ["tailscale", "status", "--json"]
         stdout: StdioCollector {
-            onStreamFinished: {
-                try {
-                    const d         = JSON.parse(text)
-                    state.connected = (d.BackendState === "Running")
-                    state.selfIp    = (d.TailscaleIPs ?? [])[0] ?? ""
-                    const peerMap   = d.Peer ?? {}
-                    state.peers = Object.values(peerMap)
-                        .map(p => ({
-                            hostname: p.HostName  ?? "",
-                            ip:       (p.TailscaleIPs ?? [])[0] ?? "",
-                            online:   p.Online ?? false,
-                        }))
-                        .sort((a, b) => Number(b.online) - Number(a.online))
-                } catch (_) {
-                    state.connected = false
-                    state.peers     = []
-                }
-            }
+            onStreamFinished: functionality.onStreamFinished(text)
         }
     }
 
@@ -44,7 +53,7 @@ BarWidget {
         interval: 10000
         running: true
         repeat: true
-        onTriggered: if (!proc.running) proc.running = true
+        onTriggered: functionality.pollIfIdle()
     }
 
     implicitWidth: dropdown.implicitWidth
