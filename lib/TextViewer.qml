@@ -180,6 +180,28 @@ Item {
         return false   // y, Esc, Enter, Tab — caller's responsibility
     }
 
+    // IPC-friendly key handler — accepts a string key name and delegates to
+    // handleKey via a synthetic event object. Covers all keys handleKey handles
+    // plus ctrl+d / ctrl+u / G / gg for scroll/jump.
+    function handleIpcKey(k: string): bool {
+        const lk = k.toLowerCase()
+        const ctrl = lk.startsWith("ctrl+")
+        const bare = ctrl ? lk.slice(5) : lk
+        const keyMap = {
+            "j": Qt.Key_J,  "down":  Qt.Key_Down,
+            "k": Qt.Key_K,  "up":    Qt.Key_Up,
+            "h": Qt.Key_H,  "left":  Qt.Key_Left,
+            "l": Qt.Key_L,  "right": Qt.Key_Right,
+            "d": Qt.Key_D,  "u":     Qt.Key_U,
+            "g": Qt.Key_G,  "v":     Qt.Key_V,
+        }
+        const qtKey = keyMap[bare] ?? 0
+        const mods  = ctrl ? Qt.ControlModifier
+                    : (k === "G" || k === "V") ? Qt.ShiftModifier
+                    : Qt.NoModifier
+        return handleKey({ key: qtKey, text: k === k.toUpperCase() ? k : lk, modifiers: mods })
+    }
+
     // Reset to top with no selection. Call when the displayed content changes.
     function reset() {
         _visualMode = ""
