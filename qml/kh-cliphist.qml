@@ -44,7 +44,75 @@ ShellRoot {
 
     Process { id: pasteProcess }
     Process { id: yankTextProcess }
-    Timer   { id: closeTimer; interval: 200; onTriggered: root.showing = false }
+    Timer   { id: closeTimer; interval: 200; onTriggered: root.core_close() }
+
+    // ── Core actions ──────────────────────────────────────────────────────────
+    function core_toggle(): void              { showing = !showing }
+    function core_open(): void                { showing = true }
+    function core_close(): void               { showing = false }
+    function core_enterInsertMode(): void     { list.enterInsertMode() }
+    function core_enterNormalMode(): void     { list.enterNormalMode(); normalModeHandler.forceActiveFocus() }
+    function core_setMode(m: string): void    { if (m === "insert") core_enterInsertMode(); else core_enterNormalMode() }
+    function core_openHelp(): void            { helpOverlay.open() }
+    function core_closeHelp(): void           { helpOverlay.close() }
+    function core_toggleHelp(): void          { helpOverlay.showing ? helpOverlay.close() : helpOverlay.open() }
+    function core_focusDetail(): void         { detailFocused = true }
+    function core_unfocusDetail(): void       { detailFocused = false; normalModeHandler.forceActiveFocus() }
+    function core_enterFullscreen(): void     { fullscreenShowing = true; fsViewer.reset() }
+    function core_exitFullscreen(): void      { fullscreenShowing = false; fsViewer.reset() }
+    function core_pasteSelected(): void       { if (list.selectedEntry !== "") { list.flash(list.selectedIndex); pasteEntry(list.selectedEntry) } }
+    function core_nav(dir: string): void      { list.nav(dir) }
+    function core_setView(v: string): void {
+        if      (v === "help")       core_openHelp()
+        else if (v === "list")       core_closeHelp()
+        else if (v === "fullscreen") core_enterFullscreen()
+    }
+    function core_type(text: string): void {
+        if (helpOverlay.showing) { helpOverlay._filtering = true; helpOverlay._filterText += text }
+        else                     list.typeText(text)
+    }
+    function core_key(k: string): void {
+        const lk = k.toLowerCase()
+        if      (lk === "?")                       core_toggleHelp()
+        else if (lk === "/" && helpOverlay.showing) { helpOverlay._filtering = true; helpOverlay._filterText = "" }
+        else if (lk === "escape" || lk === "esc") {
+            if      (helpOverlay.showing)    core_closeHelp()
+            else if (fullscreenShowing)      core_exitFullscreen()
+            else if (detailFocused)          core_unfocusDetail()
+            else                             list.handleIpcKey(k)
+        }
+        else if (lk === "enter" || lk === "return") {
+            if (detailFocused && !fullscreenShowing) core_enterFullscreen()
+        }
+        else if (lk === "tab") {
+            if      (!detailFocused && !fullscreenShowing) core_focusDetail()
+            else if (detailFocused)                        core_unfocusDetail()
+        }
+        else if (lk === "y") {
+            if (list._confirmingDelete) list.handleIpcKey(k)
+            else                        core_pasteSelected()
+        }
+        else if (lk === "v") {
+            if (fullscreenShowing || detailFocused) preview.handleIpcKey(k)
+            else                                    list.handleIpcKey(k)
+        }
+        else list.handleIpcKey(k)
+    }
+    function core_handleKeyEvent(event): bool {
+        if (event.key === Qt.Key_Shift || event.key === Qt.Key_Control ||
+            event.key === Qt.Key_Alt   || event.key === Qt.Key_Meta) return false
+        if (helpOverlay.showing) return helpOverlay.handleKey(event)
+        if (fullscreenShowing) {
+            if (fsViewer.handleKey(event))                  return true
+            if (event.text === "y")                         { core_pasteSelected(); return true }
+            if (event.key === Qt.Key_Escape || event.text === "q") { core_exitFullscreen(); return true }
+            return false
+        }
+        if (detailFocused) return preview.handleKey(event)
+        if (list.handleKey(event)) return true
+        if (event.text === "?") { core_openHelp(); return true }
+        return false
+    }
 
     // ── IPC ───────────────────────────────────────────────────────────────────
     IpcHandler {
@@ -52,53 +120,14 @@ ShellRoot {
         readonly property bool   showing: root.showing
         readonly property string mode:    list.mode
 
-        function toggle()           { root.showing = !root.showing }
-        function setMode(m: string) {
-            if (m === "insert") { list.enterInsertMode() }
-            else { list.enterNormalMode(); normalModeHandler.forceActiveFocus() }
-        }
-        function setView(v: string) {
-            if (v === "help")            helpOverlay.open()
-            else if (v === "list")       helpOverlay.close()
-            else if (v === "fullscreen") { root.fullscreenShowing = true; fsViewer.reset() }
-        }
-        function nav(dir: string) { list.nav(dir) }
-        function key(k: string) {
-            const lk = k.toLowerCase()
-            if (lk === "?") {
-                helpOverlay.showing ? helpOverlay.close() : helpOverlay.open()
-            } else if (lk === "/" && helpOverlay.showing) {
-                helpOverlay._filtering = true; helpOverlay._filterText = ""
-            } else if (lk === "escape" || lk === "esc") {
-                if      (helpOverlay.showing)     helpOverlay.close()
-                else if (root.fullscreenShowing)  { root.fullscreenShowing = false; fsViewer.reset() }
-                else if (root.detailFocused)      { root.detailFocused = false; normalModeHandler.forceActiveFocus() }
-                else                              list.handleIpcKey(k)
-            } else if (lk === "enter" || lk === "return") {
-                if (root.detailFocused && !root.fullscreenShowing)
-                    { root.fullscreenShowing = true; fsViewer.reset() }
-            } else if (lk === "tab") {
-                if (!root.detailFocused && !root.fullscreenShowing)
-                    { root.detailFocused = true }
-                else if (root.detailFocused)
-                    { root.detailFocused = false; normalModeHandler.forceActiveFocus() }
-            } else if (lk === "y") {
-                if (list._confirmingDelete) { list.handleIpcKey(k) }
-                else if (list.selectedEntry !== "")
-                    { list.flash(list.selectedIndex); pasteEntry(list.selectedEntry) }
-            } else if (lk === "v") {
-                if (root.fullscreenShowing || root.detailFocused) preview.handleIpcKey(k)
-                else list.handleIpcKey(k)
-            } else {
-                list.handleIpcKey(k)
-            }
-        }
-        function type(text: string) {
-            if (helpOverlay.showing)
-                { helpOverlay._filtering = true; helpOverlay._filterText += text }
-            else
-                list.typeText(text)
-        }
+        function toggle(): void           { root.core_toggle() }
+        function open(): void             { root.core_open() }
+        function close(): void            { root.core_close() }
+        function setMode(m: string): void { root.core_setMode(m) }
+        function setView(v: string): void { root.core_setView(v) }
+        function nav(dir: string): void   { root.core_nav(dir) }
+        function key(k: string): void     { root.core_key(k) }
+        function type(text: string): void { root.core_type(text) }
     }
 
     // ── Window ────────────────────────────────────────────────────────────────
@@ -127,7 +156,7 @@ ShellRoot {
         Rectangle {
             anchors.fill: parent
             color: "#99000000"
-            MouseArea { anchors.fill: parent; onClicked: root.showing = false }
+            MouseArea { anchors.fill: parent; onClicked: root.core_close() }
         }
 
         // Panel
@@ -149,36 +178,7 @@ ShellRoot {
                 id: normalModeHandler
                 anchors.fill: parent
 
-                Keys.onPressed: (event) => {
-                    if (event.key === Qt.Key_Shift || event.key === Qt.Key_Control ||
-                        event.key === Qt.Key_Alt   || event.key === Qt.Key_Meta) return
-
-                    if (helpOverlay.showing) {
-                        if (helpOverlay.handleKey(event)) event.accepted = true
-                        return
-                    }
-                    if (root.fullscreenShowing) {
-                        if (fsViewer.handleKey(event)) {
-                            event.accepted = true
-                        } else if (event.text === "y") {
-                            if (list.selectedEntry !== "")
-                                { list.flash(list.selectedIndex); pasteEntry(list.selectedEntry) }
-                            event.accepted = true
-                        } else if (event.key === Qt.Key_Escape || event.text === "q") {
-                            root.fullscreenShowing = false; fsViewer.reset(); event.accepted = true
-                        }
-                        return
-                    }
-                    if (root.detailFocused) {
-                        if (preview.handleKey(event)) event.accepted = true
-                        return
-                    }
-                    if (list.handleKey(event)) {
-                        event.accepted = true
-                    } else if (event.text === "?") {
-                        helpOverlay.open(); event.accepted = true
-                    }
-                }
+                Keys.onPressed: (event) => { if (root.core_handleKeyEvent(event)) event.accepted = true }
             }
 
             // Footer (anchored to bottom)
@@ -233,9 +233,9 @@ ShellRoot {
                     width: Math.round(parent.width * 0.4)
                     height: parent.height
 
-                    onSearchEscapePressed: { enterNormalMode(); normalModeHandler.forceActiveFocus() }
-                    onOpenDetail:          root.detailFocused = true
-                    onCloseRequested:      root.showing = false
+                    onSearchEscapePressed: root.core_enterNormalMode()
+                    onOpenDetail:          root.core_focusDetail()
+                    onCloseRequested:      root.core_close()
                     onYankEntryRequested:  (rawLine) => pasteEntry(rawLine)
                 }
 
@@ -256,8 +256,8 @@ ShellRoot {
                     entry:   list.selectedEntry
                     focused: root.detailFocused
 
-                    onExitFocus:           { root.detailFocused = false; normalModeHandler.forceActiveFocus() }
-                    onFullscreenRequested: { root.fullscreenShowing = true; fsViewer.reset() }
+                    onExitFocus:           root.core_unfocusDetail()
+                    onFullscreenRequested: root.core_enterFullscreen()
                     onYankEntryRequested:  (rawLine) => pasteEntry(rawLine)
                     onYankTextRequested:   (text)    => yankText(text)
                 }
