@@ -137,9 +137,12 @@ BarPlugin {
         // Dimensions: 240 px wide, aspect-matched to the workspace's monitor.
         // Monitor width/height are physical pixels; divide by scale to get
         // logical pixels, which is the coordinate space used by lastIpcObject.
-        readonly property real mon_scale: state.preview?.monitor?.scale ?? 1
-        readonly property real mon_w: (state.preview?.monitor?.width  ?? 1920) / mon_scale
-        readonly property real mon_h: (state.preview?.monitor?.height ?? 1080) / mon_scale
+        // Look up the monitor via Hyprland.monitors rather than workspace.monitor:
+        // workspace.monitor is only set while it is the active workspace on a monitor.
+        readonly property var mon: Hyprland.monitors.values.find(m => m.activeWorkspace === state.preview)
+        readonly property real mon_scale: mon?.scale ?? 1
+        readonly property real mon_w: (mon?.width  ?? 1920) / mon_scale
+        readonly property real mon_h: (mon?.height ?? 1080) / mon_scale
         readonly property real scale: 240 / mon_w
 
         implicitWidth:  240
@@ -163,10 +166,10 @@ BarPlugin {
                 delegate: Item {
                     readonly property var ipc: modelData.lastIpcObject
                     x: ipc && ipc.at
-                        ? Math.round((ipc.at[0] - (state.preview?.monitor?.x ?? 0)) * panel.scale)
+                        ? Math.round((ipc.at[0] - (panel.mon?.x ?? 0)) * panel.scale)
                         : 0
                     y: ipc && ipc.at
-                        ? Math.round((ipc.at[1] - (state.preview?.monitor?.y ?? 0)) * panel.scale)
+                        ? Math.round((ipc.at[1] - (panel.mon?.y ?? 0)) * panel.scale)
                         : 0
                     width:  ipc && ipc.size ? Math.round(ipc.size[0] * panel.scale) : 0
                     height: ipc && ipc.size ? Math.round(ipc.size[1] * panel.scale) : 0
