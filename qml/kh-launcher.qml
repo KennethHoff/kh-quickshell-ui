@@ -48,6 +48,12 @@ ShellRoot {
         readonly property var    actions:     list._actions
 
         function toggle()           { root.showing = !root.showing }
+        function launch(): void {
+            if (list.selectedApp) root.launchApp(list.selectedApp.exec, list.selectedApp.terminal, 0)
+        }
+        function launchOnWorkspace(n: int): void {
+            if (list.selectedApp) root.launchApp(list.selectedApp.exec, list.selectedApp.terminal, n)
+        }
         function enterActionsMode() { list.enterActionsMode() }
         function setMode(m: string) {
             if (m === "insert") { list.enterInsertMode() }
