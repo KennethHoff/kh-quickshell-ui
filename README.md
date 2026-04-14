@@ -62,6 +62,7 @@ programs.kh-ui = {
   bar.enable = false;                # disable kh-bar
   launcher.enable = false;           # disable kh-launcher
   clipboard-history.enable = false;  # disable kh-cliphist
+  view.enable = false;               # disable kh-view
 };
 ```
 

@@ -73,6 +73,12 @@ in
       description = "Enable the application launcher (kh-launcher).";
     };
 
+    view.enable = lib.mkOption {
+      type = lib.types.bool;
+      default = true;
+      description = "Enable the file/image viewer (kh-view).";
+    };
+
     bar = {
       enable = lib.mkOption {
         type = lib.types.bool;
@@ -164,8 +170,33 @@ in
               name = "launcher";
               extraBins = { scanApps = toString scanAppsScript; };
             };
+          } //
+          lib.optionalAttrs config.programs.kh-ui.view.enable {
+            kh-view = mkAppConfig { name = "view"; };
           };
       };
+
+      home.packages =
+        lib.optionals config.programs.kh-ui.clipboard-history.enable [
+          (pkgs.writeShellScriptBin "kh-cliphist" ''
+            exec ${lib.getExe pkgs.quickshell} -c kh-cliphist "$@"
+          '')
+        ] ++
+        lib.optionals config.programs.kh-ui.launcher.enable [
+          (pkgs.writeShellScriptBin "kh-launcher" ''
+            exec ${lib.getExe pkgs.quickshell} -c kh-launcher "$@"
+          '')
+        ] ++
+        lib.optionals config.programs.kh-ui.bar.enable [
+          (pkgs.writeShellScriptBin "kh-bar" ''
+            exec ${lib.getExe pkgs.quickshell} -c kh-bar "$@"
+          '')
+        ] ++
+        lib.optionals config.programs.kh-ui.view.enable [
+          (pkgs.writeShellScriptBin "kh-view" ''
+            exec ${lib.getExe pkgs.quickshell} -c kh-view "$@"
+          '')
+        ];
     })
 
     (lib.mkIf (config.programs.kh-ui.enable && config.wayland.windowManager.hyprland.enable) {
