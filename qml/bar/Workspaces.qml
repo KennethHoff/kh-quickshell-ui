@@ -4,6 +4,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Hyprland
+import Quickshell.Io
 import Quickshell.Wayland
 
 BarWidget {
@@ -16,6 +17,37 @@ BarWidget {
         property var  preview: null  // HyprlandWorkspace currently shown
         property var  pending: null  // workspace queued during hover delay
         property real btnX:   0      // button x for popup x-centering
+    }
+
+    IpcHandler {
+        target: "bar.workspaces"
+
+        // Returns the name of the currently focused workspace.
+        function getFocused(): string {
+            for (let i = 0; i < Hyprland.workspaces.values.length; i++) {
+                if (Hyprland.workspaces.values[i].focused)
+                    return Hyprland.workspaces.values[i].name
+            }
+            return ""
+        }
+
+        // Returns a newline-separated list of all workspace names.
+        function list(): string {
+            const names = []
+            for (let i = 0; i < Hyprland.workspaces.values.length; i++)
+                names.push(Hyprland.workspaces.values[i].name)
+            return names.join("\n")
+        }
+
+        // Switch to the workspace with the given name.
+        function switchTo(name: string): void {
+            for (let i = 0; i < Hyprland.workspaces.values.length; i++) {
+                if (Hyprland.workspaces.values[i].name === name) {
+                    Hyprland.workspaces.values[i].activate()
+                    return
+                }
+            }
+        }
     }
 
     // 300 ms hover delay before the preview appears.

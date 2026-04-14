@@ -21,8 +21,13 @@
 //   }
 //
 // barWindow and barHeight are read automatically from the plugin wrapper.
+//
+// Set ipcName to expose this dropdown via IPC as target "bar.<ipcName>":
+//   qs ipc call bar.controlcenter toggle
+//   qs ipc call bar.controlcenter isOpen
 import QtQuick
 import Quickshell
+import Quickshell.Io
 
 Item {
     id: root
@@ -40,6 +45,20 @@ Item {
 
     // Toggle — set to true to show the panel.
     property bool open: false
+
+    // Optional IPC name. When set, this dropdown is reachable as target
+    // "bar.<ipcName>" — e.g. `qs ipc call bar.controlcenter toggle`.
+    property string ipcName: ""
+
+    IpcHandler {
+        target: "bar." + root.ipcName
+        enabled: root.ipcName !== ""
+
+        function toggle(): void  { root.open = !root.open }
+        function open(): void    { root.open = true }
+        function close(): void   { root.open = false }
+        function isOpen(): bool  { return root.open }
+    }
 
     // Children of BarDropdown are placed into the popup content column.
     default property alias content: col.data

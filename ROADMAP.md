@@ -78,7 +78,9 @@ A full status bar built in Quickshell, replacing Waybar.
 - ✅ Workspace preview — hovering a workspace button for 300 ms renders a thumbnail popup; composites per-window `ScreencopyView` captures at Hyprland IPC positions scaled to 240 px wide; disappears on mouse leave; workspace name badge in corner
 - ✅ Clock — live HH:mm display, updates every second
 - ✅ Plugin system — plugins are authored as `.qml` files and wired in via Nix (`structure`/`extraPluginDirs`); `BarRow` + `BarSpacer` replace `BarLeft`/`BarRight` for flexible space-between layout; built at eval time so no runtime module import is needed
-- ⬜ IPC support — expose a `bar` IPC target so plugins (or external scripts) can query or mutate bar state; useful for things like toggling a dropdown panel from a keybind
+- ✅ IPC support — each plugin exposes its own IPC target (`bar.volume`, `bar.media`, `bar.workspaces`); dropdowns with `ipcName` set expose `bar.<name>` with `toggle`/`open`/`close`/`isOpen`
+- ⬜ Hierarchical IPC prefix — add `ipcPrefix` to `BarWidget` propagated through the parent chain (same mechanism as `barHeight`/`barWindow`); each container appends its segment so a plugin automatically gets a target like `bar1.grouping1.tailscale` without manually specifying it; the root prefix comes from the bar's Nix config entry (e.g. `Bar { ipcName: "top" }`); implement before multi-bar support
+- ⬜ Multi-bar support — allow N bars at arbitrary screen edges (top, bottom, left, right); `mkBarConfig` accepts a list of `{ edge, structure }` entries; each bar gets its own `PanelWindow` and generated `BarLayout`; `BarDropdown` opens its popup toward the screen interior so it works on any edge
 - ⬜ Active window title — display the focused window's app name and title
 - ✅ Audio controls — volume level (scroll to adjust) and mute toggle (click) via PipeWire; hidden when no sink is available
 - ✅ MPRIS media controls — prev/play-pause/next buttons + artist/title display; shows first active player, hidden when none

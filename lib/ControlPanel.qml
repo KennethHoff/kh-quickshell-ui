@@ -19,4 +19,5 @@ import QtQuick
 BarDropdown {
     label:      "●●●"
     panelWidth: 300
+    ipcName:    "controlcenter"
 }

@@ -2,6 +2,7 @@
 // Shows track title + artist for the first active player, with
 // prev/play-pause/next buttons. Hidden entirely when no player is active.
 import QtQuick
+import Quickshell.Io
 import Quickshell.Services.Mpris
 
 BarWidget {
@@ -12,6 +13,20 @@ BarWidget {
         id: state
         readonly property var  player: Mpris.players.values[0] ?? null
         readonly property bool active: player !== null
+    }
+
+    IpcHandler {
+        target: "bar.media"
+
+        function isActive(): bool    { return state.active }
+        function isPlaying(): bool   { return state.active && state.player.isPlaying }
+        function getTitle(): string  { return state.active ? (state.player.trackTitle  || "") : "" }
+        function getArtist(): string { return state.active ? (state.player.trackArtist || "") : "" }
+        function togglePlaying(): void { if (state.active && state.player.canControl) state.player.togglePlaying() }
+        function play(): void  { if (state.active && state.player.canControl && !state.player.isPlaying) state.player.togglePlaying() }
+        function pause(): void { if (state.active && state.player.canControl && state.player.isPlaying)  state.player.togglePlaying() }
+        function next(): void  { if (state.active && state.player.canGoNext)     state.player.next() }
+        function prev(): void  { if (state.active && state.player.canGoPrevious) state.player.previous() }
     }
 
     implicitWidth: state.active ? row.implicitWidth + 16 : 0
