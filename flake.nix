@@ -215,12 +215,18 @@
                 sleep 1.5
               fi
               for call in "$@"; do
-                local fn="''${call%% *}"
-                if [[ "$fn" == "$call" ]]; then
-                  "$qs" ipc --pid "$pid" call "$target" "$fn" >/dev/null 2>&1 || true
+                if [[ -z "$target" ]]; then
+                  # No fixed target — call string is "target function [arg]"
+                  read -ra _parts <<< "$call"
+                  "$qs" ipc --pid "$pid" call "''${_parts[@]}" >/dev/null 2>&1 || true
                 else
-                  local arg="''${call#* }"
-                  "$qs" ipc --pid "$pid" call "$target" "$fn" "$arg" >/dev/null 2>&1 || true
+                  local fn="''${call%% *}"
+                  if [[ "$fn" == "$call" ]]; then
+                    "$qs" ipc --pid "$pid" call "$target" "$fn" >/dev/null 2>&1 || true
+                  else
+                    local arg="''${call#* }"
+                    "$qs" ipc --pid "$pid" call "$target" "$fn" "$arg" >/dev/null 2>&1 || true
+                  fi
                 fi
               done
               sleep 0.4
