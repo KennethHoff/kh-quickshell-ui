@@ -82,25 +82,28 @@
           ${lib.concatMapStrings (d: "cp ${toString d}/*.qml $out/\n") extraPluginDirs}
         '';
 
-      viewConfig = pkgs.runCommand "kh-view-config" { } ''
-        mkdir -p $out/lib
-        cp ${self}/lib/*.qml $out/lib/
-        cp ${self}/apps/kh-view.qml $out/shell.qml
-        cp ${nixConfigQml} $out/NixConfig.qml
-        cp ${nixBinsQml} $out/NixBins.qml
-      '';
+      # mkAppConfig builds a standard app derivation.
+      # name: app name — resolves apps/kh-{name}.qml and apps/{name}/ if present.
+      # extraBins: attr set of extra binaries passed to ffi.nix.
+      mkAppConfig =
+        { name
+        , extraBins ? {}
+        }:
+        let
+          appDir = "${self}/apps/${name}";
+          nixBins = import ./ffi.nix { inherit pkgs lib extraBins; };
+        in
+        pkgs.runCommand "kh-${name}-config" { } ''
+          mkdir -p $out/lib
+          cp ${self}/lib/*.qml $out/lib/
+          cp ${self}/apps/kh-${name}.qml $out/shell.qml
+          ${lib.optionalString (builtins.pathExists appDir) "cp ${appDir}/*.qml $out/"}
+          cp ${nixConfigQml} $out/NixConfig.qml
+          cp ${nixBins} $out/NixBins.qml
+        '';
 
-      launcherConfig = pkgs.runCommand "kh-launcher-config" { } ''
-        mkdir -p $out/lib
-        cp ${self}/lib/*.qml $out/lib/
-        cp ${self}/apps/kh-launcher.qml $out/shell.qml
-        cp ${self}/apps/launcher/*.qml $out/
-        cp ${nixConfigQml} $out/NixConfig.qml
-        cp ${import ./ffi.nix {
-          inherit pkgs lib;
-          extraBins = { scanApps = toString scanAppsScript; };
-        }} $out/NixBins.qml
-      '';
+      viewConfig     = mkAppConfig { name = "view"; };
+      launcherConfig = mkAppConfig { name = "launcher"; extraBins = { scanApps = toString scanAppsScript; }; };
 
       barConfig = mkBarConfig {
         structure = ''
@@ -116,17 +119,7 @@
         '';
       };
 
-      cliphistConfig = pkgs.runCommand "kh-cliphist-config" { } ''
-        mkdir -p $out/lib
-        cp ${self}/lib/*.qml $out/lib/
-        cp ${self}/apps/kh-cliphist.qml $out/shell.qml
-        cp ${self}/apps/cliphist/*.qml $out/
-        cp ${nixConfigQml} $out/NixConfig.qml
-        cp ${import ./ffi.nix {
-          inherit pkgs lib;
-          extraBins = { cliphistDecodeAll = toString cliphistDecodeAllScript; };
-        }} $out/NixBins.qml
-      '';
+      cliphistConfig = mkAppConfig { name = "cliphist"; extraBins = { cliphistDecodeAll = toString cliphistDecodeAllScript; }; };
     in
     {
       homeModules.default = import ./hm-module.nix self;

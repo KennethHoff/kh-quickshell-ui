@@ -52,14 +52,19 @@ let
       ${lib.concatMapStrings (d: "cp ${toString d}/*.qml $out/\n") extraPluginDirs}
     '';
 
-  cliphistConfig = pkgs.runCommandLocal "qs-kh-cliphist" { } ''
-    mkdir -p $out/lib
-    cp ${src}/lib/*.qml $out/lib/
-    cp ${src}/apps/kh-cliphist.qml $out/shell.qml
-    cp ${src}/apps/cliphist/*.qml $out/
-    cp ${nixConfig} $out/NixConfig.qml
-    cp ${nixBins}   $out/NixBins.qml
-  '';
+  mkAppConfig = { name, extraBins ? {} }:
+    let
+      appDir = src + "/apps/${name}";
+      nixBins' = import (src + "/ffi.nix") { inherit pkgs lib extraBins; };
+    in
+    pkgs.runCommandLocal "qs-kh-${name}" { } ''
+      mkdir -p $out/lib
+      cp ${src}/lib/*.qml $out/lib/
+      cp ${src}/apps/kh-${name}.qml $out/shell.qml
+      ${lib.optionalString (builtins.pathExists appDir) "cp ${appDir}/*.qml $out/"}
+      cp ${nixConfig}  $out/NixConfig.qml
+      cp ${nixBins'}   $out/NixBins.qml
+    '';
 in
 {
   options.programs.kh-ui = {
@@ -153,7 +158,10 @@ in
         enable = lib.mkDefault true;
         configs =
           lib.optionalAttrs config.programs.kh-ui.clipboard-history.enable {
-            kh-cliphist = cliphistConfig;
+            kh-cliphist = mkAppConfig {
+              name = "cliphist";
+              extraBins = { cliphistDecodeAll = toString cliphistDecodeAll; };
+            };
           } //
           lib.optionalAttrs config.programs.kh-ui.bar.enable {
             kh-bar = mkBarConfig {
@@ -161,23 +169,10 @@ in
             };
           } //
           lib.optionalAttrs config.programs.kh-ui.launcher.enable {
-            kh-launcher =
-              let
-                nixBins = import (src + "/ffi.nix") {
-                  inherit pkgs lib;
-                  extraBins = {
-                    scanApps = toString scanAppsScript;
-                  };
-                };
-              in
-              pkgs.runCommandLocal "qs-kh-launcher" { } ''
-                mkdir -p $out/lib
-                cp ${src}/lib/*.qml $out/lib/
-                cp ${src}/apps/kh-launcher.qml $out/shell.qml
-                cp ${src}/apps/launcher/*.qml $out/
-                cp ${nixConfig} $out/NixConfig.qml
-                cp ${nixBins}   $out/NixBins.qml
-              '';
+            kh-launcher = mkAppConfig {
+              name = "launcher";
+              extraBins = { scanApps = toString scanAppsScript; };
+            };
           };
       };
     })
