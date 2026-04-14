@@ -1,14 +1,15 @@
 # quickshell-ui
 
-QML shell components for [Quickshell](https://quickshell.outfoxxed.me/): a status bar (`kh-bar`), application launcher (`kh-launcher`), and clipboard history viewer (`kh-cliphist`).
+QML shell components for [Quickshell](https://quickshell.outfoxxed.me/): a status bar (`kh-bar`), application launcher (`kh-launcher`), clipboard history viewer (`kh-cliphist`), and file/image viewer (`kh-view`).
 
 ## Components
 
 | Name | Description | IPC target | Toggle call |
 |---|---|---|---|
 | `kh-bar` | Status bar (all monitors) | — | always visible |
-| `kh-launcher` | Application launcher | `launcher` | `quickshell ipc -c kh-launcher call launcher toggle` |
-| `kh-cliphist` | Clipboard history viewer | `viewer` | `quickshell ipc -c kh-cliphist call viewer toggle` |
+| `kh-launcher` | Application launcher overlay | `launcher` | `qs ipc call launcher toggle` |
+| `kh-cliphist` | Clipboard history overlay | `cliphist` | `qs ipc call cliphist toggle` |
+| `kh-view` | File / image viewer overlay | `view` | `qs ipc call view toggle` |
 
 ## Quick start
 
@@ -18,6 +19,7 @@ Run a component directly without installing:
 nix run .#kh-bar
 nix run .#kh-launcher
 nix run .#kh-cliphist
+nix run .#kh-view
 ```
 
 ## Flake integration
@@ -124,10 +126,9 @@ Available composition types (no import statement needed):
 |---|---|
 | `BarRow` | Full-width `RowLayout` row; children laid out left-to-right |
 | `BarSpacer` | Flexible spacer; expands to fill remaining width |
-| `ControlPanel` | `●●●` dropdown frame; children go in the popup panel |
-| `ControlTile` | Rounded toggle tile with label, sublabel, active/inactive colors |
-| `TailscalePanel` | Tailscale ControlTile; exposes `connected`, `selfIp`, `peers` |
-| `EthernetPanel` | Ethernet ControlTile; exposes `connected`, `iface` |
+| `ControlPanel` | `●●●` dropdown frame; any QML item can be a child |
+| `TailscalePanel` | Tailscale toggle tile; exposes `connected`, `selfIp`, `peers` |
+| `EthernetPanel` | Ethernet toggle tile; exposes `connected`, `iface` |
 | `TailscalePeers` | Peer list section; bind via `source: <TailscalePanel id>` |
 | `BarDropdown` | Generic bar button that opens a popup panel |
 | `DropdownHeader` | Muted section heading |
@@ -182,11 +183,14 @@ programs.kh-ui.bar = {
 
 Each bar plugin exposes its own IPC target — no single bottleneck. Targets follow the pattern `bar.<plugin>`:
 
-| Target | Functions |
+| Target | Functions / Properties |
 |---|---|
-| `bar.workspaces` | `getFocused()` → string, `list()` → newline-separated names, `switchTo(name)` |
+| `bar.workspaces` | `getFocused()` → string, `list()` → newline-separated names, `switchTo(name)`, `showPreview(name)`, `hidePreview()` |
 | `bar.volume` | `getVolume()` → int (0–150), `setVolume(v)`, `adjustVolume(delta)`, `isMuted()` → bool, `setMuted(muted)`, `toggleMute()` |
 | `bar.media` | `isActive()` → bool, `isPlaying()` → bool, `getTitle()`, `getArtist()`, `togglePlaying()`, `play()`, `pause()`, `next()`, `prev()` |
+| `bar.tray` | `list()` → newline-separated titles, `activate(title)`, `showMenu(title)` |
+| `bar.tailscale` | `isConnected()` → bool, `getSelfIp()` → string, `toggle()` |
+| `bar.ethernet` | `isConnected()` → bool, `getIface()` → string |
 | `bar.controlcenter` | `toggle()`, `open()`, `close()`, `isOpen()` → bool |
 
 ```bash
@@ -194,6 +198,8 @@ Each bar plugin exposes its own IPC target — no single bottleneck. Targets fol
 qs ipc call bar.workspaces switchTo 2
 qs ipc call bar.volume setVolume 50
 qs ipc call bar.media togglePlaying
+qs ipc call bar.tray activate "KDE Connect"
+qs ipc call bar.tailscale toggle
 qs ipc call bar.controlcenter toggle
 qs ipc prop get bar.volume isMuted
 ```
@@ -215,14 +221,61 @@ qs ipc call bar.mypanel toggle
 qs ipc call bar.mypanel isOpen
 ```
 
-### 6. Autostart and keybinds (Hyprland)
+### 6. Launcher IPC
+
+| Target | Functions / Properties |
+|---|---|
+| `launcher` | `toggle()`, `open()`, `close()`, `launch()`, `launchOnWorkspace(n)`, `enterActionsMode()`, `setMode(m)`, `nav(dir)`, `key(k)`, `type(text)` |
+| | **Props:** `showing` → bool, `mode` → string, `selectedAppName` → string, `selectedAppExec` → string |
+
+```bash
+qs ipc -c kh-launcher call launcher launch
+qs ipc -c kh-launcher call launcher launchOnWorkspace 2
+qs ipc -c kh-launcher prop get launcher selectedAppName
+```
+
+### 7. Cliphist IPC
+
+| Target | Functions / Properties |
+|---|---|
+| `cliphist` | `toggle()`, `open()`, `close()`, `setMode(m)`, `setView(v)`, `nav(dir)`, `key(k)`, `type(text)` |
+| | **Props:** `showing` → bool, `mode` → string |
+
+```bash
+qs ipc -c kh-cliphist call cliphist toggle
+qs ipc -c kh-cliphist call cliphist nav down
+```
+
+### 8. kh-view
+
+`kh-view` is a file/image viewer overlay. Pass files as arguments via the Nix module or directly:
+
+```bash
+nix run .#kh-view -- /path/to/file.png /path/to/other.jpg
+```
+
+#### kh-view IPC
+
+| Target | Functions / Properties |
+|---|---|
+| `view` | `quit()`, `next()`, `prev()`, `seek(n)`, `setFullscreen(on)`, `setWrap(on)`, `key(k)` |
+| | **Props:** `currentIndex` → int, `count` → int, `fullscreen` → bool, `wrap` → bool, `hasPrev` → bool, `hasNext` → bool |
+
+```bash
+qs ipc -c kh-view call view next
+qs ipc -c kh-view call view setFullscreen true
+qs ipc -c kh-view prop get view currentIndex
+```
+
+### 9. Autostart and keybinds (Hyprland)
 
 When `wayland.windowManager.hyprland.enable` is true the module automatically adds `exec-once` entries for all enabled components. You only need to add keybinds:
 
 ```nix
 wayland.windowManager.hyprland.settings.bind = [
   "$mainMod, SPACE, exec, ${lib.getExe pkgs.quickshell} ipc -c kh-launcher call launcher toggle"
-  "$mainMod, V,     exec, ${lib.getExe pkgs.quickshell} ipc -c kh-cliphist call viewer toggle"
+  "$mainMod, V,     exec, ${lib.getExe pkgs.quickshell} ipc -c kh-cliphist call cliphist toggle"
+  "$mainMod, I,     exec, ${lib.getExe pkgs.quickshell} ipc -c kh-view     call view     toggle"
 ];
 ```
 
