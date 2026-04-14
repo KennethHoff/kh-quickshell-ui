@@ -65,11 +65,18 @@ ShellRoot {
         function key(k: string) {
             const lk = k.toLowerCase()
             if      (lk === "f")                    root._fullscreen = !root._fullscreen
-            else if (lk === "h" || lk === "left")   root._focusedPane = root._wrap ? (root._focusedPane - 1 + root._paths.length) % root._paths.length : Math.max(0, root._focusedPane - 1)
-            else if (lk === "l" || lk === "right")  root._focusedPane = root._wrap ? (root._focusedPane + 1) % root._paths.length : Math.min(root._paths.length - 1, root._focusedPane + 1)
             else if (lk === "q" || lk === "escape") Qt.quit()
             else if (lk === "tab" && !root._fullscreen)
                 root._focusedPane = (root._focusedPane + 1) % root._paths.length
+            else if (root._fullscreen && (lk === "h" || lk === "left"))
+                root._focusedPane = root._wrap ? (root._focusedPane - 1 + root._paths.length) % root._paths.length : Math.max(0, root._focusedPane - 1)
+            else if (root._fullscreen && (lk === "l" || lk === "right"))
+                root._focusedPane = root._wrap ? (root._focusedPane + 1) % root._paths.length : Math.min(root._paths.length - 1, root._focusedPane + 1)
+            else {
+                // Forward to the active pane's TextViewer (cursor, scroll, visual, etc.)
+                const pane = paneRepeater.itemAt(root._focusedPane)
+                if (pane) pane.handleViewerIpcKey(k)
+            }
         }
     }
 
@@ -157,7 +164,8 @@ ShellRoot {
                     property bool   _loading: true
                     property var    _lines:   []
 
-                    function handleViewerKey(event) { return paneViewer.handleKey(event) }
+                    function handleViewerKey(event)      { return paneViewer.handleKey(event) }
+                    function handleViewerIpcKey(k: string) { return paneViewer.handleIpcKey(k) }
 
                     Component.onCompleted: {
                         const ext = modelData.split(".").pop().toLowerCase()
