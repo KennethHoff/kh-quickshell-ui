@@ -24,6 +24,7 @@ let
     colors = config.lib.stylix.colors;
     fontName = config.stylix.fonts.sansSerif.name;
     fontSize = config.stylix.fonts.sizes.applications;
+    inherit (config.programs.kh-ui) volumeMax;
   };
 
   mkAppConfig =
@@ -73,6 +74,16 @@ in
 {
   options.programs.kh-ui = {
     enable = lib.mkEnableOption "kh-ui shell UI — prerequisite for all kh-ui options; activates nothing on its own. Enable individual components via their own enable options.";
+
+    volumeMax = lib.mkOption {
+      type = lib.types.float;
+      default = 1.5;
+      description = ''
+        Maximum volume level as a multiplier (1.0 = 100%). Applied as the
+        ceiling in the volume bar plugin and the OSD progress bar. Match this
+        to the <literal>-l</literal> flag you pass to <literal>wpctl set-volume</literal>.
+      '';
+    };
 
     clipboard-history.enable = lib.mkOption {
       type = lib.types.bool;

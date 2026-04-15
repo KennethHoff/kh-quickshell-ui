@@ -23,7 +23,7 @@ BarPlugin {
         id: functionality
 
         // ui+ipc
-        function apply(v: real): void         { if (state.valid) state.sink.audio.volume = Math.max(0.0, Math.min(1.5, v)) }
+        function apply(v: real): void         { if (state.valid) state.sink.audio.volume = Math.max(0.0, Math.min(cfg.volumeMax, v)) }
         // ui+ipc
         function toggleMute(): void           { if (state.valid) state.sink.audio.muted = !state.sink.audio.muted }
         // ipc only
