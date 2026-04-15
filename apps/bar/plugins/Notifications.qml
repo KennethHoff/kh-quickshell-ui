@@ -27,6 +27,6 @@ BarPlugin {
         color: cfg.color.base05
         font.family:    cfg.fontFamily
         font.pixelSize: cfg.fontSize - 1
-        text: "󰂚"
+        text: "\uF0F3"
     }
 }
