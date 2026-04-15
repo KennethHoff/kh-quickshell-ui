@@ -104,6 +104,13 @@ Column {
                 onTriggered: functionality.clearPing()
             }
 
+            Rectangle {
+                anchors.fill: parent
+                color:        _cfg.color.base02
+                radius:       3
+                visible:      _mouse.containsMouse
+            }
+
             DropdownItem {
                 id: _item
                 dotColor:       modelData.online ? _cfg.color.base0B : _cfg.color.base03
@@ -118,8 +125,10 @@ Column {
             }
 
             MouseArea {
+                id:           _mouse
                 anchors.fill: parent
-                onClicked: functionality.ping()
+                hoverEnabled: true
+                onClicked:    functionality.ping()
             }
         }
     }
@@ -152,6 +161,13 @@ Column {
             width:          parent ? parent.width : 280
             implicitHeight: _exitItem.implicitHeight
 
+            Rectangle {
+                anchors.fill: parent
+                color:        _cfg.color.base02
+                radius:       3
+                visible:      _exitMouse.containsMouse && !_exitDelegate._pending
+            }
+
             DropdownItem {
                 id: _exitItem
                 dotColor:       _active ? _cfg.color.base0A : _cfg.color.base03
@@ -165,7 +181,9 @@ Column {
             }
 
             MouseArea {
+                id:           _exitMouse
                 anchors.fill: parent
+                hoverEnabled: true
                 enabled:      !_exitDelegate._pending
                 onClicked:    source.setExitNode(_active ? "" : modelData.ip)
             }
