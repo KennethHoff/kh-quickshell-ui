@@ -2,6 +2,8 @@
 
 QML shell components for [Quickshell](https://quickshell.outfoxxed.me/): a status bar (`kh-bar`), application launcher (`kh-launcher`), clipboard history viewer (`kh-cliphist`), and file/image viewer (`kh-view`).
 
+Everything controllable via keyboard is also controllable via [Quickshell IPC](https://quickshell.outfoxxed.me/docs/ipc/) — every navigation action, mode switch, plugin toggle, and value query has a corresponding IPC call. This makes all components fully scriptable and suitable for automation or agentic workflows.
+
 ## Components
 
 | Name | Description | IPC target | Toggle call |
@@ -60,7 +62,11 @@ programs.kh-ui = {
 };
 ```
 
-### 4. Configure the bar
+---
+
+## Bar (`kh-bar`)
+
+### Configuration
 
 The bar requires an explicit layout — there is no default. Set it via `programs.kh-ui.bar.structure`:
 
@@ -79,19 +85,16 @@ programs.kh-ui.bar.structure = ''
 
 `BarRow` is a full-width `RowLayout` row. `BarSpacer` expands to fill remaining space — place it between plugin groups to push them apart (equivalent to CSS `space-between`). Multiple `BarRow`s, additional spacers, or any other QML types can appear at the top level.
 
-#### Built-in plugins
+### Layout types
 
-| Plugin | Description |
+| Component | Purpose |
 |---|---|
-| `Workspaces` | Hyprland workspace switcher; hover for live preview thumbnail |
-| `MediaPlayer` | MPRIS prev/play-pause/next + track info; hidden when no player active |
-| `Clock` | `HH:mm:ss` clock |
-| `Volume` | PipeWire volume; scroll to adjust, click to mute |
-| `Tray` | StatusNotifierItem tray icons; left-click activates, right-click menu |
+| `BarRow` | Full-width `RowLayout` row; children laid out left-to-right |
+| `BarSpacer` | Flexible spacer; expands to fill remaining width |
+| `BarGroup` | Bar button that opens a popup panel; children are panel content |
+| `BarDropdown` | Generic dropdown primitive; use `BarGroup` for most cases |
 
-#### Composable panel components
-
-Use `BarGroup` to group plugins behind a single dropdown button. Any plugin or component can be a child:
+Use `BarGroup` to group plugins behind a single dropdown button:
 
 ```nix
 programs.kh-ui.bar.structure = ''
@@ -116,34 +119,83 @@ programs.kh-ui.bar.structure = ''
 '';
 ```
 
-Available composition types (no import statement needed):
+### Plugins
+
+#### `Workspaces`
+
+Hyprland workspace switcher. Displays all workspaces and highlights the active one. Click a workspace to switch to it. Hover a workspace for 300 ms to show a live thumbnail preview.
+
+#### `MediaPlayer`
+
+MPRIS playback controls (prev / play-pause / next) with artist and title display. Hidden when no player is active. Shows the first active player when multiple are running.
+
+#### `Clock`
+
+Live `HH:mm:ss` clock. Updates every second.
+
+#### `Volume`
+
+PipeWire volume control. Scroll to adjust volume, click to toggle mute. Hidden when no sink is available.
+
+#### `Tray`
+
+StatusNotifierItem system tray. Left-click activates an item, right-click shows its native context menu. Hidden when no tray items are present.
+
+#### `TailscalePanel`
+
+Tailscale status tile. Shows connection state and the machine's Tailscale IP. Click to toggle `tailscale up` / `tailscale down`. Exposes `connected` (bool), `selfIp` (string), and `peers` (array) for use by `TailscalePeers`.
+
+> **Operator permission required.** `tailscale up`/`down` fail with "Access denied" unless your user is set as the Tailscale operator. Run this once:
+> ```bash
+> sudo tailscale up --operator=$USER
+> ```
+> Note: `tailscale set --operator` is [broken upstream](https://github.com/tailscale/tailscale/issues/18294) and `extraUpFlags` in the NixOS module [only applies when `authKeyFile` is set](https://github.com/NixOS/nixpkgs/issues/276912), so there is currently no clean declarative path for users who authenticate manually.
+
+#### `EthernetPanel`
+
+Ethernet status tile. Shows the active interface name and link state. Exposes `connected` (bool) and `iface` (string).
+
+#### `TailscalePeers`
+
+Peer list panel section. Displays the self IP header and all peers with online/offline indicators. Bind it to a `TailscalePanel` via the `source` property — it hides itself when disconnected:
+
+```qml
+TailscalePanel { id: ts }
+TailscalePeers { source: ts }
+```
+
+### Primitive components
+
+Low-level building blocks for custom plugins and panels (no import needed):
 
 | Component | Purpose |
 |---|---|
-| `BarRow` | Full-width `RowLayout` row; children laid out left-to-right |
-| `BarSpacer` | Flexible spacer; expands to fill remaining width |
-| `BarGroup` | Bar button that opens a popup panel; children are panel content |
-| `TailscalePanel` | Tailscale toggle tile; exposes `connected`, `selfIp`, `peers` |
-| `EthernetPanel` | Ethernet toggle tile; exposes `connected`, `iface` |
-| `TailscalePeers` | Peer list section; bind via `source: <TailscalePanel id>` |
-| `BarDropdown` | Generic dropdown primitive; use `BarGroup` for most cases |
 | `ControlTile` | Styled toggle pill for custom panel tiles |
 | `DropdownHeader` | Muted section heading |
 | `DropdownDivider` | 1 px horizontal rule |
 | `DropdownItem` | Row with dot indicator, primary label, secondary label |
 | `NixConfig` | Theme colors (`color.baseXX`), font family and size |
 
-#### Writing a custom plugin
+### Writing a custom plugin
 
 A plugin is a `BarPlugin` subtype. `BarPlugin` handles the sizing boilerplate and provides `ipcPrefix`, `barHeight`, and `barWindow` — you only need to set `implicitWidth`.
+
+Two singleton helpers are available in every plugin without an import:
+
+| Helper | Purpose |
+|---|---|
+| `NixConfig` | Theme colors (`color.baseXX`), font family and size |
+| `NixBins` | Store-path binaries injected via `extraBins`; use when shelling out to external tools |
 
 Example `MyWidget.qml`:
 
 ```qml
 import QtQuick
+import Quickshell.Io
 
 BarPlugin {
     NixConfig { id: cfg }
+    NixBins   { id: bin }  // omit if the plugin doesn't run external processes
 
     implicitWidth: _label.implicitWidth + 16
 
@@ -177,34 +229,27 @@ programs.kh-ui.bar = {
 };
 ```
 
-### 5. Bar IPC
+### IPC
 
-IPC targets are hierarchical and derived from the bar's `ipcName` (default `"bar"`) plus each component's position in the layout tree. Set `programs.kh-ui.bar.ipcName` to give your bar a unique root prefix — required when running multiple bars.
+Each plugin registers at a suffix derived from its type. The full target path is built from the nesting in your `structure`:
 
-Targets follow the pattern `<ipcName>.<plugin>`, with group nesting appended automatically:
-
-| Target (default `ipcName = "bar"`) | Functions / Properties |
-|---|---|
-| `bar.workspaces` | `getFocused()` → string, `list()` → newline-separated names, `switchTo(name)`, `showPreview(name)`, `hidePreview()` |
-| `bar.volume` | `getVolume()` → int (0–150), `setVolume(v)`, `adjustVolume(delta)`, `isMuted()` → bool, `setMuted(muted)`, `toggleMute()` |
-| `bar.media` | `isActive()` → bool, `isPlaying()` → bool, `getTitle()`, `getArtist()`, `togglePlaying()`, `play()`, `pause()`, `next()`, `prev()` |
-| `bar.tray` | `list()` → newline-separated titles, `activate(title)`, `showMenu(title)` |
-| `bar.controlcenter` | `toggle()`, `open()`, `close()`, `isOpen()` → bool |
-| `bar.controlcenter.tailscale` | `isConnected()` → bool, `getSelfIp()` → string, `toggle()` |
-| `bar.controlcenter.ethernet` | `isConnected()` → bool, `getIface()` → string |
-
-```bash
-# Examples (with default ipcName = "bar")
-qs ipc call bar.workspaces switchTo 2
-qs ipc call bar.volume setVolume 50
-qs ipc call bar.media togglePlaying
-qs ipc call bar.tray activate "KDE Connect"
-qs ipc call bar.controlcenter toggle
-qs ipc call bar.controlcenter.tailscale toggle
-qs ipc prop get bar.volume isMuted
+```
+bar.<plugin>
+bar.<group-ipcName>.<plugin>
+bar.<group-ipcName>.<nested-group-ipcName>.<plugin>
 ```
 
-Targets reflect structure — a `TailscalePanel` inside a `BarGroup { ipcName: "net" }` in a bar with `ipcName = "top"` is reachable as `top.net.tailscale`.
+For example, a `TailscalePanel` inside `BarGroup { ipcName: "net" }` is reachable as `bar.net.tailscale`.
+
+| Plugin | Suffix | Functions / Properties |
+|---|---|---|
+| `Workspaces` | `.workspaces` | `getFocused()` → string, `list()` → newline-separated names, `switchTo(name)`, `showPreview(name)`, `hidePreview()` |
+| `Volume` | `.volume` | `getVolume()` → int (0–150), `setVolume(v)`, `adjustVolume(delta)`, `isMuted()` → bool, `setMuted(muted)`, `toggleMute()` |
+| `MediaPlayer` | `.media` | `isActive()` → bool, `isPlaying()` → bool, `getTitle()`, `getArtist()`, `togglePlaying()`, `play()`, `pause()`, `next()`, `prev()` |
+| `Tray` | `.tray` | `list()` → newline-separated titles, `activate(title)`, `showMenu(title)` |
+| `TailscalePanel` | `.tailscale` | `isConnected()` → bool, `getSelfIp()` → string, `toggle()` |
+| `EthernetPanel` | `.ethernet` | `isConnected()` → bool, `getIface()` → string |
+| `BarGroup` / `BarDropdown` | `.<ipcName>` | `toggle()`, `open()`, `close()`, `isOpen()` → bool |
 
 #### Dropdown IPC for custom plugins
 
@@ -225,7 +270,11 @@ qs ipc call bar.mypanel isOpen
 
 Custom plugins inside a group get their prefix automatically — use `ipcPrefix + ".mywidget"` as the `IpcHandler` target (see the custom plugin example above).
 
-### 6. Launcher IPC
+---
+
+## Launcher (`kh-launcher`)
+
+### IPC
 
 | Target | Functions / Properties |
 |---|---|
@@ -238,7 +287,11 @@ qs ipc -c kh-launcher call launcher launchOnWorkspace 2
 qs ipc -c kh-launcher prop get launcher selectedAppName
 ```
 
-### 7. Cliphist IPC
+---
+
+## Clipboard History (`kh-cliphist`)
+
+### IPC
 
 | Target | Functions / Properties |
 |---|---|
@@ -250,15 +303,17 @@ qs ipc -c kh-cliphist call cliphist toggle
 qs ipc -c kh-cliphist call cliphist nav down
 ```
 
-### 8. kh-view
+---
 
-`kh-view` is a file/image viewer overlay. Pass files as arguments via the Nix module or directly:
+## File Viewer (`kh-view`)
+
+Pass files as arguments via the Nix module or directly:
 
 ```bash
 nix run .#kh-view -- /path/to/file.png /path/to/other.jpg
 ```
 
-#### kh-view IPC
+### IPC
 
 | Target | Functions / Properties |
 |---|---|
@@ -271,7 +326,9 @@ qs ipc -c kh-view call view setFullscreen true
 qs ipc -c kh-view prop get view currentIndex
 ```
 
-### 9. Autostart and keybinds (Hyprland)
+---
+
+## Autostart and keybinds (Hyprland)
 
 When `wayland.windowManager.hyprland.enable` is true the module automatically adds `exec-once` entries for all enabled components. You only need to add keybinds:
 
@@ -282,6 +339,8 @@ wayland.windowManager.hyprland.settings.bind = [
   "$mainMod, I,     exec, ${lib.getExe pkgs.quickshell} ipc -c kh-view     call view     toggle"
 ];
 ```
+
+---
 
 ## Development
 
