@@ -14,6 +14,16 @@ Features to implement. Each entry becomes its own Quickshell component or launch
 
 ---
 
+## Configuration / Portability
+
+Hardcoded assumptions that should be user-configurable.
+
+- ⬜ **Configurable terminal** — `kh-launcher` hardcodes `bin.kitty` for apps with `Terminal=true`; should be a Nix option (e.g. `programs.kh-ui.launcher.terminal`) defaulting to nothing, forcing the user to set it
+- ⬜ **`kitty` removed from universal `ffi.nix` bins** — `kitty` is injected into every app's `NixBins.qml` even for apps that never launch a terminal (bar, cliphist, view); move it to the launcher-specific `extraBins` instead
+- ⬜ **Hyprland-only `exec-once` wiring** — `hm-module.nix` only adds apps to `exec-once` when `wayland.windowManager.hyprland.enable` is true; users on Sway or other compositors get no autostart integration; needs a generic autostart mechanism or at minimum a `programs.kh-ui.autostart` option the user can wire up themselves
+
+---
+
 ## Clipboard History
 
 Standalone Quickshell daemon (`quickshell -c kh-cliphist`) with a searchable
