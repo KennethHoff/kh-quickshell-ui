@@ -217,6 +217,7 @@ A full status bar built in Quickshell, replacing Waybar.
 - [8] ✅ Exit node selection — exit-node-capable peers shown in a separate section in `TailscalePeers`; click to run `tailscale set --exit-node <ip>`; active exit node highlighted in `base0A` with "active" sublabel; click again to clear; pending state blocks double-clicks and shows `…` on the active row
 - [9] ⬜ Advertise exit node toggle — button to run `tailscale set --advertise-exit-node` on/off for the local machine
 - [10] ⬜ Shields-up toggle — toggle `tailscale set --shields-up` to block incoming connections; reflected in the tile UI
+- [11] ⬜ Hover highlight in `TailscalePeers` — hovering a peer or exit node row shows a subtle background highlight so it's clear which item the cursor is over; currently no visual feedback on hover
 
 ### Sonarr
 
