@@ -111,6 +111,17 @@ in
       description = "Enable the file/image viewer (kh-view).";
     };
 
+    osd.enable = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = ''
+        Enable the on-screen display daemon (kh-osd).
+
+        Reacts automatically to PipeWire volume and mute changes.
+        IPC is available for testing: qs ipc call osd showVolume <0–150>
+      '';
+    };
+
     bar = {
       enable = lib.mkOption {
         type = lib.types.bool;
@@ -202,6 +213,9 @@ in
           }
           // lib.optionalAttrs config.programs.kh-ui.view.enable {
             kh-view = mkAppConfig { name = "view"; };
+          }
+          // lib.optionalAttrs config.programs.kh-ui.osd.enable {
+            kh-osd = mkAppConfig { name = "osd"; };
           };
       };
 
@@ -225,6 +239,11 @@ in
           (pkgs.writeShellScriptBin "kh-view" ''
             exec ${lib.getExe pkgs.quickshell} -c kh-view "$@"
           '')
+        ]
+        ++ lib.optionals config.programs.kh-ui.osd.enable [
+          (pkgs.writeShellScriptBin "kh-osd" ''
+            exec ${lib.getExe pkgs.quickshell} -c kh-osd "$@"
+          '')
         ];
     })
 
@@ -239,6 +258,9 @@ in
         ]
         ++ lib.optionals config.programs.kh-ui.bar.enable [
           "${lib.getExe pkgs.quickshell} -c kh-bar"
+        ]
+        ++ lib.optionals config.programs.kh-ui.osd.enable [
+          "${lib.getExe pkgs.quickshell} -c kh-osd"
         ];
     })
   ];

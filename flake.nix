@@ -174,6 +174,8 @@
           cliphistDecodeAll = toString cliphistDecodeAllScript;
         };
       };
+
+      osdConfig = mkAppConfig { name = "osd"; };
     in
     {
       formatter.${system} = pkgs.nixfmt-tree;
@@ -193,6 +195,7 @@
         kh-bar = barConfig;
         kh-cliphist = cliphistConfig;
         cliphistDecodeAll = cliphistDecodeAllScript;
+        kh-osd = osdConfig;
         kh-view = viewConfig;
         kh-launcher = launcherConfig;
         scanApps = scanAppsScript;
@@ -205,6 +208,15 @@
             pkgs.writeShellScript "run-kh-bar" ''
               qs=${lib.getExe' pkgs.quickshell "quickshell"}
               exec "$qs" -p ${barConfig}
+            ''
+          );
+        };
+        kh-osd = {
+          type = "app";
+          program = toString (
+            pkgs.writeShellScript "run-kh-osd" ''
+              qs=${lib.getExe' pkgs.quickshell "quickshell"}
+              exec "$qs" -p ${osdConfig}
             ''
           );
         };
@@ -225,6 +237,7 @@
                               kh-bar)      config=${barConfig};      target=""        ;;
                               kh-cliphist) config=${cliphistConfig}; target=viewer   ;;
                               kh-launcher) config=${launcherConfig}; target=launcher ;;
+                              kh-osd)      config=${osdConfig};      target="" ;;
                               kh-view)     config=${viewConfig};     target=""
                                 # Build the list file from KH_VIEW_FILE (or KH_VIEW_LIST if already set)
                                 if [[ -z "''${KH_VIEW_LIST:-}" && -n "''${KH_VIEW_FILE:-}" ]]; then
