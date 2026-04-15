@@ -54,12 +54,17 @@ let
     {
       structure,
       extraPluginDirs ? [ ],
+      extraBins ? { },
     }:
     mkAppConfig {
       name = "bar";
       generatedFiles = {
         "BarLayout.qml" = import (src + "/bar-config.nix") { inherit pkgs structure; };
       };
+      extraBins = {
+        tailscale = lib.getExe pkgs.tailscale;
+      }
+      // extraBins;
       inherit extraPluginDirs;
     };
 in
