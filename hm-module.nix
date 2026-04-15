@@ -149,20 +149,6 @@ in
           </programlisting>
         '';
       };
-      ipcName = lib.mkOption {
-        type = lib.types.str;
-        default = "bar";
-        description = ''
-          Root IPC prefix for all bar targets. Plugin targets are derived
-          hierarchically from this — e.g. with <literal>ipcName = "top"</literal>
-          the volume plugin is reachable as <literal>top.volume</literal> and
-          a group named "controlcenter" exposes its children as
-          <literal>top.controlcenter.tailscale</literal> etc.
-
-          Use a unique name per bar when running multiple bars (see multi-bar
-          support) so each bar's IPC targets are distinct.
-        '';
-      };
       extraPluginDirs = lib.mkOption {
         type = lib.types.listOf lib.types.path;
         default = [ ];
@@ -191,7 +177,7 @@ in
           }
           // lib.optionalAttrs config.programs.kh-ui.bar.enable {
             kh-bar = mkBarConfig {
-              inherit (config.programs.kh-ui.bar) structure ipcName extraPluginDirs;
+              inherit (config.programs.kh-ui.bar) structure extraPluginDirs;
             };
           }
           // lib.optionalAttrs config.programs.kh-ui.launcher.enable {
