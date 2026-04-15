@@ -29,31 +29,45 @@ Hardcoded assumptions that should be user-configurable.
 Standalone Quickshell daemon (`quickshell -c kh-cliphist`) with a searchable
 list of clipboard entries from `cliphist`. SUPER+V toggles it via IPC.
 
-- ✅ Searchable list; all text entries pre-decoded on open so search matches full content
+### Core
+
+- ✅ Searchable list — all text entries pre-decoded on open so search matches full content
 - ✅ Text entries shown as-is; image entries shown as thumbnails
 - ✅ Enter copies the selected entry via `cliphist decode | wl-copy`; entry flashes on copy
-- ✅ Search filters: `img:` / `text:` type filter, `'` exact substring match
+- ✅ Search filters — `img:` / `text:` type filter, `'` exact substring match
 - ✅ Entry counter in footer
+- ✅ Fast search — haystacks pre-processed at load time; filter debounced at 80 ms; full-text cache updated via O(1) index lookup as decode streams in
+
+### Navigation
+
 - ✅ Modal insert/normal mode — opens in normal mode; `j`/`k` navigate, `G` bottom, `/` → insert (search focused); Escape → normal mode or closes
-- ✅ Full IPC control (`toggle`, `setMode`, `nav`, `key`, `type`)
 - ✅ `gg` top, `G` bottom, `Ctrl+D`/`Ctrl+U` half-page scroll
 - ✅ Emacs bindings in insert mode — `Ctrl+A`/`E` start/end, `Ctrl+F`/`B` forward/back char, `Ctrl+D` delete forward, `Ctrl+K` delete to end, `Ctrl+W` delete word, `Ctrl+U` delete to line start
+
+### Detail Panel
+
 - ✅ Detail panel layout — always-visible side pane (40/60 split); auto-loads selected entry on navigation (120 ms debounce)
 - ✅ Detail panel text metadata — char/word/line count shown for text entries
 - ✅ Detail panel image metadata — dimensions and file size shown for image entries
 - ✅ Detail panel navigation — `Tab`/`l` enters the panel; `Tab`/`Esc` returns to the list
 - ✅ Detail panel cursor and motions — `hjkl`/`w`/`b`/`e`/`W`/`B`/`E`; `0`/`$`/`^` line
 - ✅ Detail panel visual select — `v`/`V`/`Ctrl+V` char/line/block; word motions extend char selection; `o`/`O` swap anchor corner; `y` copies selection
+- ⬜ Insert mode in detail panel — edit text content inline before copying; vim operator bindings (`ciw`, `dw`, etc.); `i`/`a`/`I`/`A`/`o`/`O` to enter insert; Escape back to normal; `y` copies the modified content
+
+### Fullscreen View
+
 - ✅ Fullscreen view — `Enter` from detail opens; `Escape` returns; full text/image filling the panel
 - ✅ Fullscreen navigation — `hjkl`/`w`/`b`/`e`/`W`/`B`/`E` cursor; `0`/`$`/`^` line; `gg`/`G`/`Ctrl+D`/`U` navigate
 - ✅ Fullscreen visual select — `v`/`V`/`Ctrl+V` char/line/block; word motions extend; `o`/`O` swap anchor corner; `y` copies selection
+- ⬜ Insert mode in fullscreen — same as detail panel insert mode, for the fullscreen view
+
+### Help
+
 - ✅ Help overlay — `?` opens a popup showing all mode bindings (normal / visual / insert) at once; `/` filters rows inline; popup shrinks to fit matches
-- ⬜ Make the help overlay context-aware — visually highlight the section that corresponds to the current mode (e.g. accent the header or show an indicator arrow), so all sections remain visible but the active one is called out
-- ✅ Fast search — haystacks pre-processed at load time; filter debounced at 80 ms; full-text cache updated via O(1) index lookup as decode streams in
-- ⬜ Insert mode in preview/fullscreen — edit the text content of an entry inline before copying; vim operator bindings (`ciw`, `dw`, `cit`, etc.); `i`/`a`/`I`/`A`/`o`/`O` to enter insert; Escape back to normal; `y` copies the (modified) content
-- ✅ Timestamp on entries — first-seen time shown right-aligned on each row ("just now" / "5m ago" / "3h ago" / "2d ago" / "4w ago"); persisted to `$XDG_DATA_HOME/kh-cliphist/meta/timestamps` (id‹TAB›unix_seconds per line); stale IDs pruned on each load; refreshes when the overlay is reopened
-- ⬜ Source app attribution — record the active Hyprland window at copy time and show it on each row. Attempted via `wl-paste --watch` + `hyprctl activewindow`, but accuracy is poor: (1) copying from within the cliphist overlay (a WlrLayershell layer surface) always reports the last regular window instead of nothing; (2) every copy-from-overlay creates a new cliphist entry that gets mis-attributed. A reliable implementation would need either a Hyprland plugin/event hook that fires on actual clipboard writes, or a wayland protocol that exposes the source client of a clipboard change.
-- ⬜ Auto-paste — close the window and simulate Ctrl+V into the previously focused app via `wtype`
+- ⬜ Context-aware help — visually highlight the section corresponding to the current mode; all sections remain visible but the active one is called out
+
+### Entry Management
+
 - ✅ Delete single entry — `d` in normal mode; confirmation popup; executes via `cliphist delete`; cursor repositions to the entry above
 - ✅ Delete range in visual mode — `d` deletes all entries in the selected range; confirmation popup before executing
 - ✅ Delete animation — fade-out on deleted entries
@@ -61,7 +75,20 @@ list of clipboard entries from `cliphist`. SUPER+V toggles it via IPC.
 - ✅ Pinned entries sort to top — pinned entries appear at the top of both unfiltered and search-filtered lists
 - ✅ Pin persistence — persisted to `$XDG_DATA_HOME/kh-cliphist/pins` (one entry ID per line); deleting a pinned entry removes it from the pin set
 - ✅ Pin visual indicator — 3 px coloured bar on the left edge of each pinned delegate row
-- ⬜ Batch pin in visual mode — `p` in visual mode toggles pin on all entries in the selected range; `handleVisualKey` currently does not handle `p`
+- ⬜ Batch pin in visual mode — `p` in visual mode toggles pin on all entries in the selected range
+
+### Metadata
+
+- ✅ Timestamp on entries — first-seen time shown right-aligned on each row ("just now" / "5m ago" / "3h ago" / "2d ago" / "4w ago"); persisted to `$XDG_DATA_HOME/kh-cliphist/meta/timestamps`; stale IDs pruned on each load; refreshes on reopen
+- ⬜ Source app attribution — record the active Hyprland window at copy time and show it on each row. Attempted via `wl-paste --watch` + `hyprctl activewindow`, but accuracy is poor: (1) copying from within the cliphist overlay always reports the last regular window; (2) every copy-from-overlay creates a mis-attributed entry. Needs a Hyprland plugin/event hook or a Wayland protocol that exposes the source client of a clipboard change.
+
+### IPC
+
+- ✅ IPC control — `toggle`, `setMode`, `nav`, `key`, `type`
+
+### Integration
+
+- ⬜ Auto-paste — close the window and simulate Ctrl+V into the previously focused app via `wtype`
 
 ---
 
