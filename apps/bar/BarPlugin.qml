@@ -30,6 +30,18 @@ Item {
         return "bar"
     }
 
+    // Walk the parent chain to find the nearest BarDropdown.col that exposes
+    // panelOpen. Returns true when not inside any dropdown (always visible).
+    // Use this to gate timers/polling so they stop when the panel is closed.
+    readonly property bool panelOpen: {
+        var p = parent
+        while (p) {
+            if (typeof p.panelOpen === 'boolean') return p.panelOpen
+            p = p.parent
+        }
+        return true
+    }
+
     implicitHeight: barHeight
 
     // Row uses width/height, not implicit* — bind them so plugins size correctly.
