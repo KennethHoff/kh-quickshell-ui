@@ -121,7 +121,7 @@ BarPlugin {
     Timer {
         id: _timer
         interval: 2000
-        running: true
+        running: root.visible
         repeat: true
         onTriggered: functionality.pollIfIdle()
     }
