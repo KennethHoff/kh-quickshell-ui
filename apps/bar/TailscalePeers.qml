@@ -165,7 +165,7 @@ Column {
                 anchors.fill: parent
                 color:        _cfg.color.base02
                 radius:       3
-                visible:      _exitMouse.containsMouse && !_exitDelegate._pending
+                visible:      _exitMouse.containsMouse
             }
 
             DropdownItem {
@@ -184,8 +184,7 @@ Column {
                 id:           _exitMouse
                 anchors.fill: parent
                 hoverEnabled: true
-                enabled:      !_exitDelegate._pending
-                onClicked:    source.setExitNode(_active ? "" : modelData.ip)
+                onClicked:    if (!_exitDelegate._pending) source.setExitNode(_active ? "" : modelData.ip)
             }
         }
     }
