@@ -159,94 +159,95 @@ A full status bar built in Quickshell, replacing Waybar.
   }
   ```
 - [65] ✅ Hierarchical IPC prefix — `ipcPrefix` propagates through `BarPlugin` → `BarRow` → `BarDropdown.col` via parent chain walk; each `BarGroup`/`BarDropdown` appends its `ipcName` segment so plugins get targets like `bar.controlcenter.tailscale` automatically; root prefix is `ipcName` from `mkBarConfig` (default `"bar"`), exposed as `programs.kh-ui.bar.ipcName` in the hm-module; `EthernetPanel` and `TailscalePanel` converted from `ControlTile` to `BarPlugin` base so they join the prefix chain regardless of popup nesting depth
-- [66] ⬜ Multi-bar support — allow N bars at arbitrary screen edges (top, bottom, left, right); `mkBarConfig` accepts a list of `{ edge, structure }` entries; each bar gets its own `PanelWindow` and generated `BarLayout`; `BarDropdown` opens its popup toward the screen interior so it works on any edge; currently kh-bar uses a single `PanelWindow` with no screen binding (multi-screen removed pending this entry)
+- [66] ⬜ Plugin error surface — a standard mechanism for plugins to report failures to the user; currently any subprocess that exits non-zero is silently ignored and the plugin stays in its last known state; needs a shared primitive (e.g. a visual error state on `ControlTile`, a toast, or a bar-level error badge) so plugins like `TailscalePanel` can surface "toggle failed" instead of doing nothing
+- [67] ⬜ Multi-bar support — allow N bars at arbitrary screen edges (top, bottom, left, right); `mkBarConfig` accepts a list of `{ edge, structure }` entries; each bar gets its own `PanelWindow` and generated `BarLayout`; `BarDropdown` opens its popup toward the screen interior so it works on any edge; currently kh-bar uses a single `PanelWindow` with no screen binding (multi-screen removed pending this entry)
 
 ### Workspaces
 
-- [67] ✅ Workspace display — show Hyprland workspaces; highlight the active workspace
-- [68] ✅ Workspace click to switch — click a workspace button to switch to it
-- [69] ✅ Workspace preview on hover — hovering a button for 300 ms shows a thumbnail popup; disappears on mouse leave
-- [70] ✅ Workspace preview thumbnails — composites per-window `ScreencopyView` captures at Hyprland IPC positions; scaled to 240 px wide
-- [71] ✅ Workspace preview badge — workspace name badge in the corner of the thumbnail
-- [72] ⬜ Workspace preview click-through — clicking a window inside the preview thumbnail focuses that specific window directly, not just the workspace
-- [73] ⬜ Submap indicator — show the active Hyprland submap name (e.g. `resize`, `passthrough`) in the bar when a non-default submap is active; hidden during normal operation; sourced from the `submap` Hyprland IPC event
-- [74] ⬜ Scratchpad indicator — show a count of hidden scratchpad windows; click cycles through them via `hyprctl dispatch togglespecialworkspace`; hidden when scratchpad is empty
+- [68] ✅ Workspace display — show Hyprland workspaces; highlight the active workspace
+- [69] ✅ Workspace click to switch — click a workspace button to switch to it
+- [70] ✅ Workspace preview on hover — hovering a button for 300 ms shows a thumbnail popup; disappears on mouse leave
+- [71] ✅ Workspace preview thumbnails — composites per-window `ScreencopyView` captures at Hyprland IPC positions; scaled to 240 px wide
+- [72] ✅ Workspace preview badge — workspace name badge in the corner of the thumbnail
+- [73] ⬜ Workspace preview click-through — clicking a window inside the preview thumbnail focuses that specific window directly, not just the workspace
+- [74] ⬜ Submap indicator — show the active Hyprland submap name (e.g. `resize`, `passthrough`) in the bar when a non-default submap is active; hidden during normal operation; sourced from the `submap` Hyprland IPC event
+- [75] ⬜ Scratchpad indicator — show a count of hidden scratchpad windows; click cycles through them via `hyprctl dispatch togglespecialworkspace`; hidden when scratchpad is empty
 
 ### Active Window
 
-- [75] ⬜ Active window title — display the focused window's app name and title
+- [76] ⬜ Active window title — display the focused window's app name and title
 
 ### Clock
 
-- [76] ✅ Clock — live HH:mm display, updates every second
-- [77] ⬜ Calendar dropdown — clock opens a dropdown on click; month grid with `h`/`j`/`k`/`l` navigation
-- [78] ⬜ Unit converter tab — accessible from the calendar dropdown; length, weight, temperature, etc.
-- [79] ⬜ Stopwatch — start/stop/reset via click or IPC; elapsed time shown in the bar while running; hidden when stopped; supports multiple named concurrent stopwatches, each shown as a separate chip in the bar
+- [77] ✅ Clock — live HH:mm display, updates every second
+- [78] ⬜ Calendar dropdown — clock opens a dropdown on click; month grid with `h`/`j`/`k`/`l` navigation
+- [79] ⬜ Unit converter tab — accessible from the calendar dropdown; length, weight, temperature, etc.
+- [80] ⬜ Stopwatch — start/stop/reset via click or IPC; elapsed time shown in the bar while running; hidden when stopped; supports multiple named concurrent stopwatches, each shown as a separate chip in the bar
 
 ### Audio
 
-- [80] ✅ Volume scroll — scroll on the widget to adjust volume via PipeWire; hidden when no sink is available
-- [81] ✅ Mute toggle — click the widget to toggle mute via PipeWire
-- [82] ⬜ Microphone mute toggle — mutes the configured virtual PipeWire source node (not the physical device); the setup uses virtual sinks and sources that physical devices and apps route through, so mute targets the virtual node to silence all inputs simultaneously; configured via Nix with the target node name
-- [83] ⬜ Output device quick switch — right-click or dropdown on the volume widget to select between available PipeWire sinks without opening the full Audio Mixer
+- [81] ✅ Volume scroll — scroll on the widget to adjust volume via PipeWire; hidden when no sink is available
+- [82] ✅ Mute toggle — click the widget to toggle mute via PipeWire
+- [83] ⬜ Microphone mute toggle — mutes the configured virtual PipeWire source node (not the physical device); the setup uses virtual sinks and sources that physical devices and apps route through, so mute targets the virtual node to silence all inputs simultaneously; configured via Nix with the target node name
+- [84] ⬜ Output device quick switch — right-click or dropdown on the volume widget to select between available PipeWire sinks without opening the full Audio Mixer
 
 ### Media (MPRIS)
 
-- [84] ✅ MPRIS playback controls — prev/play-pause/next buttons
-- [85] ✅ MPRIS track display — artist and title shown alongside controls
-- [86] ✅ MPRIS visibility — shows the first active player; hidden when no player is active
-- [87] ⬜ MPRIS multi-source — when more than one player is active, show a dropdown (or similar) to select which source is displayed rather than always picking the first one
-- [88] ⬜ Seek bar — progress indicator showing position within the current track; click or drag to seek; sourced from MPRIS `Position` and `Length` metadata
-- [89] ⬜ Album art — thumbnail of the current track's artwork sourced from MPRIS `mpris:artUrl`; shown alongside artist/title
-- [90] ⬜ Shuffle / repeat toggles — buttons reflecting and toggling the MPRIS `Shuffle` and `LoopStatus` properties
+- [85] ✅ MPRIS playback controls — prev/play-pause/next buttons
+- [86] ✅ MPRIS track display — artist and title shown alongside controls
+- [87] ✅ MPRIS visibility — shows the first active player; hidden when no player is active
+- [88] ⬜ MPRIS multi-source — when more than one player is active, show a dropdown (or similar) to select which source is displayed rather than always picking the first one
+- [89] ⬜ Seek bar — progress indicator showing position within the current track; click or drag to seek; sourced from MPRIS `Position` and `Length` metadata
+- [90] ⬜ Album art — thumbnail of the current track's artwork sourced from MPRIS `mpris:artUrl`; shown alongside artist/title
+- [91] ⬜ Shuffle / repeat toggles — buttons reflecting and toggling the MPRIS `Shuffle` and `LoopStatus` properties
 
 ### System Tray
 
-- [91] ✅ Taskbar icons — tray icons via StatusNotifierItem protocol; left click activates, right click shows native context menu via `display()`; hidden when no items present
-- [92] ⬜ Overflow bucket — when icon count exceeds a configured limit, least-recently-interacted icons collapse into an expander chip; click expander to reveal the overflow tray
+- [92] ✅ Taskbar icons — tray icons via StatusNotifierItem protocol; left click activates, right click shows native context menu via `display()`; hidden when no items present
+- [93] ⬜ Overflow bucket — when icon count exceeds a configured limit, least-recently-interacted icons collapse into an expander chip; click expander to reveal the overflow tray
 
 ### Tailscale
 
-- [93] ✅ Tailscale status polling — polls `tailscale status --json` every 10 s; parses `BackendState`, `TailscaleIPs`, and `Peer` map; exposes `connected`, `selfIp`, and `peers` for use in `TailscalePeers`
-- [94] ✅ Tailscale tile appearance — `ControlTile`-based pill; label + IP sublabel; highlights when connected via `activeColor`
-- [95] ✅ Tailscale toggle on click — click the tile to run `tailscale up`/`down` and re-poll on exit; requires `tailscale` added to `extraBins` for the bar config so it is available as a Nix store path; also requires the user to be set as operator once: `sudo tailscale up --operator=$USER` (note: `tailscale set --operator` is [broken upstream](https://github.com/tailscale/tailscale/issues/18294); `extraUpFlags` in the NixOS module only applies when `authKeyFile` is set)
-- [96] ✅ IPC — `bar.tailscale` target exposes `isConnected()`, `getSelfIp()`, `toggle()`
-- [97] ⬜ Toggle error feedback — when `tailscale up`/`down` exits non-zero, surface the failure visibly on the tile (e.g. flash red, show a brief error sublabel, or emit a notification); currently the tile silently stays in its previous state; the most common cause is the operator not being configured (`sudo tailscale up --operator=$USER`)
-- [98] ⬜ Exit node selection — list exit-node-capable peers; click one to run `tailscale set --exit-node=<ip>`; highlight active exit node; click again (or a clear button) to disable
-- [99] ⬜ Advertise exit node toggle — button to run `tailscale set --advertise-exit-node` on/off for the local machine
-- [100] ⬜ Shields-up toggle — toggle `tailscale set --shields-up` to block incoming connections; reflected in the tile UI
+- [94] ✅ Tailscale status polling — polls `tailscale status --json` every 10 s; parses `BackendState`, `TailscaleIPs`, and `Peer` map; exposes `connected`, `selfIp`, and `peers` for use in `TailscalePeers`
+- [95] ✅ Tailscale tile appearance — `ControlTile`-based pill; label + IP sublabel; highlights when connected via `activeColor`
+- [96] ✅ Tailscale toggle on click — click the tile to run `tailscale up`/`down` and re-poll on exit; requires `tailscale` added to `extraBins` for the bar config so it is available as a Nix store path; also requires the user to be set as operator once: `sudo tailscale up --operator=$USER` (note: `tailscale set --operator` is [broken upstream](https://github.com/tailscale/tailscale/issues/18294); `extraUpFlags` in the NixOS module only applies when `authKeyFile` is set)
+- [97] ✅ IPC — `bar.tailscale` target exposes `isConnected()`, `getSelfIp()`, `toggle()`
+- [98] ⬜ Toggle error feedback — when `tailscale up`/`down` exits non-zero, surface the failure visibly on the tile (e.g. flash red, show a brief error sublabel, or emit a notification); currently the tile silently stays in its previous state; the most common cause is the operator not being configured (`sudo tailscale up --operator=$USER`)
+- [99] ⬜ Exit node selection — list exit-node-capable peers; click one to run `tailscale set --exit-node=<ip>`; highlight active exit node; click again (or a clear button) to disable
+- [100] ⬜ Advertise exit node toggle — button to run `tailscale set --advertise-exit-node` on/off for the local machine
+- [101] ⬜ Shields-up toggle — toggle `tailscale set --shields-up` to block incoming connections; reflected in the tile UI
 
 ### Sonarr
 
-- [101] ⬜ Sonarr — badge when new episodes are downloaded; click to open a panel showing recently grabbed episodes and upcoming releases (polls Sonarr API)
+- [102] ⬜ Sonarr — badge when new episodes are downloaded; click to open a panel showing recently grabbed episodes and upcoming releases (polls Sonarr API)
 
 ### Network
 
-- [102] ⬜ Network status — show active wired interface name and link state via nmcli; hidden when disconnected
+- [103] ⬜ Network status — show active wired interface name and link state via nmcli; hidden when disconnected
 
 ### System Stats
 
-- [103] ⬜ CPU usage — utilisation % across all cores; updates on a short interval; hidden when idle below a threshold
-- [104] ⬜ RAM usage — used/total memory; sourced from `/proc/meminfo`
-- [105] ⬜ GPU stats — utilisation % and VRAM used/total for AMD (`/sys/class/drm`) or Nvidia (`nvml`); hidden when idle below a threshold
-- [106] ⬜ Disk usage — used/total for one or more configured mount points (e.g. `/`, `/home`)
-- [107] ⬜ Temperature — CPU and GPU temps via `/sys/class/hwmon`; colour-coded (cool → warm → hot); shown alongside the corresponding CPU/GPU stat
+- [104] ⬜ CPU usage — utilisation % across all cores; updates on a short interval; hidden when idle below a threshold
+- [105] ⬜ RAM usage — used/total memory; sourced from `/proc/meminfo`
+- [106] ⬜ GPU stats — utilisation % and VRAM used/total for AMD (`/sys/class/drm`) or Nvidia (`nvml`); hidden when idle below a threshold
+- [107] ⬜ Disk usage — used/total for one or more configured mount points (e.g. `/`, `/home`)
+- [108] ⬜ Temperature — CPU and GPU temps via `/sys/class/hwmon`; colour-coded (cool → warm → hot); shown alongside the corresponding CPU/GPU stat
 
 ### Docker
 
-- [108] ⬜ Docker status — running container count badge; click opens a panel listing all containers with name, image, and status
-- [109] ⬜ Container actions — start/stop/restart individual containers from the panel
-- [110] ⬜ Log tail — select a container in the panel and stream its logs inline (`docker logs -f`)
+- [109] ⬜ Docker status — running container count badge; click opens a panel listing all containers with name, image, and status
+- [110] ⬜ Container actions — start/stop/restart individual containers from the panel
+- [111] ⬜ Log tail — select a container in the panel and stream its logs inline (`docker logs -f`)
 
 ### Aspire
 
-- [111] ⬜ Aspire status — running service count badge sourced from `aspire ps`; hidden when no Aspire session is active
-- [112] ⬜ Aspire panel — click to open a list of all services with their state, endpoint URLs, and health; click a URL to open in browser
-- [113] ⬜ Resource drill-down — select a service to tail its structured logs inline
+- [112] ⬜ Aspire status — running service count badge sourced from `aspire ps`; hidden when no Aspire session is active
+- [113] ⬜ Aspire panel — click to open a list of all services with their state, endpoint URLs, and health; click a URL to open in browser
+- [114] ⬜ Resource drill-down — select a service to tail its structured logs inline
 
 ### Notifications
 
-- [114] ⬜ Notifications indicator — unread badge count in the bar; click opens the Notification Center panel
+- [115] ⬜ Notifications indicator — unread badge count in the bar; click opens the Notification Center panel
 
 ---
 
@@ -259,14 +260,14 @@ Disturb toggle.
 
 ### Toasts
 
-- [115] ⬜ Incoming toasts — transient popup per notification with app icon, summary, and body; auto-dismisses after timeout
-- [116] ⬜ Urgency handling — `critical` notifications ignore DND and persist until dismissed; `low` notifications skip the toast entirely
+- [116] ⬜ Incoming toasts — transient popup per notification with app icon, summary, and body; auto-dismisses after timeout
+- [117] ⬜ Urgency handling — `critical` notifications ignore DND and persist until dismissed; `low` notifications skip the toast entirely
 
 ### History Panel
 
-- [117] ⬜ Persistent history panel — toggle via SUPER or bar button; all notifications since last clear, grouped by app; dismiss individual or all
-- [118] ⬜ Action buttons — render notification action buttons; click executes the action via DBus reply
-- [119] ⬜ Do Not Disturb toggle — suppress toasts while enabled; history still accumulates; togglable from the bar and the panel
+- [118] ⬜ Persistent history panel — toggle via SUPER or bar button; all notifications since last clear, grouped by app; dismiss individual or all
+- [119] ⬜ Action buttons — render notification action buttons; click executes the action via DBus reply
+- [120] ⬜ Do Not Disturb toggle — suppress toasts while enabled; history still accumulates; togglable from the bar and the panel
 
 ---
 
@@ -279,14 +280,14 @@ IPC/keybind.
 
 ### Core
 
-- [120] ⬜ Stream list — all active PipeWire audio streams grouped by app, with app icon and name
-- [121] ⬜ Per-app volume slider — drag or scroll to adjust individual stream volume
-- [122] ⬜ Per-app mute toggle — click to mute/unmute a stream
-- [123] ⬜ Output device selector — choose the default sink from a list of available PipeWire sinks
+- [121] ⬜ Stream list — all active PipeWire audio streams grouped by app, with app icon and name
+- [122] ⬜ Per-app volume slider — drag or scroll to adjust individual stream volume
+- [123] ⬜ Per-app mute toggle — click to mute/unmute a stream
+- [124] ⬜ Output device selector — choose the default sink from a list of available PipeWire sinks
 
 ### Visualization
 
-- [124] ⬜ Live activity indicator — VU meter or pulse animation showing which streams are currently producing audio
+- [125] ⬜ Live activity indicator — VU meter or pulse animation showing which streams are currently producing audio
 
 ---
 
@@ -298,10 +299,10 @@ progress bar and icon, then fades out automatically.
 
 ### Core
 
-- [125] ⬜ Volume OSD — appears on volume up/down/mute shortcuts; shows icon and progress bar reflecting the new level
-- [126] ⬜ Brightness OSD — appears on brightness shortcuts; same layout as volume OSD
-- [127] ⬜ Auto-dismiss — fades out after ~2 s; timer resets if the value changes again before dismissal
-- [128] ⬜ IPC trigger — `qs ipc call osd show --value <0–100> --icon <name>` so any keybind daemon can drive it
+- [126] ⬜ Volume OSD — appears on volume up/down/mute shortcuts; shows icon and progress bar reflecting the new level
+- [127] ⬜ Brightness OSD — appears on brightness shortcuts; same layout as volume OSD
+- [128] ⬜ Auto-dismiss — fades out after ~2 s; timer resets if the value changes again before dismissal
+- [129] ⬜ IPC trigger — `qs ipc call osd show --value <0–100> --icon <name>` so any keybind daemon can drive it
 
 ---
 
@@ -312,25 +313,25 @@ or stdin; shows all files side-by-side with Tab to cycle focus between panes.
 
 ### Core
 
-- [129] ✅ `nix run .#kh-view -- <file> [<file2> ...]` or `<cmd> | nix run .#kh-view`
-- [130] ✅ Image detection by extension (png/jpg/jpeg/gif/webp/bmp/svg)
-- [131] ✅ N files shown side-by-side in equal-width panes; Tab cycles focus; active divider highlights
-- [132] ✅ `q`/`Esc` quits
-- [133] ✅ IPC — `target: "viewer"`; `next()`/`prev()`/`seek(n)`/`quit()`/`setFullscreen(bool)`/`key(k)`; readable props `currentIndex`, `count`, `fullscreen`, `hasPrev`, `hasNext`
-- [134] ⬜ Optional pane labels — each pane optionally shows a header bar with a short name and description; `kh-view` accepts label metadata alongside each file via a sidecar format or extended list protocol *(implement together with Dev Tooling → screenshot skill labels)*
-- [135] ⬜ Monitor selection — `--monitor <name|index>` flag; defaults to the monitor containing the active window
+- [130] ✅ `nix run .#kh-view -- <file> [<file2> ...]` or `<cmd> | nix run .#kh-view`
+- [131] ✅ Image detection by extension (png/jpg/jpeg/gif/webp/bmp/svg)
+- [132] ✅ N files shown side-by-side in equal-width panes; Tab cycles focus; active divider highlights
+- [133] ✅ `q`/`Esc` quits
+- [134] ✅ IPC — `target: "viewer"`; `next()`/`prev()`/`seek(n)`/`quit()`/`setFullscreen(bool)`/`key(k)`; readable props `currentIndex`, `count`, `fullscreen`, `hasPrev`, `hasNext`
+- [135] ⬜ Optional pane labels — each pane optionally shows a header bar with a short name and description; `kh-view` accepts label metadata alongside each file via a sidecar format or extended list protocol *(implement together with Dev Tooling → screenshot skill labels)*
+- [136] ⬜ Monitor selection — `--monitor <name|index>` flag; defaults to the monitor containing the active window
 
 ### Navigation
 
-- [136] ✅ Per-pane cursor and motions — `hjkl`/`w`/`b`/`e`/`W`/`B`/`E`; `0`/`$`/`^` line; `gg`/`G`/`Ctrl+D`/`U` scroll
-- [137] ✅ Per-pane visual select — `v`/`V`/`Ctrl+V` char/line/block; word motions extend; `y` copies selection
-- [138] ✅ Fullscreen mode — `f` toggles single fullscreen pane; `h`/`l` steps through all loaded files; dot indicators at bottom center
+- [137] ✅ Per-pane cursor and motions — `hjkl`/`w`/`b`/`e`/`W`/`B`/`E`; `0`/`$`/`^` line; `gg`/`G`/`Ctrl+D`/`U` scroll
+- [138] ✅ Per-pane visual select — `v`/`V`/`Ctrl+V` char/line/block; word motions extend; `y` copies selection
+- [139] ✅ Fullscreen mode — `f` toggles single fullscreen pane; `h`/`l` steps through all loaded files; dot indicators at bottom center
 
 ### Content
 
-- [139] ⬜ Syntax highlighting — detect language from file extension; apply token-level colouring using Tree-sitter or `bat` themes
-- [140] ⬜ Directory and glob input — `kh-view ./images/` opens all recognised media files; `kh-view ./images/*.png` expands the glob; files sorted by name
-- [141] ⬜ Image gallery mode — `g` toggles a grid thumbnail view when all panes are images; `hjkl` navigate; Enter opens selected image fullscreen
+- [140] ⬜ Syntax highlighting — detect language from file extension; apply token-level colouring using Tree-sitter or `bat` themes
+- [141] ⬜ Directory and glob input — `kh-view ./images/` opens all recognised media files; `kh-view ./images/*.png` expands the glob; files sorted by name
+- [142] ⬜ Image gallery mode — `g` toggles a grid thumbnail view when all panes are images; `hjkl` navigate; Enter opens selected image fullscreen
 
 ---
 
@@ -342,18 +343,18 @@ keybind or IPC, or open by clicking a System Stats bar widget.
 
 ### Core
 
-- [142] ⬜ Process list — all running processes with PID, name, CPU %, and RAM usage; sourced from `/proc`
-- [143] ⬜ Sort — cycle sort column with `s`; toggle ascending/descending with `S`
-- [144] ⬜ Filter — `/` to search by process name
-- [145] ⬜ IPC trigger — openable from bar widget clicks on CPU or RAM
+- [143] ⬜ Process list — all running processes with PID, name, CPU %, and RAM usage; sourced from `/proc`
+- [144] ⬜ Sort — cycle sort column with `s`; toggle ascending/descending with `S`
+- [145] ⬜ Filter — `/` to search by process name
+- [146] ⬜ IPC trigger — openable from bar widget clicks on CPU or RAM
 
 ### Actions
 
-- [146] ⬜ Kill — `k` sends SIGTERM to the selected process; `K` sends SIGKILL; confirmation popup before executing
+- [147] ⬜ Kill — `k` sends SIGTERM to the selected process; `K` sends SIGKILL; confirmation popup before executing
 
 ### Views
 
-- [147] ⬜ Tree view — `t` toggles parent/child process tree layout
+- [148] ⬜ Tree view — `t` toggles parent/child process tree layout
 
 ---
 
@@ -364,15 +365,15 @@ Side-by-side two-pane file diff. `kh-diff file1 file2` or pipe from `git diff`
 
 ### Core
 
-- [148] ⬜ Two-pane diff — left/right panes showing old and new versions with added/removed/changed lines highlighted
-- [149] ⬜ Pipe input — `git diff | kh-diff` or `diff -u a b | kh-diff` reads unified diff from stdin and renders it
-- [150] ⬜ IPC — same pattern as File Viewer
+- [149] ⬜ Two-pane diff — left/right panes showing old and new versions with added/removed/changed lines highlighted
+- [150] ⬜ Pipe input — `git diff | kh-diff` or `diff -u a b | kh-diff` reads unified diff from stdin and renders it
+- [151] ⬜ IPC — same pattern as File Viewer
 
 ### Navigation
 
-- [151] ⬜ `]c` / `[c` jump to next/previous change hunk
-- [152] ⬜ `Tab` cycles focus between panes; `hjkl` scroll within a pane; `gg`/`G`/`Ctrl+D`/`U` navigate
-- [153] ⬜ `y` copies the selected hunk or visual selection
+- [152] ⬜ `]c` / `[c` jump to next/previous change hunk
+- [153] ⬜ `Tab` cycles focus between panes; `hjkl` scroll within a pane; `gg`/`G`/`Ctrl+D`/`U` navigate
+- [154] ⬜ `y` copies the selected hunk or visual selection
 
 ---
 
@@ -384,15 +385,15 @@ via keybind or IPC.
 
 ### Core
 
-- [154] ⬜ Region capture — `slurp` crosshair selection; result copied to clipboard via `wl-copy`
-- [155] ⬜ Fullscreen capture — capture the focused monitor immediately
-- [156] ⬜ Window capture — click to select a window; captures its geometry via Hyprland IPC
-- [157] ⬜ IPC trigger — `qs ipc call screenshot <region|fullscreen|window>` so any keybind daemon can drive it
+- [155] ⬜ Region capture — `slurp` crosshair selection; result copied to clipboard via `wl-copy`
+- [156] ⬜ Fullscreen capture — capture the focused monitor immediately
+- [157] ⬜ Window capture — click to select a window; captures its geometry via Hyprland IPC
+- [158] ⬜ IPC trigger — `qs ipc call screenshot <region|fullscreen|window>` so any keybind daemon can drive it
 
 ### Output
 
-- [158] ⬜ Save to file — write to `$XDG_PICTURES_DIR/Screenshots/` with a timestamp filename in addition to clipboard copy
-- [159] ⬜ Annotation layer — draw arrows, boxes, and text over the capture before copying/saving
+- [159] ⬜ Save to file — write to `$XDG_PICTURES_DIR/Screenshots/` with a timestamp filename in addition to clipboard copy
+- [160] ⬜ Annotation layer — draw arrows, boxes, and text over the capture before copying/saving
 
 ---
 
@@ -400,8 +401,8 @@ via keybind or IPC.
 
 Improvements to the Claude skills and agentic development workflow.
 
-- [160] ⬜ `screenshot` skill passes labels to `kh-view` — once kh-view supports optional pane labels, update the skill to supply a name and short description for each shot (what app/state it shows, what to look for); makes review sessions self-documenting without manual annotation *(implement together with File Viewer → optional pane labels)*
-- [161] ⬜ Headless Hyprland for workspace preview screenshots — `kh-bar`'s Workspaces plugin uses
+- [161] ⬜ `screenshot` skill passes labels to `kh-view` — once kh-view supports optional pane labels, update the skill to supply a name and short description for each shot (what app/state it shows, what to look for); makes review sessions self-documenting without manual annotation *(implement together with File Viewer → optional pane labels)*
+- [162] ⬜ Headless Hyprland for workspace preview screenshots — `kh-bar`'s Workspaces plugin uses
   `Quickshell.Hyprland` types and `ScreencopyView`, which require a live Hyprland session;
   Sway headless can't drive them.
 
