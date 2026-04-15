@@ -37,6 +37,7 @@ list of clipboard entries from `cliphist`. SUPER+V toggles it via IPC.
 - ✅ Search filters — `img:` / `text:` type filter, `'` exact substring match
 - ✅ Entry counter in footer
 - ✅ Fast search — haystacks pre-processed at load time; filter debounced at 80 ms; full-text cache updated via O(1) index lookup as decode streams in
+- ✅ IPC — `toggle`, `setMode`, `nav`, `key`, `type`
 
 ### Navigation
 
@@ -81,10 +82,6 @@ list of clipboard entries from `cliphist`. SUPER+V toggles it via IPC.
 
 - ✅ Timestamp on entries — first-seen time shown right-aligned on each row ("just now" / "5m ago" / "3h ago" / "2d ago" / "4w ago"); persisted to `$XDG_DATA_HOME/kh-cliphist/meta/timestamps`; stale IDs pruned on each load; refreshes on reopen
 - ⬜ Source app attribution — record the active Hyprland window at copy time and show it on each row. Attempted via `wl-paste --watch` + `hyprctl activewindow`, but accuracy is poor: (1) copying from within the cliphist overlay always reports the last regular window; (2) every copy-from-overlay creates a mis-attributed entry. Needs a Hyprland plugin/event hook or a Wayland protocol that exposes the source client of a clipboard change.
-
-### IPC
-
-- ✅ IPC control — `toggle`, `setMode`, `nav`, `key`, `type`
 
 ### Integration
 
@@ -259,11 +256,16 @@ and a persistent history panel (toggle via SUPER or bar button). Groups
 notifications by app, supports action buttons, and integrates a Do Not
 Disturb toggle.
 
+### Toasts
+
 - ⬜ Incoming toasts — transient popup per notification with app icon, summary, and body; auto-dismisses after timeout
+- ⬜ Urgency handling — `critical` notifications ignore DND and persist until dismissed; `low` notifications skip the toast entirely
+
+### History Panel
+
 - ⬜ Persistent history panel — toggle via SUPER or bar button; all notifications since last clear, grouped by app; dismiss individual or all
 - ⬜ Action buttons — render notification action buttons; click executes the action via DBus reply
 - ⬜ Do Not Disturb toggle — suppress toasts while enabled; history still accumulates; togglable from the bar and the panel
-- ⬜ Urgency handling — `critical` notifications ignore DND and persist until dismissed; `low` notifications skip the toast entirely
 
 ---
 
@@ -274,11 +276,16 @@ streams grouped by app, with per-app volume sliders, mute toggles, and live
 visualizations indicating which apps are currently producing audio. Toggle via
 IPC/keybind.
 
+### Core
+
 - ⬜ Stream list — all active PipeWire audio streams grouped by app, with app icon and name
 - ⬜ Per-app volume slider — drag or scroll to adjust individual stream volume
 - ⬜ Per-app mute toggle — click to mute/unmute a stream
-- ⬜ Live activity indicator — VU meter or pulse animation showing which streams are currently producing audio
 - ⬜ Output device selector — choose the default sink from a list of available PipeWire sinks
+
+### Visualization
+
+- ⬜ Live activity indicator — VU meter or pulse animation showing which streams are currently producing audio
 
 ---
 
@@ -287,6 +294,8 @@ IPC/keybind.
 Transient overlay that appears briefly when volume or brightness changes via
 keyboard shortcuts, replacing SwayOSD or mako-based notifications. Shows a
 progress bar and icon, then fades out automatically.
+
+### Core
 
 - ⬜ Volume OSD — appears on volume up/down/mute shortcuts; shows icon and progress bar reflecting the new level
 - ⬜ Brightness OSD — appears on brightness shortcuts; same layout as volume OSD
@@ -300,18 +309,27 @@ progress bar and icon, then fades out automatically.
 One-shot viewer for arbitrary text or image files. Accepts N file arguments
 or stdin; shows all files side-by-side with Tab to cycle focus between panes.
 
+### Core
+
 - ✅ `nix run .#kh-view -- <file> [<file2> ...]` or `<cmd> | nix run .#kh-view`
 - ✅ Image detection by extension (png/jpg/jpeg/gif/webp/bmp/svg)
 - ✅ N files shown side-by-side in equal-width panes; Tab cycles focus; active divider highlights
-- ✅ Per-pane: `hjkl`/`w`/`b`/`e`/`W`/`B`/`E` cursor; `0`/`$`/`^` line; `gg`/`G`/`Ctrl+D`/`U` scroll; `v`/`V`/`Ctrl+V` char/line/block visual select; word motions extend char selection; `y` copies selection
 - ✅ `q`/`Esc` quits
-- ✅ Fullscreen mode — `f` toggles single fullscreen pane; `h`/`l` steps through all loaded files; dot indicators at bottom center show position
-- ✅ IPC support — `target: "viewer"`; `next()`/`prev()`/`seek(n)`/`quit()`/`setFullscreen(bool)`/`key(k)`; readable props `currentIndex`, `count`, `fullscreen`, `hasPrev`, `hasNext`; enables scripted slideshows and library review workflows
-- ⬜ Optional pane labels — `kh-view` accepts label metadata alongside each file (e.g. via a sidecar format or extended list protocol); each pane optionally shows a header bar with a short name and description; used by the `screenshot` skill to annotate review sessions with context about what each shot shows and what to look for *(implement together with Dev Tooling → screenshot skill labels)*
-- ⬜ Monitor selection — `--monitor <name|index>` flag to open the window on a specific monitor; defaults to the monitor containing the active window
-- ⬜ Syntax highlighting — detect language from file extension and apply token-level colouring using Tree-sitter or `bat` themes; code files become significantly easier to read
-- ⬜ Directory and glob input — `kh-view ./images/` opens all recognised media files in a directory; `kh-view ./images/*.png` expands the glob; files sorted by name by default
-- ⬜ Image gallery mode — when all panes are images, `g` toggles a grid thumbnail view; `h`/`j`/`k`/`l` navigate the grid; Enter opens the selected image in fullscreen; natural entry point when opening a directory of images
+- ✅ IPC — `target: "viewer"`; `next()`/`prev()`/`seek(n)`/`quit()`/`setFullscreen(bool)`/`key(k)`; readable props `currentIndex`, `count`, `fullscreen`, `hasPrev`, `hasNext`
+- ⬜ Optional pane labels — each pane optionally shows a header bar with a short name and description; `kh-view` accepts label metadata alongside each file via a sidecar format or extended list protocol *(implement together with Dev Tooling → screenshot skill labels)*
+- ⬜ Monitor selection — `--monitor <name|index>` flag; defaults to the monitor containing the active window
+
+### Navigation
+
+- ✅ Per-pane cursor and motions — `hjkl`/`w`/`b`/`e`/`W`/`B`/`E`; `0`/`$`/`^` line; `gg`/`G`/`Ctrl+D`/`U` scroll
+- ✅ Per-pane visual select — `v`/`V`/`Ctrl+V` char/line/block; word motions extend; `y` copies selection
+- ✅ Fullscreen mode — `f` toggles single fullscreen pane; `h`/`l` steps through all loaded files; dot indicators at bottom center
+
+### Content
+
+- ⬜ Syntax highlighting — detect language from file extension; apply token-level colouring using Tree-sitter or `bat` themes
+- ⬜ Directory and glob input — `kh-view ./images/` opens all recognised media files; `kh-view ./images/*.png` expands the glob; files sorted by name
+- ⬜ Image gallery mode — `g` toggles a grid thumbnail view when all panes are images; `hjkl` navigate; Enter opens selected image fullscreen
 
 ---
 
@@ -321,12 +339,20 @@ Keyboard-driven process viewer, replacing `htop`. Shows running processes
 sortable by CPU, RAM, or name; `k` kills the selected process. Toggle via
 keybind or IPC, or open by clicking a System Stats bar widget.
 
+### Core
+
 - ⬜ Process list — all running processes with PID, name, CPU %, and RAM usage; sourced from `/proc`
 - ⬜ Sort — cycle sort column with `s`; toggle ascending/descending with `S`
 - ⬜ Filter — `/` to search by process name
-- ⬜ Kill — `k` sends SIGTERM to the selected process; `K` sends SIGKILL; confirmation popup before executing
-- ⬜ Tree view — `t` toggles parent/child process tree layout
 - ⬜ IPC trigger — openable from bar widget clicks on CPU or RAM
+
+### Actions
+
+- ⬜ Kill — `k` sends SIGTERM to the selected process; `K` sends SIGKILL; confirmation popup before executing
+
+### Views
+
+- ⬜ Tree view — `t` toggles parent/child process tree layout
 
 ---
 
@@ -335,12 +361,17 @@ keybind or IPC, or open by clicking a System Stats bar widget.
 Side-by-side two-pane file diff. `kh-diff file1 file2` or pipe from `git diff`
 / `diff`. Keyboard-driven; vim motion navigation. Natural sibling to File Viewer.
 
+### Core
+
 - ⬜ Two-pane diff — left/right panes showing old and new versions with added/removed/changed lines highlighted
 - ⬜ Pipe input — `git diff | kh-diff` or `diff -u a b | kh-diff` reads unified diff from stdin and renders it
+- ⬜ IPC — same pattern as File Viewer
+
+### Navigation
+
 - ⬜ `]c` / `[c` jump to next/previous change hunk
 - ⬜ `Tab` cycles focus between panes; `hjkl` scroll within a pane; `gg`/`G`/`Ctrl+D`/`U` navigate
 - ⬜ `y` copies the selected hunk or visual selection
-- ⬜ IPC support — same pattern as File Viewer
 
 ---
 
@@ -350,12 +381,17 @@ Region/window/fullscreen capture tool, replacing Flameshot. Captures via
 `grim`/`slurp`; result goes to clipboard or is saved to a file. Triggered
 via keybind or IPC.
 
+### Core
+
 - ⬜ Region capture — `slurp` crosshair selection; result copied to clipboard via `wl-copy`
 - ⬜ Fullscreen capture — capture the focused monitor immediately
 - ⬜ Window capture — click to select a window; captures its geometry via Hyprland IPC
+- ⬜ IPC trigger — `qs ipc call screenshot <region|fullscreen|window>` so any keybind daemon can drive it
+
+### Output
+
 - ⬜ Save to file — write to `$XDG_PICTURES_DIR/Screenshots/` with a timestamp filename in addition to clipboard copy
 - ⬜ Annotation layer — draw arrows, boxes, and text over the capture before copying/saving
-- ⬜ IPC trigger — `qs ipc call screenshot <region|fullscreen|window>` so any keybind daemon can drive it
 
 ---
 
