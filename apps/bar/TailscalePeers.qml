@@ -1,9 +1,13 @@
 // Tailscale peer list section for use inside ControlPanel.
 // Binds to a TailscalePanel instance via the `source` property to show
-// this machine's Tailscale IP and all peers with online/offline status.
+// this machine's Tailscale IP, all peers, and available exit nodes.
 //
 // Clicking a peer row runs `tailscale ping -c 1 <ip>` and shows the
 // round-trip latency in the secondary label. The result clears after 5 s.
+//
+// Clicking an exit node row sets it as the active exit node via
+// `tailscale set --exit-node <ip>`; clicking the active exit node clears
+// it. The active exit node is highlighted in base0A.
 //
 // Hidden when source has no connected peers.
 //
@@ -22,6 +26,8 @@ Column {
     width:   parent.width
     spacing: 4
     visible: source !== null && source.connected && source.peers.length > 0
+
+    // ── Peers ──────────────────────────────────────────────────────────────
 
     DropdownDivider {
         dividerColor: _cfg.color.base02
@@ -114,6 +120,54 @@ Column {
             MouseArea {
                 anchors.fill: parent
                 onClicked: functionality.ping()
+            }
+        }
+    }
+
+    // ── Exit nodes ─────────────────────────────────────────────────────────
+
+    property var _exitPeers: source ? source.peers.filter(p => p.exitNodeOption) : []
+
+    DropdownDivider {
+        dividerColor: _cfg.color.base02
+        visible:      _exitPeers.length > 0
+    }
+
+    DropdownHeader {
+        text:       "exit nodes"
+        textColor:  _cfg.color.base04
+        fontFamily: _cfg.fontFamily
+        fontSize:   _cfg.fontSize
+        visible:    _exitPeers.length > 0
+    }
+
+    Repeater {
+        model: _exitPeers
+        delegate: Item {
+            id: _exitDelegate
+
+            readonly property bool _active:  source && modelData.ip === source.exitNodeIp
+            readonly property bool _pending: source ? source.exitNodePending : false
+
+            width:          parent ? parent.width : 280
+            implicitHeight: _exitItem.implicitHeight
+
+            DropdownItem {
+                id: _exitItem
+                dotColor:       _active ? _cfg.color.base0A : _cfg.color.base03
+                primaryText:    modelData.hostname
+                primaryColor:   _active ? _cfg.color.base0A : _cfg.color.base05
+                secondaryText:  _pending && _active ? "…"
+                                    : (_active ? "active" : modelData.ip)
+                secondaryColor: _active ? _cfg.color.base0A : _cfg.color.base03
+                fontFamily:     _cfg.fontFamily
+                fontSize:       _cfg.fontSize
+            }
+
+            MouseArea {
+                anchors.fill: parent
+                enabled:      !_exitDelegate._pending
+                onClicked:    source.setExitNode(_active ? "" : modelData.ip)
             }
         }
     }

@@ -215,7 +215,7 @@ A full status bar built in Quickshell, replacing Waybar.
 - [5] ✅ Toggle pending state — while `tailscale up`/`down` is running, the tile pulses its opacity and shows `...` as the sublabel; double-clicks are ignored; opacity resets on completion
 - [6] ⬜ Toggle error feedback — when `tailscale up`/`down` exits non-zero, surface the failure visibly on the tile (e.g. flash red, show a brief error sublabel, or emit a notification); currently the tile silently stays in its previous state; the most common cause is the operator not being configured (`sudo tailscale up --operator=$USER`)
 - [7] ✅ Peer ping — click a peer row in `TailscalePeers` to run `tailscale ping -c 1 <ip>` and display the round-trip latency inline; secondary label shows `ping…` while in flight, then the latency (e.g. `24ms`) in `base0E`; clears back to IP after 5 s; double-click ignored while pending
-- [8] ⬜ Exit node selection — list exit-node-capable peers; click one to run `tailscale set --exit-node=<ip>`; highlight active exit node; click again (or a clear button) to disable
+- [8] ✅ Exit node selection — exit-node-capable peers shown in a separate section in `TailscalePeers`; click to run `tailscale set --exit-node <ip>`; active exit node highlighted in `base0A` with "active" sublabel; click again to clear; pending state blocks double-clicks and shows `…` on the active row
 - [9] ⬜ Advertise exit node toggle — button to run `tailscale set --advertise-exit-node` on/off for the local machine
 - [10] ⬜ Shields-up toggle — toggle `tailscale set --shields-up` to block incoming connections; reflected in the tile UI
 
