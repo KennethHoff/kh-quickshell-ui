@@ -18,8 +18,8 @@ Features to implement. Each entry becomes its own Quickshell component or launch
 
 Hardcoded assumptions that should be user-configurable.
 
-- ⬜ **Configurable terminal** — `kh-launcher` hardcodes `bin.kitty` for apps with `Terminal=true`; should be a Nix option (e.g. `programs.kh-ui.launcher.terminal`) defaulting to nothing, forcing the user to set it
-- ⬜ **`kitty` removed from universal `ffi.nix` bins** — `kitty` is injected into every app's `NixBins.qml` even for apps that never launch a terminal (bar, cliphist, view); move it to the launcher-specific `extraBins` instead
+- ✅ **Configurable terminal** — `programs.kh-ui.launcher.terminal` option (defaults to `pkgs.kitty`); injected as `bin.terminal` into the launcher's `NixBins.qml` via `extraBins`; `kh-launcher.qml` uses `bin.terminal` instead of `bin.kitty`
+- ✅ **`kitty` removed from universal `ffi.nix` bins** — moved to launcher-specific `extraBins` as `terminal`; no longer injected into bar, cliphist, or view configs
 - ⬜ **Hyprland-only `exec-once` wiring** — `hm-module.nix` only adds apps to `exec-once` when `wayland.windowManager.hyprland.enable` is true; users on Sway or other compositors get no autostart integration; needs a generic autostart mechanism or at minimum a `programs.kh-ui.autostart` option the user can wire up themselves
 
 ---

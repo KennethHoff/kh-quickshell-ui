@@ -27,7 +27,7 @@ ShellRoot {
         id: impl
         function launchApp(exec, terminal, workspace): void {
             let cmd = exec
-            if (terminal) cmd = bin.kitty + " -- bash -c " + JSON.stringify(cmd)
+            if (terminal) cmd = bin.terminal + " -- bash -c " + JSON.stringify(cmd)
 
             if (workspace > 0) {
                 launchProcess.command = [

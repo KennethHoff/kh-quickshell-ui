@@ -131,6 +131,7 @@
         name = "launcher";
         extraBins = {
           scanApps = toString scanAppsScript;
+          terminal = lib.getExe pkgs.kitty;
         };
       };
 

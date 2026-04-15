@@ -73,10 +73,18 @@ in
       description = "Enable the clipboard history viewer (kh-cliphist).";
     };
 
-    launcher.enable = lib.mkOption {
-      type = lib.types.bool;
-      default = false;
-      description = "Enable the application launcher (kh-launcher).";
+    launcher = {
+      enable = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = "Enable the application launcher (kh-launcher).";
+      };
+      terminal = lib.mkOption {
+        type = lib.types.package;
+        default = pkgs.kitty;
+        defaultText = lib.literalExpression "pkgs.kitty";
+        description = "Terminal emulator used to launch apps with Terminal=true in their .desktop entry.";
+      };
     };
 
     view.enable = lib.mkOption {
@@ -169,6 +177,7 @@ in
               name = "launcher";
               extraBins = {
                 scanApps = toString scanAppsScript;
+                terminal = lib.getExe config.programs.kh-ui.launcher.terminal;
               };
             };
           }
