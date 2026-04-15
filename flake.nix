@@ -143,6 +143,7 @@
       };
 
       barConfig = mkBarConfig {
+        ipcName = "dev-bar";
         structure = ''
           BarRow {
               Workspaces {}
