@@ -181,8 +181,7 @@ A full status bar built in Quickshell, replacing Waybar.
 
 - [1] ✅ Clock — live HH:mm display, updates every second
 - [2] ⬜ Calendar dropdown — clock opens a dropdown on click; month grid with `h`/`j`/`k`/`l` navigation
-- [3] ⬜ Unit converter tab — accessible from the calendar dropdown; length, weight, temperature, etc.
-- [4] ⬜ Stopwatch — start/stop/reset via click or IPC; elapsed time shown in the bar while running; hidden when stopped; supports multiple named concurrent stopwatches, each shown as a separate chip in the bar
+- [3] ⬜ Stopwatch — start/stop/reset via click or IPC; elapsed time shown in the bar while running; hidden when stopped; supports multiple named concurrent stopwatches, each shown as a separate chip in the bar
 
 ### Audio
 
