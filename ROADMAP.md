@@ -162,7 +162,10 @@ A full status bar built in Quickshell, replacing Waybar.
 
 ### Tailscale
 
-- ✅ Tailscale tile — `TailscalePanel` toggles `tailscale up`/`down` on click; status updates reactively after the command completes; exposes `connected`, `selfIp`, and `peers` for use in `TailscalePeers`
+- ✅ Tailscale status polling — polls `tailscale status --json` every 10 s; parses `BackendState`, `TailscaleIPs`, and `Peer` map; exposes `connected`, `selfIp`, and `peers` for use in `TailscalePeers`
+- ✅ Tailscale tile appearance — `ControlTile`-based pill; label + IP sublabel; highlights when connected via `activeColor`
+- ⬜ Tailscale toggle on click — click the tile to run `tailscale up`/`down` and re-poll on exit; requires `tailscale` added to `extraBins` for the bar config so it is available as a Nix store path
+- ✅ IPC — `bar.tailscale` target exposes `isConnected()`, `getSelfIp()`, `toggle()`
 - ⬜ Exit node selection — list exit-node-capable peers; click one to run `tailscale set --exit-node=<ip>`; highlight active exit node; click again (or a clear button) to disable
 - ⬜ Advertise exit node toggle — button to run `tailscale set --advertise-exit-node` on/off for the local machine
 - ⬜ Shields-up toggle — toggle `tailscale set --shields-up` to block incoming connections; reflected in the tile UI
