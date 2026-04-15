@@ -14,9 +14,11 @@ BarPlugin {
         bodySupported: true
         imageSupported: false
         persistenceSupported: false
+
+        onNotification: notification => { notification.tracked = true }
     }
 
-    readonly property int unreadCount: server.notifications.values.length
+    readonly property int unreadCount: server.trackedNotifications.values.length
 
     visible: unreadCount > 0
     implicitWidth: visible ? label.implicitWidth + 24 : 0
