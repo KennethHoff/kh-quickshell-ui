@@ -110,8 +110,9 @@ in
         type = lib.types.str;
         description = ''
           QML structure for the bar layout. The string is placed verbatim
-          inside the root BarLayout Item, which exposes <literal>barHeight</literal>
-          and <literal>barWindow</literal> to all children via the parent chain.
+          inside the root BarLayout Item, which exposes <literal>barHeight</literal>,
+          <literal>barWindow</literal>, and <literal>ipcPrefix</literal> to all
+          children via the parent chain.
 
           Use <literal>BarRow</literal> for a full-width row and
           <literal>BarSpacer</literal> to push items apart (CSS space-between
