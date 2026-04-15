@@ -38,8 +38,8 @@ BarPlugin {
     // ── IPC ────────────────────────────────────────────────────────────────
     IpcHandler {
         target: ipcPrefix + ".tailscale"
-        function isConnected(): bool { return _state.connected }
-        function getSelfIp(): string { return _state.selfIp }
+        function isConnected(): bool  { return _state.connected }
+        function getSelfIp(): string  { return _state.selfIp }
         function toggle(): void      { functionality.toggle() }
     }
 
@@ -121,7 +121,7 @@ BarPlugin {
     Timer {
         id: _timer
         interval: 2000
-        running: root.visible
+        running: root.panelOpen
         repeat: true
         onTriggered: functionality.pollIfIdle()
     }
