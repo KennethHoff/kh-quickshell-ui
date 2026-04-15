@@ -211,41 +211,42 @@ A full status bar built in Quickshell, replacing Waybar.
 - [94] ✅ Tailscale tile appearance — `ControlTile`-based pill; label + IP sublabel; highlights when connected via `activeColor`
 - [95] ✅ Tailscale toggle on click — click the tile to run `tailscale up`/`down` and re-poll on exit; requires `tailscale` added to `extraBins` for the bar config so it is available as a Nix store path; also requires the user to be set as operator once: `sudo tailscale up --operator=$USER` (note: `tailscale set --operator` is [broken upstream](https://github.com/tailscale/tailscale/issues/18294); `extraUpFlags` in the NixOS module only applies when `authKeyFile` is set)
 - [96] ✅ IPC — `bar.tailscale` target exposes `isConnected()`, `getSelfIp()`, `toggle()`
-- [97] ⬜ Exit node selection — list exit-node-capable peers; click one to run `tailscale set --exit-node=<ip>`; highlight active exit node; click again (or a clear button) to disable
-- [98] ⬜ Advertise exit node toggle — button to run `tailscale set --advertise-exit-node` on/off for the local machine
-- [99] ⬜ Shields-up toggle — toggle `tailscale set --shields-up` to block incoming connections; reflected in the tile UI
+- [97] ⬜ Toggle error feedback — when `tailscale up`/`down` exits non-zero, surface the failure visibly on the tile (e.g. flash red, show a brief error sublabel, or emit a notification); currently the tile silently stays in its previous state; the most common cause is the operator not being configured (`sudo tailscale up --operator=$USER`)
+- [98] ⬜ Exit node selection — list exit-node-capable peers; click one to run `tailscale set --exit-node=<ip>`; highlight active exit node; click again (or a clear button) to disable
+- [99] ⬜ Advertise exit node toggle — button to run `tailscale set --advertise-exit-node` on/off for the local machine
+- [100] ⬜ Shields-up toggle — toggle `tailscale set --shields-up` to block incoming connections; reflected in the tile UI
 
 ### Sonarr
 
-- [100] ⬜ Sonarr — badge when new episodes are downloaded; click to open a panel showing recently grabbed episodes and upcoming releases (polls Sonarr API)
+- [101] ⬜ Sonarr — badge when new episodes are downloaded; click to open a panel showing recently grabbed episodes and upcoming releases (polls Sonarr API)
 
 ### Network
 
-- [101] ⬜ Network status — show active wired interface name and link state via nmcli; hidden when disconnected
+- [102] ⬜ Network status — show active wired interface name and link state via nmcli; hidden when disconnected
 
 ### System Stats
 
-- [102] ⬜ CPU usage — utilisation % across all cores; updates on a short interval; hidden when idle below a threshold
-- [103] ⬜ RAM usage — used/total memory; sourced from `/proc/meminfo`
-- [104] ⬜ GPU stats — utilisation % and VRAM used/total for AMD (`/sys/class/drm`) or Nvidia (`nvml`); hidden when idle below a threshold
-- [105] ⬜ Disk usage — used/total for one or more configured mount points (e.g. `/`, `/home`)
-- [106] ⬜ Temperature — CPU and GPU temps via `/sys/class/hwmon`; colour-coded (cool → warm → hot); shown alongside the corresponding CPU/GPU stat
+- [103] ⬜ CPU usage — utilisation % across all cores; updates on a short interval; hidden when idle below a threshold
+- [104] ⬜ RAM usage — used/total memory; sourced from `/proc/meminfo`
+- [105] ⬜ GPU stats — utilisation % and VRAM used/total for AMD (`/sys/class/drm`) or Nvidia (`nvml`); hidden when idle below a threshold
+- [106] ⬜ Disk usage — used/total for one or more configured mount points (e.g. `/`, `/home`)
+- [107] ⬜ Temperature — CPU and GPU temps via `/sys/class/hwmon`; colour-coded (cool → warm → hot); shown alongside the corresponding CPU/GPU stat
 
 ### Docker
 
-- [107] ⬜ Docker status — running container count badge; click opens a panel listing all containers with name, image, and status
-- [108] ⬜ Container actions — start/stop/restart individual containers from the panel
-- [109] ⬜ Log tail — select a container in the panel and stream its logs inline (`docker logs -f`)
+- [108] ⬜ Docker status — running container count badge; click opens a panel listing all containers with name, image, and status
+- [109] ⬜ Container actions — start/stop/restart individual containers from the panel
+- [110] ⬜ Log tail — select a container in the panel and stream its logs inline (`docker logs -f`)
 
 ### Aspire
 
-- [110] ⬜ Aspire status — running service count badge sourced from `aspire ps`; hidden when no Aspire session is active
-- [111] ⬜ Aspire panel — click to open a list of all services with their state, endpoint URLs, and health; click a URL to open in browser
-- [112] ⬜ Resource drill-down — select a service to tail its structured logs inline
+- [111] ⬜ Aspire status — running service count badge sourced from `aspire ps`; hidden when no Aspire session is active
+- [112] ⬜ Aspire panel — click to open a list of all services with their state, endpoint URLs, and health; click a URL to open in browser
+- [113] ⬜ Resource drill-down — select a service to tail its structured logs inline
 
 ### Notifications
 
-- [113] ⬜ Notifications indicator — unread badge count in the bar; click opens the Notification Center panel
+- [114] ⬜ Notifications indicator — unread badge count in the bar; click opens the Notification Center panel
 
 ---
 
@@ -258,14 +259,14 @@ Disturb toggle.
 
 ### Toasts
 
-- [114] ⬜ Incoming toasts — transient popup per notification with app icon, summary, and body; auto-dismisses after timeout
-- [115] ⬜ Urgency handling — `critical` notifications ignore DND and persist until dismissed; `low` notifications skip the toast entirely
+- [115] ⬜ Incoming toasts — transient popup per notification with app icon, summary, and body; auto-dismisses after timeout
+- [116] ⬜ Urgency handling — `critical` notifications ignore DND and persist until dismissed; `low` notifications skip the toast entirely
 
 ### History Panel
 
-- [116] ⬜ Persistent history panel — toggle via SUPER or bar button; all notifications since last clear, grouped by app; dismiss individual or all
-- [117] ⬜ Action buttons — render notification action buttons; click executes the action via DBus reply
-- [118] ⬜ Do Not Disturb toggle — suppress toasts while enabled; history still accumulates; togglable from the bar and the panel
+- [117] ⬜ Persistent history panel — toggle via SUPER or bar button; all notifications since last clear, grouped by app; dismiss individual or all
+- [118] ⬜ Action buttons — render notification action buttons; click executes the action via DBus reply
+- [119] ⬜ Do Not Disturb toggle — suppress toasts while enabled; history still accumulates; togglable from the bar and the panel
 
 ---
 
@@ -278,14 +279,14 @@ IPC/keybind.
 
 ### Core
 
-- [119] ⬜ Stream list — all active PipeWire audio streams grouped by app, with app icon and name
-- [120] ⬜ Per-app volume slider — drag or scroll to adjust individual stream volume
-- [121] ⬜ Per-app mute toggle — click to mute/unmute a stream
-- [122] ⬜ Output device selector — choose the default sink from a list of available PipeWire sinks
+- [120] ⬜ Stream list — all active PipeWire audio streams grouped by app, with app icon and name
+- [121] ⬜ Per-app volume slider — drag or scroll to adjust individual stream volume
+- [122] ⬜ Per-app mute toggle — click to mute/unmute a stream
+- [123] ⬜ Output device selector — choose the default sink from a list of available PipeWire sinks
 
 ### Visualization
 
-- [123] ⬜ Live activity indicator — VU meter or pulse animation showing which streams are currently producing audio
+- [124] ⬜ Live activity indicator — VU meter or pulse animation showing which streams are currently producing audio
 
 ---
 
@@ -297,10 +298,10 @@ progress bar and icon, then fades out automatically.
 
 ### Core
 
-- [124] ⬜ Volume OSD — appears on volume up/down/mute shortcuts; shows icon and progress bar reflecting the new level
-- [125] ⬜ Brightness OSD — appears on brightness shortcuts; same layout as volume OSD
-- [126] ⬜ Auto-dismiss — fades out after ~2 s; timer resets if the value changes again before dismissal
-- [127] ⬜ IPC trigger — `qs ipc call osd show --value <0–100> --icon <name>` so any keybind daemon can drive it
+- [125] ⬜ Volume OSD — appears on volume up/down/mute shortcuts; shows icon and progress bar reflecting the new level
+- [126] ⬜ Brightness OSD — appears on brightness shortcuts; same layout as volume OSD
+- [127] ⬜ Auto-dismiss — fades out after ~2 s; timer resets if the value changes again before dismissal
+- [128] ⬜ IPC trigger — `qs ipc call osd show --value <0–100> --icon <name>` so any keybind daemon can drive it
 
 ---
 
@@ -311,25 +312,25 @@ or stdin; shows all files side-by-side with Tab to cycle focus between panes.
 
 ### Core
 
-- [128] ✅ `nix run .#kh-view -- <file> [<file2> ...]` or `<cmd> | nix run .#kh-view`
-- [129] ✅ Image detection by extension (png/jpg/jpeg/gif/webp/bmp/svg)
-- [130] ✅ N files shown side-by-side in equal-width panes; Tab cycles focus; active divider highlights
-- [131] ✅ `q`/`Esc` quits
-- [132] ✅ IPC — `target: "viewer"`; `next()`/`prev()`/`seek(n)`/`quit()`/`setFullscreen(bool)`/`key(k)`; readable props `currentIndex`, `count`, `fullscreen`, `hasPrev`, `hasNext`
-- [133] ⬜ Optional pane labels — each pane optionally shows a header bar with a short name and description; `kh-view` accepts label metadata alongside each file via a sidecar format or extended list protocol *(implement together with Dev Tooling → screenshot skill labels)*
-- [134] ⬜ Monitor selection — `--monitor <name|index>` flag; defaults to the monitor containing the active window
+- [129] ✅ `nix run .#kh-view -- <file> [<file2> ...]` or `<cmd> | nix run .#kh-view`
+- [130] ✅ Image detection by extension (png/jpg/jpeg/gif/webp/bmp/svg)
+- [131] ✅ N files shown side-by-side in equal-width panes; Tab cycles focus; active divider highlights
+- [132] ✅ `q`/`Esc` quits
+- [133] ✅ IPC — `target: "viewer"`; `next()`/`prev()`/`seek(n)`/`quit()`/`setFullscreen(bool)`/`key(k)`; readable props `currentIndex`, `count`, `fullscreen`, `hasPrev`, `hasNext`
+- [134] ⬜ Optional pane labels — each pane optionally shows a header bar with a short name and description; `kh-view` accepts label metadata alongside each file via a sidecar format or extended list protocol *(implement together with Dev Tooling → screenshot skill labels)*
+- [135] ⬜ Monitor selection — `--monitor <name|index>` flag; defaults to the monitor containing the active window
 
 ### Navigation
 
-- [135] ✅ Per-pane cursor and motions — `hjkl`/`w`/`b`/`e`/`W`/`B`/`E`; `0`/`$`/`^` line; `gg`/`G`/`Ctrl+D`/`U` scroll
-- [136] ✅ Per-pane visual select — `v`/`V`/`Ctrl+V` char/line/block; word motions extend; `y` copies selection
-- [137] ✅ Fullscreen mode — `f` toggles single fullscreen pane; `h`/`l` steps through all loaded files; dot indicators at bottom center
+- [136] ✅ Per-pane cursor and motions — `hjkl`/`w`/`b`/`e`/`W`/`B`/`E`; `0`/`$`/`^` line; `gg`/`G`/`Ctrl+D`/`U` scroll
+- [137] ✅ Per-pane visual select — `v`/`V`/`Ctrl+V` char/line/block; word motions extend; `y` copies selection
+- [138] ✅ Fullscreen mode — `f` toggles single fullscreen pane; `h`/`l` steps through all loaded files; dot indicators at bottom center
 
 ### Content
 
-- [138] ⬜ Syntax highlighting — detect language from file extension; apply token-level colouring using Tree-sitter or `bat` themes
-- [139] ⬜ Directory and glob input — `kh-view ./images/` opens all recognised media files; `kh-view ./images/*.png` expands the glob; files sorted by name
-- [140] ⬜ Image gallery mode — `g` toggles a grid thumbnail view when all panes are images; `hjkl` navigate; Enter opens selected image fullscreen
+- [139] ⬜ Syntax highlighting — detect language from file extension; apply token-level colouring using Tree-sitter or `bat` themes
+- [140] ⬜ Directory and glob input — `kh-view ./images/` opens all recognised media files; `kh-view ./images/*.png` expands the glob; files sorted by name
+- [141] ⬜ Image gallery mode — `g` toggles a grid thumbnail view when all panes are images; `hjkl` navigate; Enter opens selected image fullscreen
 
 ---
 
@@ -341,18 +342,18 @@ keybind or IPC, or open by clicking a System Stats bar widget.
 
 ### Core
 
-- [141] ⬜ Process list — all running processes with PID, name, CPU %, and RAM usage; sourced from `/proc`
-- [142] ⬜ Sort — cycle sort column with `s`; toggle ascending/descending with `S`
-- [143] ⬜ Filter — `/` to search by process name
-- [144] ⬜ IPC trigger — openable from bar widget clicks on CPU or RAM
+- [142] ⬜ Process list — all running processes with PID, name, CPU %, and RAM usage; sourced from `/proc`
+- [143] ⬜ Sort — cycle sort column with `s`; toggle ascending/descending with `S`
+- [144] ⬜ Filter — `/` to search by process name
+- [145] ⬜ IPC trigger — openable from bar widget clicks on CPU or RAM
 
 ### Actions
 
-- [145] ⬜ Kill — `k` sends SIGTERM to the selected process; `K` sends SIGKILL; confirmation popup before executing
+- [146] ⬜ Kill — `k` sends SIGTERM to the selected process; `K` sends SIGKILL; confirmation popup before executing
 
 ### Views
 
-- [146] ⬜ Tree view — `t` toggles parent/child process tree layout
+- [147] ⬜ Tree view — `t` toggles parent/child process tree layout
 
 ---
 
@@ -363,15 +364,15 @@ Side-by-side two-pane file diff. `kh-diff file1 file2` or pipe from `git diff`
 
 ### Core
 
-- [147] ⬜ Two-pane diff — left/right panes showing old and new versions with added/removed/changed lines highlighted
-- [148] ⬜ Pipe input — `git diff | kh-diff` or `diff -u a b | kh-diff` reads unified diff from stdin and renders it
-- [149] ⬜ IPC — same pattern as File Viewer
+- [148] ⬜ Two-pane diff — left/right panes showing old and new versions with added/removed/changed lines highlighted
+- [149] ⬜ Pipe input — `git diff | kh-diff` or `diff -u a b | kh-diff` reads unified diff from stdin and renders it
+- [150] ⬜ IPC — same pattern as File Viewer
 
 ### Navigation
 
-- [150] ⬜ `]c` / `[c` jump to next/previous change hunk
-- [151] ⬜ `Tab` cycles focus between panes; `hjkl` scroll within a pane; `gg`/`G`/`Ctrl+D`/`U` navigate
-- [152] ⬜ `y` copies the selected hunk or visual selection
+- [151] ⬜ `]c` / `[c` jump to next/previous change hunk
+- [152] ⬜ `Tab` cycles focus between panes; `hjkl` scroll within a pane; `gg`/`G`/`Ctrl+D`/`U` navigate
+- [153] ⬜ `y` copies the selected hunk or visual selection
 
 ---
 
@@ -383,15 +384,15 @@ via keybind or IPC.
 
 ### Core
 
-- [153] ⬜ Region capture — `slurp` crosshair selection; result copied to clipboard via `wl-copy`
-- [154] ⬜ Fullscreen capture — capture the focused monitor immediately
-- [155] ⬜ Window capture — click to select a window; captures its geometry via Hyprland IPC
-- [156] ⬜ IPC trigger — `qs ipc call screenshot <region|fullscreen|window>` so any keybind daemon can drive it
+- [154] ⬜ Region capture — `slurp` crosshair selection; result copied to clipboard via `wl-copy`
+- [155] ⬜ Fullscreen capture — capture the focused monitor immediately
+- [156] ⬜ Window capture — click to select a window; captures its geometry via Hyprland IPC
+- [157] ⬜ IPC trigger — `qs ipc call screenshot <region|fullscreen|window>` so any keybind daemon can drive it
 
 ### Output
 
-- [157] ⬜ Save to file — write to `$XDG_PICTURES_DIR/Screenshots/` with a timestamp filename in addition to clipboard copy
-- [158] ⬜ Annotation layer — draw arrows, boxes, and text over the capture before copying/saving
+- [158] ⬜ Save to file — write to `$XDG_PICTURES_DIR/Screenshots/` with a timestamp filename in addition to clipboard copy
+- [159] ⬜ Annotation layer — draw arrows, boxes, and text over the capture before copying/saving
 
 ---
 
@@ -399,8 +400,8 @@ via keybind or IPC.
 
 Improvements to the Claude skills and agentic development workflow.
 
-- [159] ⬜ `screenshot` skill passes labels to `kh-view` — once kh-view supports optional pane labels, update the skill to supply a name and short description for each shot (what app/state it shows, what to look for); makes review sessions self-documenting without manual annotation *(implement together with File Viewer → optional pane labels)*
-- [160] ⬜ Headless Hyprland for workspace preview screenshots — `kh-bar`'s Workspaces plugin uses
+- [160] ⬜ `screenshot` skill passes labels to `kh-view` — once kh-view supports optional pane labels, update the skill to supply a name and short description for each shot (what app/state it shows, what to look for); makes review sessions self-documenting without manual annotation *(implement together with File Viewer → optional pane labels)*
+- [161] ⬜ Headless Hyprland for workspace preview screenshots — `kh-bar`'s Workspaces plugin uses
   `Quickshell.Hyprland` types and `ScreencopyView`, which require a live Hyprland session;
   Sway headless can't drive them.
 
