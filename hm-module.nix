@@ -17,31 +17,32 @@ let
 
   cliphistDecodeAll = import (src + "/scripts/cliphist-decode-all.nix") { inherit pkgs lib; };
 
-  scanAppsScript    = import (src + "/scripts/scan-apps.nix")           { inherit pkgs lib; };
+  scanAppsScript = import (src + "/scripts/scan-apps.nix") { inherit pkgs lib; };
 
   nixConfig = import (src + "/config.nix") {
     inherit pkgs;
-    colors   = config.lib.stylix.colors;
+    colors = config.lib.stylix.colors;
     fontName = config.stylix.fonts.sansSerif.name;
     fontSize = config.stylix.fonts.sizes.applications;
   };
 
   mkAppConfig =
-    { name
-    , extraBins ? {}
-    , generatedFiles ? {}
-    , extraPluginDirs ? []
+    {
+      name,
+      extraBins ? { },
+      generatedFiles ? { },
+      extraPluginDirs ? [ ],
     }:
     let
-      appDir     = src + "/apps/${name}";
+      appDir = src + "/apps/${name}";
       pluginsDir = src + "/apps/${name}/plugins";
-      nixBins    = import (src + "/ffi.nix") { inherit pkgs lib extraBins; };
+      nixBins = import (src + "/ffi.nix") { inherit pkgs lib extraBins; };
     in
     pkgs.runCommandLocal "qs-kh-${name}" { } ''
       mkdir -p $out/lib
       cp ${src}/lib/*.qml $out/lib/
       cp ${src}/apps/kh-${name}.qml $out/shell.qml
-      ${lib.optionalString (builtins.pathExists appDir)     "cp ${appDir}/*.qml $out/"}
+      ${lib.optionalString (builtins.pathExists appDir) "cp ${appDir}/*.qml $out/"}
       ${lib.optionalString (builtins.pathExists pluginsDir) "cp ${pluginsDir}/*.qml $out/"}
       ${lib.concatStrings (lib.mapAttrsToList (dest: path: "cp ${path} $out/${dest}\n") generatedFiles)}
       ${lib.concatMapStrings (d: "cp ${toString d}/*.qml $out/\n") extraPluginDirs}
@@ -50,10 +51,15 @@ let
     '';
 
   mkBarConfig =
-    { structure, extraPluginDirs ? [] }:
+    {
+      structure,
+      extraPluginDirs ? [ ],
+    }:
     mkAppConfig {
       name = "bar";
-      generatedFiles = { "BarLayout.qml" = import (src + "/bar-config.nix") { inherit pkgs structure; }; };
+      generatedFiles = {
+        "BarLayout.qml" = import (src + "/bar-config.nix") { inherit pkgs structure; };
+      };
       inherit extraPluginDirs;
     };
 in
@@ -88,25 +94,25 @@ in
       structure = lib.mkOption {
         type = lib.types.str;
         default = ''
-              BarRow {
-                  Workspaces {}
-                  MediaPlayer {}
-                  BarSpacer {}
-                  BarGroup {
-                      label: "●●●"
-                      ipcName: "controlcenter"
-                      panelWidth: 300
-                      Row {
-                          spacing: 8
-                          EthernetPanel {}
-                          TailscalePanel { id: ts }
-                      }
-                      TailscalePeers { source: ts }
+          BarRow {
+              Workspaces {}
+              MediaPlayer {}
+              BarSpacer {}
+              BarGroup {
+                  label: "●●●"
+                  ipcName: "controlcenter"
+                  panelWidth: 300
+                  Row {
+                      spacing: 8
+                      EthernetPanel {}
+                      TailscalePanel { id: ts }
                   }
-                  Clock {}
-                  Volume {}
-                  Tray {}
+                  TailscalePeers { source: ts }
               }
+              Clock {}
+              Volume {}
+              Tray {}
+          }
         '';
         description = ''
           QML structure for the bar layout. The string is placed verbatim
@@ -169,21 +175,25 @@ in
           lib.optionalAttrs config.programs.kh-ui.clipboard-history.enable {
             kh-cliphist = mkAppConfig {
               name = "cliphist";
-              extraBins = { cliphistDecodeAll = toString cliphistDecodeAll; };
+              extraBins = {
+                cliphistDecodeAll = toString cliphistDecodeAll;
+              };
             };
-          } //
-          lib.optionalAttrs config.programs.kh-ui.bar.enable {
+          }
+          // lib.optionalAttrs config.programs.kh-ui.bar.enable {
             kh-bar = mkBarConfig {
               inherit (config.programs.kh-ui.bar) structure extraPluginDirs;
             };
-          } //
-          lib.optionalAttrs config.programs.kh-ui.launcher.enable {
+          }
+          // lib.optionalAttrs config.programs.kh-ui.launcher.enable {
             kh-launcher = mkAppConfig {
               name = "launcher";
-              extraBins = { scanApps = toString scanAppsScript; };
+              extraBins = {
+                scanApps = toString scanAppsScript;
+              };
             };
-          } //
-          lib.optionalAttrs config.programs.kh-ui.view.enable {
+          }
+          // lib.optionalAttrs config.programs.kh-ui.view.enable {
             kh-view = mkAppConfig { name = "view"; };
           };
       };
@@ -193,18 +203,18 @@ in
           (pkgs.writeShellScriptBin "kh-cliphist" ''
             exec ${lib.getExe pkgs.quickshell} -c kh-cliphist "$@"
           '')
-        ] ++
-        lib.optionals config.programs.kh-ui.launcher.enable [
+        ]
+        ++ lib.optionals config.programs.kh-ui.launcher.enable [
           (pkgs.writeShellScriptBin "kh-launcher" ''
             exec ${lib.getExe pkgs.quickshell} -c kh-launcher "$@"
           '')
-        ] ++
-        lib.optionals config.programs.kh-ui.bar.enable [
+        ]
+        ++ lib.optionals config.programs.kh-ui.bar.enable [
           (pkgs.writeShellScriptBin "kh-bar" ''
             exec ${lib.getExe pkgs.quickshell} -c kh-bar "$@"
           '')
-        ] ++
-        lib.optionals config.programs.kh-ui.view.enable [
+        ]
+        ++ lib.optionals config.programs.kh-ui.view.enable [
           (pkgs.writeShellScriptBin "kh-view" ''
             exec ${lib.getExe pkgs.quickshell} -c kh-view "$@"
           '')
@@ -216,11 +226,11 @@ in
         lib.optionals config.programs.kh-ui.clipboard-history.enable [
           "${lib.getExe pkgs.quickshell} -c kh-cliphist"
           "${lib.getExe' pkgs.wl-clipboard "wl-paste"} --watch ${lib.getExe pkgs.cliphist} store"
-        ] ++
-        lib.optionals config.programs.kh-ui.launcher.enable [
+        ]
+        ++ lib.optionals config.programs.kh-ui.launcher.enable [
           "${lib.getExe pkgs.quickshell} -c kh-launcher"
-        ] ++
-        lib.optionals config.programs.kh-ui.bar.enable [
+        ]
+        ++ lib.optionals config.programs.kh-ui.bar.enable [
           "${lib.getExe pkgs.quickshell} -c kh-bar"
         ];
     })

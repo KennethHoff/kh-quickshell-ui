@@ -17,7 +17,8 @@ pkgs.writeText "NixBins.qml" ''
       readonly property string kitty:    "${lib.getExe pkgs.kitty}"
       readonly property string stat:     "${lib.getExe' pkgs.coreutils "stat"}"
       readonly property string wlCopy:   "${lib.getExe' pkgs.wl-clipboard "wl-copy"}"
-      ${lib.concatStringsSep "\n      "
-        (lib.mapAttrsToList (name: val: ''readonly property string ${name}: "${val}"'') extraBins)}
+      ${lib.concatStringsSep "\n      " (
+        lib.mapAttrsToList (name: val: ''readonly property string ${name}: "${val}"'') extraBins
+      )}
   }
 ''
