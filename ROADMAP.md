@@ -298,15 +298,32 @@ IPC/keybind.
 
 ## OSD
 
-Transient overlay that appears briefly when volume or brightness changes via
-keyboard shortcuts, replacing SwayOSD or mako-based notifications. Shows a
-progress bar and icon, then fades out automatically.
+Transient overlay that appears briefly on system events such as volume
+changes. Currently a single hardcoded volume display; the end goal is a
+plugin architecture matching the bar — user-composable slots, each slot an
+independent QML component with its own PipeWire/system bindings and IPC,
+so any combination of indicators can be shown without forking the daemon.
 
 ### Core
 
-- [1] ✅ Volume OSD — appears on volume up/down/mute shortcuts; shows icon and progress bar reflecting the new level
-- [3] ✅ Auto-dismiss — fades out after ~2 s; timer resets if the value changes again before dismissal
-- [4] ✅ IPC trigger — `qs ipc call osd showVolume <0–100>` / `qs ipc call osd showMuted` so any keybind daemon can drive it
+- [1] ✅ Volume OSD — appears on volume up/down/mute; shows icon and progress bar reflecting the new level
+- [2] ✅ Auto-dismiss — fades out after ~2 s; timer resets if the value changes again before dismissal
+- [3] ✅ IPC trigger — `qs ipc call osd showVolume <0–100>` / `qs ipc call osd showMuted`
+- [4] ⬜ Plugin system — replace hardcoded volume slot with user-composable OSD plugins, following the same pattern as the bar (`OsdPlugin` base type, `nix.osd.structure` config string, `extraPluginDirs`)
+- [5] ⬜ Volume plugin — extract current volume display into a first-party `OsdVolume` plugin
+- [6] ⬜ Per-plugin dismiss timer — each active plugin manages its own visibility and timer independently so multiple plugins can coexist without interfering
+
+### Audio plugins
+
+Each plugin is **reactive** — subscribes to its own signal source, self-triggers on a state transition, then dismisses. The daemon needs no upfront knowledge of individual plugins.
+
+- **OsdVolume** *(first-party, extracted from current impl)* — volume level on up/down/mute; icon + progress bar via PipeWire
+- **OsdMicMute** — microphone mute toggle indicator; useful for push-to-talk or global mute keys; via PipeWire input sink
+
+### Connectivity plugins
+
+- **OsdBluetooth** — device name + connected/disconnected icon on pairing events; via Quickshell Bluetooth bindings
+- **OsdVpn** — VPN interface up/down; IPC-driven (no standard DBus signal)
 
 ---
 
@@ -437,13 +454,23 @@ Improvements to the Claude skills and agentic development workflow.
 
 Ideas with clear value but no committed timeline.
 
+### Applications
+
 - **Scratchpad** — persistent floating notepad toggled by keybind; plain text, autosaved to `$XDG_DATA_HOME/kh-scratch`; vim bindings; `y` copies selection
-- **SSH launcher mode** — Launcher mode that fuzzy-searches `~/.ssh/config` hosts; Enter opens kitty with `ssh <host>`
 - **Log viewer** — tail `journalctl` or arbitrary log files with unit/level filter; keyboard-driven alternative to `kitty -e journalctl`
-- **Ping + bandwidth monitor** (Bar) — rolling average latency to a configured host plus live upload/download throughput; colour-coded latency indicator; hidden when idle below threshold
-- **Multiple time zones** (Bar) — show additional configured time zones alongside the main clock; click to expand a list of all configured zones
-- **Web search prefixes** (Launcher mode) — configurable prefix → URL mappings (e.g. `g <q>` → Google, `gh <q>` → GitHub, `mdn <q>` → MDN); defined in Nix; Enter opens in default browser
-- **Browser history** (Launcher mode) — fuzzy search Firefox/Chromium history by title and URL; reads from the browser's SQLite history database; Enter opens in browser; read-only, no write access to profile
+
+### Plugins
+
+#### Bar
+
+- **Ping + bandwidth monitor** — rolling average latency to a configured host plus live upload/download throughput; colour-coded latency indicator; hidden when idle below threshold
+- **Multiple time zones** — show additional configured time zones alongside the main clock; click to expand a list of all configured zones
+
+#### Launcher
+
+- **SSH launcher mode** — fuzzy-searches `~/.ssh/config` hosts; Enter opens kitty with `ssh <host>`
+- **Web search prefixes** — configurable prefix → URL mappings (e.g. `g <q>` → Google, `gh <q>` → GitHub, `mdn <q>` → MDN); defined in Nix; Enter opens in default browser
+- **Browser history** — fuzzy search Firefox/Chromium history by title and URL; reads from the browser's SQLite history database; Enter opens in browser; read-only, no write access to profile
 
 ---
 
@@ -451,22 +478,39 @@ Ideas with clear value but no committed timeline.
 
 Considered and deprioritised. Kept here to avoid re-litigating.
 
-- **Night light** — toggle `wlsunset`/`gammastep` on/off with a colour temperature slider
-- **Pomodoro** — countdown timer in the bar; IPC controllable; notification on completion
-- **Weather** — current conditions widget fetching from `wttr.in`; 3-day forecast dropdown
-- **Calculator mode** — evaluate expressions in the Launcher search field; Enter copies result to clipboard
-- **Recent files mode** — fuzzy search `recently-used.xbel`; Enter opens in default app
-- **NixOS update notifier** — badge when `nix flake metadata` shows the system is behind upstream
-- **Keyboard layout switcher** — bar widget showing current layout; click/scroll to cycle via `hyprctl switchxkblayout`
-- **GitHub/GitLab notifications** — unread badge via API; click to list PRs/issues/mentions
-- **Password generator** — generate and copy a random password from the Launcher
-- **Crypto/stock ticker** — live price widget in the bar
-- **Wallpaper picker** — browse and apply wallpapers via `swww`; no wallpapers in use
-- **Git branch indicator** (Bar) — show active branch for the focused window's CWD; unclear what "focused window's repo" means in practice outside of a terminal
+### Applications
+
 - **Font browser** — grid/list of installed fonts with live preview text
+- **Wallpaper picker** — browse and apply wallpapers via `swww`; no wallpapers in use
+
+### Plugins
+
+#### Bar
+
+- **Pomodoro** — countdown timer; IPC controllable; notification on completion
+- **Weather** — current conditions widget fetching from `wttr.in`; 3-day forecast dropdown
+- **Night light** — toggle `wlsunset`/`gammastep` on/off with a colour temperature slider
+- **NixOS update notifier** — badge when `nix flake metadata` shows the system is behind upstream
+- **Keyboard layout switcher** — current layout; click/scroll to cycle via `hyprctl switchxkblayout`
+- **GitHub/GitLab notifications** — unread badge via API; click to list PRs/issues/mentions
+- **Crypto/stock ticker** — live price widget
+- **Git branch indicator** — active branch for the focused window's CWD; unclear what "focused window's repo" means outside a terminal
+- **Clock timestamp copy** — click the clock to copy the current time; too niche and a widget action with no visual feedback is confusing
+
+#### Launcher
+
+- **Calculator mode** — evaluate expressions in the search field; Enter copies result to clipboard
+- **Recent files mode** — fuzzy search `recently-used.xbel`; Enter opens in default app
+- **Password generator** — generate and copy a random password
 - **IDE project picker** — fuzzy search project directories and open in editor; terminal workflow already covers this
 - **Dictionary** — inline word definition via WordNet; search engine covers the need
-- **Clock timestamp copy** — click the clock to copy the current time to clipboard; too niche and a widget action with no visual feedback is confusing
+
+#### OSD
+
+- **OsdCapsLock** / **OsdNumLock** — lock key state indicators; technically feasible but not worth the screen noise
+- **OsdPowerProfile** — profile changes are infrequent and visible in the bar; OSD adds little
+- **OsdColourTemperature** — night light transitions are gradual; a transient overlay is more disruptive than the change itself
+- **OsdNowPlaying** — the bar's MediaPlayer already covers this; an OSD duplicate adds noise without value
 
 ---
 
@@ -474,9 +518,17 @@ Considered and deprioritised. Kept here to avoid re-litigating.
 
 Features deferred until the system runs on a laptop. No implementation timeline.
 
+### Plugins
+
+#### Bar
+
 - **Battery bar module** — percentage + charging indicator via `/sys/class/power_supply`; dropdown with estimated time remaining and power profile selector
 - **WiFi bar module** — connection name and signal strength in the bar; dropdown listing nearby networks with connect support (password prompt for new ones)
 - **WiFi tile** — `WifiPanel`; toggle WiFi on/off and show connection status; pairs with the WiFi bar module
 - **Power profiles** — cycle `power-profiles-daemon` profiles (power-saver / balanced / performance); show active profile as an icon
 - **Bluetooth manager** — list paired devices, connect/disconnect, toggle Bluetooth on/off; replaces reaching for `bluetoothctl` or a tray app
-- **Brightness OSD** — appears on brightness shortcuts; same layout as volume OSD; `qs ipc call osd showBrightness <0–100>`
+
+#### OSD
+
+- **OsdBrightness** — brightness level on step changes; icon + progress bar; IPC-driven (`qs ipc call osd showBrightness <0–100>`)
+- **OsdBattery** — level indicator on plug/unplug and when crossing thresholds (20 %, 10 %, 5 %); via UPower
