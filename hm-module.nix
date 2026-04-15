@@ -93,27 +93,6 @@ in
       };
       structure = lib.mkOption {
         type = lib.types.str;
-        default = ''
-          BarRow {
-              Workspaces {}
-              MediaPlayer {}
-              BarSpacer {}
-              BarGroup {
-                  label: "●●●"
-                  ipcName: "controlcenter"
-                  panelWidth: 300
-                  Row {
-                      spacing: 8
-                      EthernetPanel {}
-                      TailscalePanel { id: ts }
-                  }
-                  TailscalePeers { source: ts }
-              }
-              Clock {}
-              Volume {}
-              Tray {}
-          }
-        '';
         description = ''
           QML structure for the bar layout. The string is placed verbatim
           inside the root BarLayout Item, which exposes <literal>barHeight</literal>
