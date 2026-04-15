@@ -25,11 +25,13 @@ BarPlugin {
     QtObject {
         id: _state
         property bool   connected: false
+        property bool   pending:   false
         property string selfIp:    ""
         property var    peers:     []
     }
 
     readonly property alias connected: _state.connected
+    readonly property alias pending:   _state.pending
     readonly property alias selfIp:    _state.selfIp
     readonly property alias peers:     _state.peers
 
@@ -49,8 +51,9 @@ BarPlugin {
         anchors.fill: parent
 
         label:              "tailscale"
-        sublabel:           _state.connected ? _state.selfIp : "off"
+        sublabel:           _state.pending ? "..." : (_state.connected ? _state.selfIp : "off")
         active:             _state.connected
+        pending:            _state.pending
         activeColor:        _cfg.color.base0B
         inactiveColor:      _cfg.color.base02
         activeLabelColor:   _cfg.color.base00
@@ -68,7 +71,9 @@ BarPlugin {
 
         // ui+ipc
         function toggle(): void {
+            if (_state.pending) return
             _toggle.command = _state.connected ? [bin.tailscale, "down"] : [bin.tailscale, "up"]
+            _state.pending = true
             _toggle.running = true
         }
         // ui only
@@ -91,7 +96,10 @@ BarPlugin {
             }
         }
         // ui only
-        function onToggleExited(): void { _proc.running = true }
+        function onToggleExited(): void {
+            _state.pending = false
+            _proc.running = true
+        }
         // ui only
         function pollIfIdle(): void { if (!_proc.running) _proc.running = true }
     }

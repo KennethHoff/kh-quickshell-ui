@@ -9,6 +9,7 @@ Rectangle {
     property string label:       ""
     property string sublabel:    ""
     property bool   active:      false
+    property bool   pending:     false
 
     property color  activeColor:         "#89b4fa"
     property color  inactiveColor:       "#313244"
@@ -31,6 +32,14 @@ Rectangle {
     implicitHeight: 44
     radius: 8
     color: active ? activeColor : inactiveColor
+
+    SequentialAnimation on opacity {
+        running: root.pending
+        loops:   Animation.Infinite
+        NumberAnimation { to: 0.45; duration: 500; easing.type: Easing.InOutSine }
+        NumberAnimation { to: 1.0;  duration: 500; easing.type: Easing.InOutSine }
+        onStopped: root.opacity = 1.0
+    }
 
     Column {
         anchors.centerIn: parent
