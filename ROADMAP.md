@@ -85,7 +85,7 @@ A full status bar built in Quickshell, replacing Waybar.
 
 - ✅ Plugin system — plugins are authored as `.qml` files and wired in via Nix (`structure`/`extraPluginDirs`); `BarRow` + `BarSpacer` replace `BarLeft`/`BarRight` for flexible space-between layout; built at eval time so no runtime module import is needed
 - ✅ IPC support — each plugin exposes its own IPC target (`bar.volume`, `bar.media`, `bar.workspaces`); dropdowns with `ipcName` set expose `bar.<name>` with `toggle`/`open`/`close`/`isOpen`
-- ⬜ `BarGroup` plugin — a container plugin that groups any number of child plugins behind a single dropdown button; children are declared inline in `structure` exactly like top-level plugins; any plugin (Volume, Workspaces, custom) can appear inside a group or directly in the bar — placement is independent of plugin type; the button shows a configurable label or icon; implement before hierarchical IPC
+- ✅ `BarGroup` plugin — a container plugin that groups any number of child plugins behind a single dropdown button; children are declared inline in `structure` exactly like top-level plugins; any plugin (Volume, Workspaces, custom) can appear inside a group or directly in the bar — placement is independent of plugin type; the button shows a configurable label or icon; implement before hierarchical IPC
   ```qml
   // Network + audio behind one button
   BarGroup {
