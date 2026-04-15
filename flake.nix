@@ -116,13 +116,14 @@
       mkBarConfig =
         {
           structure,
+          ipcName ? "bar",
           extraPluginDirs ? [ ],
           extraBins ? { },
         }:
         mkAppConfig {
           name = "bar";
           generatedFiles = {
-            "BarLayout.qml" = import ./bar-config.nix { inherit pkgs structure; };
+            "BarLayout.qml" = import ./bar-config.nix { inherit pkgs structure ipcName; };
           };
           extraBins = {
             nmcli = lib.getExe' pkgs.networkmanager "nmcli";

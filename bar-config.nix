@@ -19,7 +19,11 @@
 #       Volume {}
 #       Tray {}
 #   }
-{ pkgs, structure }:
+{
+  pkgs,
+  structure,
+  ipcName ? "bar",
+}:
 pkgs.writeText "BarLayout.qml" ''
   // Generated from bar structure — do not edit by hand.
   // To change the bar layout set programs.kh-ui.bar.structure in your
@@ -37,6 +41,7 @@ pkgs.writeText "BarLayout.qml" ''
       id: layout
       required property int barHeight
       required property var barWindow
+      property string ipcPrefix: "${ipcName}"
 
   ${structure}
   }
