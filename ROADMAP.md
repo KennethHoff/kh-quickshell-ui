@@ -38,8 +38,15 @@ list of clipboard entries from `cliphist`. SUPER+V toggles it via IPC.
 - ✅ Full IPC control (`toggle`, `setMode`, `nav`, `key`, `type`)
 - ✅ `gg` top, `G` bottom, `Ctrl+D`/`Ctrl+U` half-page scroll
 - ✅ Emacs bindings in insert mode — `Ctrl+A`/`E` start/end, `Ctrl+F`/`B` forward/back char, `Ctrl+D` delete forward, `Ctrl+K` delete to end, `Ctrl+W` delete word, `Ctrl+U` delete to line start
-- ✅ Detail panel — always-visible side pane (40/60 split); auto-loads selected entry on navigation (120 ms debounce); text with char/word/line count; image with dimensions and file size; `Tab`/`l` enters, `Tab`/`Esc` returns to list; `hjkl`/`w`/`b`/`e`/`W`/`B`/`E` cursor; `0`/`$`/`^` line; `v`/`V`/`Ctrl+V` char/line/block visual select; `h`/`l`/word motions extend char selection; `o`/`O` swap anchor corner; `y` copies selection
-- ✅ Fullscreen view — `Enter` from detail (when focused); `Escape` back; full text/image view filling the panel; `y` copies; `hjkl`/`w`/`b`/`e`/`W`/`B`/`E` cursor; `0`/`$`/`^` line; `gg`/`G`/`Ctrl+D`/`U` navigate; `v`/`V`/`Ctrl+V` char/line/block visual select; word motions extend char selection; `o`/`O` swap anchor corner; `y` copies selection
+- ✅ Detail panel layout — always-visible side pane (40/60 split); auto-loads selected entry on navigation (120 ms debounce)
+- ✅ Detail panel text metadata — char/word/line count shown for text entries
+- ✅ Detail panel image metadata — dimensions and file size shown for image entries
+- ✅ Detail panel navigation — `Tab`/`l` enters the panel; `Tab`/`Esc` returns to the list
+- ✅ Detail panel cursor and motions — `hjkl`/`w`/`b`/`e`/`W`/`B`/`E`; `0`/`$`/`^` line
+- ✅ Detail panel visual select — `v`/`V`/`Ctrl+V` char/line/block; word motions extend char selection; `o`/`O` swap anchor corner; `y` copies selection
+- ✅ Fullscreen view — `Enter` from detail opens; `Escape` returns; full text/image filling the panel
+- ✅ Fullscreen navigation — `hjkl`/`w`/`b`/`e`/`W`/`B`/`E` cursor; `0`/`$`/`^` line; `gg`/`G`/`Ctrl+D`/`U` navigate
+- ✅ Fullscreen visual select — `v`/`V`/`Ctrl+V` char/line/block; word motions extend; `o`/`O` swap anchor corner; `y` copies selection
 - ✅ Help overlay — `?` opens a popup showing all mode bindings (normal / visual / insert) at once; `/` filters rows inline; popup shrinks to fit matches
 - ⬜ Make the help overlay context-aware — visually highlight the section that corresponds to the current mode (e.g. accent the header or show an indicator arrow), so all sections remain visible but the active one is called out
 - ✅ Fast search — haystacks pre-processed at load time; filter debounced at 80 ms; full-text cache updated via O(1) index lookup as decode streams in
@@ -47,8 +54,13 @@ list of clipboard entries from `cliphist`. SUPER+V toggles it via IPC.
 - ✅ Timestamp on entries — first-seen time shown right-aligned on each row ("just now" / "5m ago" / "3h ago" / "2d ago" / "4w ago"); persisted to `$XDG_DATA_HOME/kh-cliphist/meta/timestamps` (id‹TAB›unix_seconds per line); stale IDs pruned on each load; refreshes when the overlay is reopened
 - ⬜ Source app attribution — record the active Hyprland window at copy time and show it on each row. Attempted via `wl-paste --watch` + `hyprctl activewindow`, but accuracy is poor: (1) copying from within the cliphist overlay (a WlrLayershell layer surface) always reports the last regular window instead of nothing; (2) every copy-from-overlay creates a new cliphist entry that gets mis-attributed. A reliable implementation would need either a Hyprland plugin/event hook that fires on actual clipboard writes, or a wayland protocol that exposes the source client of a clipboard change.
 - ⬜ Auto-paste — close the window and simulate Ctrl+V into the previously focused app via `wtype`
-- ✅ Delete from UI — `d` in normal mode deletes the selected entry; `d` in visual mode deletes the selected range; confirms via popup before executing; fade-out animation on deleted entries; cursor repositions to the entry above the deleted one; executed via `cliphist delete`
-- ✅ Pinned entries — `p` toggles pin on the selected entry; pinned entries sort to the top of the list (both unfiltered and search-filtered); persisted to `$XDG_DATA_HOME/kh-cliphist/pins` (one entry ID per line); deleting a pinned entry removes it from the pin set; 3 px coloured bar on the left edge of each pinned delegate row
+- ✅ Delete single entry — `d` in normal mode; confirmation popup; executes via `cliphist delete`; cursor repositions to the entry above
+- ✅ Delete range in visual mode — `d` deletes all entries in the selected range; confirmation popup before executing
+- ✅ Delete animation — fade-out on deleted entries
+- ✅ Pin toggle — `p` toggles pin on the selected entry
+- ✅ Pinned entries sort to top — pinned entries appear at the top of both unfiltered and search-filtered lists
+- ✅ Pin persistence — persisted to `$XDG_DATA_HOME/kh-cliphist/pins` (one entry ID per line); deleting a pinned entry removes it from the pin set
+- ✅ Pin visual indicator — 3 px coloured bar on the left edge of each pinned delegate row
 - ⬜ Batch pin in visual mode — `p` in visual mode toggles pin on all entries in the selected range; `handleVisualKey` currently does not handle `p`
 
 ---
@@ -67,7 +79,7 @@ Searchable application launcher (`quickshell -c kh-launcher`).
 - ✅ `l` / Tab enters actions mode for the selected app (only switches if the app has actions)
 - ✅ `j`/`k` navigate actions; `Enter` launches selected action
 - ✅ `h` / Esc returns from actions mode to app list
-- ✅ Apps with `Terminal=true` run wrapped in kitty
+- ✅ Apps with `Terminal=true` run wrapped in the configured terminal (`bin.terminal`)
 - ✅ Window closes automatically after launching
 - ✅ Flash animation (green) when an app or action is launched
 - ✅ `?` toggles a searchable help overlay listing all keybinds; help sections are mode-aware (actions vs. normal/insert)
@@ -93,8 +105,10 @@ A full status bar built in Quickshell, replacing Waybar.
 
 ### Core
 
-- ✅ Plugin system — plugins are authored as `.qml` files and wired in via Nix (`structure`/`extraPluginDirs`); `BarRow` + `BarSpacer` replace `BarLeft`/`BarRight` for flexible space-between layout; built at eval time so no runtime module import is needed
-- ✅ IPC support — each plugin exposes its own IPC target (`bar.volume`, `bar.media`, `bar.workspaces`); dropdowns with `ipcName` set expose `bar.<name>` with `toggle`/`open`/`close`/`isOpen`
+- ✅ Plugin authoring system — plugins are `.qml` files wired in via Nix (`structure`/`extraPluginDirs`); built at eval time so no runtime module import is needed
+- ✅ `BarRow` and `BarSpacer` layout types — `BarRow` is a full-width row; `BarSpacer` fills remaining space (CSS space-between equivalent)
+- ✅ Per-plugin IPC targets — each plugin exposes its own named target (e.g. `bar.volume`, `bar.workspaces`)
+- ✅ Dropdown IPC — dropdowns with `ipcName` set expose `bar.<name>` with `toggle`/`open`/`close`/`isOpen`
 - ✅ `BarGroup` plugin — a container plugin that groups any number of child plugins behind a single dropdown button; children are declared inline in `structure` exactly like top-level plugins; any plugin (Volume, Workspaces, custom) can appear inside a group or directly in the bar — placement is independent of plugin type; the button shows a configurable label or icon; implement before hierarchical IPC
   ```qml
   // Network + audio behind one button
@@ -125,8 +139,11 @@ A full status bar built in Quickshell, replacing Waybar.
 
 ### Workspaces
 
-- ✅ Workspaces — show Hyprland workspaces, highlight active, click to switch
-- ✅ Workspace preview — hovering a workspace button for 300 ms renders a thumbnail popup; composites per-window `ScreencopyView` captures at Hyprland IPC positions scaled to 240 px wide; disappears on mouse leave; workspace name badge in corner
+- ✅ Workspace display — show Hyprland workspaces; highlight the active workspace
+- ✅ Workspace click to switch — click a workspace button to switch to it
+- ✅ Workspace preview on hover — hovering a button for 300 ms shows a thumbnail popup; disappears on mouse leave
+- ✅ Workspace preview thumbnails — composites per-window `ScreencopyView` captures at Hyprland IPC positions; scaled to 240 px wide
+- ✅ Workspace preview badge — workspace name badge in the corner of the thumbnail
 - ⬜ Workspace preview click-through — clicking a window inside the preview thumbnail focuses that specific window directly, not just the workspace
 - ⬜ Submap indicator — show the active Hyprland submap name (e.g. `resize`, `passthrough`) in the bar when a non-default submap is active; hidden during normal operation; sourced from the `submap` Hyprland IPC event
 - ⬜ Scratchpad indicator — show a count of hidden scratchpad windows; click cycles through them via `hyprctl dispatch togglespecialworkspace`; hidden when scratchpad is empty
@@ -138,18 +155,22 @@ A full status bar built in Quickshell, replacing Waybar.
 ### Clock
 
 - ✅ Clock — live HH:mm display, updates every second
-- ⬜ Calendar — clock with dropdown calendar on click; month grid with `h`/`j`/`k`/`l` navigation; unit converter tab (length, weight, temperature, etc.) accessible from the same dropdown
+- ⬜ Calendar dropdown — clock opens a dropdown on click; month grid with `h`/`j`/`k`/`l` navigation
+- ⬜ Unit converter tab — accessible from the calendar dropdown; length, weight, temperature, etc.
 - ⬜ Stopwatch — start/stop/reset via click or IPC; elapsed time shown in the bar while running; hidden when stopped; supports multiple named concurrent stopwatches, each shown as a separate chip in the bar
 
 ### Audio
 
-- ✅ Audio controls — volume level (scroll to adjust) and mute toggle (click) via PipeWire; hidden when no sink is available
+- ✅ Volume scroll — scroll on the widget to adjust volume via PipeWire; hidden when no sink is available
+- ✅ Mute toggle — click the widget to toggle mute via PipeWire
 - ⬜ Microphone mute toggle — mutes the configured virtual PipeWire source node (not the physical device); the setup uses virtual sinks and sources that physical devices and apps route through, so mute targets the virtual node to silence all inputs simultaneously; configured via Nix with the target node name
 - ⬜ Output device quick switch — right-click or dropdown on the volume widget to select between available PipeWire sinks without opening the full Audio Mixer
 
 ### Media (MPRIS)
 
-- ✅ MPRIS media controls — prev/play-pause/next buttons + artist/title display; shows first active player, hidden when none
+- ✅ MPRIS playback controls — prev/play-pause/next buttons
+- ✅ MPRIS track display — artist and title shown alongside controls
+- ✅ MPRIS visibility — shows the first active player; hidden when no player is active
 - ⬜ MPRIS multi-source — when more than one player is active, show a dropdown (or similar) to select which source is displayed rather than always picking the first one
 - ⬜ Seek bar — progress indicator showing position within the current track; click or drag to seek; sourced from MPRIS `Position` and `Length` metadata
 - ⬜ Album art — thumbnail of the current track's artwork sourced from MPRIS `mpris:artUrl`; shown alongside artist/title
