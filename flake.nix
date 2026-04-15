@@ -140,6 +140,9 @@
               Workspaces {}
               MediaPlayer {}
               BarSpacer {}
+              Tray {}
+              Clock {}
+              Volume {}
               BarGroup {
                   label: "●●●"
                   ipcName: "controlcenter"
@@ -151,9 +154,6 @@
                   }
                   TailscalePeers { source: ts }
               }
-              Clock {}
-              Volume {}
-              Tray {}
           }
         '';
       };
