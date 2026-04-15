@@ -304,10 +304,9 @@ progress bar and icon, then fades out automatically.
 
 ### Core
 
-- [1] ⬜ Volume OSD — appears on volume up/down/mute shortcuts; shows icon and progress bar reflecting the new level
-- [2] ⬜ Brightness OSD — appears on brightness shortcuts; same layout as volume OSD
-- [3] ⬜ Auto-dismiss — fades out after ~2 s; timer resets if the value changes again before dismissal
-- [4] ⬜ IPC trigger — `qs ipc call osd show --value <0–100> --icon <name>` so any keybind daemon can drive it
+- [1] ✅ Volume OSD — appears on volume up/down/mute shortcuts; shows icon and progress bar reflecting the new level
+- [3] ✅ Auto-dismiss — fades out after ~2 s; timer resets if the value changes again before dismissal
+- [4] ✅ IPC trigger — `qs ipc call osd showVolume <0–100>` / `qs ipc call osd showMuted` so any keybind daemon can drive it
 
 ---
 
@@ -480,3 +479,4 @@ Features deferred until the system runs on a laptop. No implementation timeline.
 - **WiFi tile** — `WifiPanel`; toggle WiFi on/off and show connection status; pairs with the WiFi bar module
 - **Power profiles** — cycle `power-profiles-daemon` profiles (power-saver / balanced / performance); show active profile as an icon
 - **Bluetooth manager** — list paired devices, connect/disconnect, toggle Bluetooth on/off; replaces reaching for `bluetoothctl` or a tray app
+- **Brightness OSD** — appears on brightness shortcuts; same layout as volume OSD; `qs ipc call osd showBrightness <0–100>`
