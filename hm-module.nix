@@ -62,6 +62,7 @@ let
         "BarLayout.qml" = import (src + "/bar-config.nix") { inherit pkgs structure; };
       };
       extraBins = {
+        nmcli = lib.getExe' pkgs.networkmanager "nmcli";
         tailscale = lib.getExe pkgs.tailscale;
       }
       // extraBins;

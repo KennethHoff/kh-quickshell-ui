@@ -7,6 +7,7 @@ import QtQuick
 import Quickshell.Io
 
 ControlTile {
+    NixBins   { id: bin }
     NixConfig { id: _cfg }
 
     QtObject {
@@ -63,7 +64,7 @@ ControlTile {
     Process {
         id: _proc
         running: true
-        command: ["nmcli", "-t", "-f", "DEVICE,TYPE,STATE", "dev"]
+        command: [bin.nmcli, "-t", "-f", "DEVICE,TYPE,STATE", "dev"]
         stdout: StdioCollector {
             onStreamFinished: functionality.onStreamFinished(text)
         }
