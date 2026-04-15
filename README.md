@@ -48,27 +48,21 @@ The module requires [Stylix](https://github.com/nix-community/stylix) — colors
 
 ### 3. Enable the components
 
-Enable everything with a single option:
-
-```nix
-programs.kh-ui.enable = true;
-```
-
-Individual components can be disabled while keeping the rest active:
+Each component is opt-in. Enable only what you want:
 
 ```nix
 programs.kh-ui = {
   enable = true;
-  bar.enable = false;                # disable kh-bar
-  launcher.enable = false;           # disable kh-launcher
-  clipboard-history.enable = false;  # disable kh-cliphist
-  view.enable = false;               # disable kh-view
+  bar.enable = true;
+  launcher.enable = true;
+  clipboard-history.enable = true;
+  view.enable = true;
 };
 ```
 
 ### 4. Configure the bar
 
-The bar layout is a QML snippet set via `programs.kh-ui.bar.structure`. The default:
+The bar requires an explicit layout — there is no default. Set it via `programs.kh-ui.bar.structure`:
 
 ```nix
 programs.kh-ui.bar.structure = ''
@@ -76,7 +70,6 @@ programs.kh-ui.bar.structure = ''
     Workspaces {}
     MediaPlayer {}
     BarSpacer {}
-    ControlCenter {}
     Clock {}
     Volume {}
     Tray {}

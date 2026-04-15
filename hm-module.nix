@@ -69,26 +69,26 @@ in
 
     clipboard-history.enable = lib.mkOption {
       type = lib.types.bool;
-      default = true;
+      default = false;
       description = "Enable the clipboard history viewer (kh-cliphist).";
     };
 
     launcher.enable = lib.mkOption {
       type = lib.types.bool;
-      default = true;
+      default = false;
       description = "Enable the application launcher (kh-launcher).";
     };
 
     view.enable = lib.mkOption {
       type = lib.types.bool;
-      default = true;
+      default = false;
       description = "Enable the file/image viewer (kh-view).";
     };
 
     bar = {
       enable = lib.mkOption {
         type = lib.types.bool;
-        default = true;
+        default = false;
         description = "Enable the status bar (kh-bar).";
       };
       structure = lib.mkOption {
