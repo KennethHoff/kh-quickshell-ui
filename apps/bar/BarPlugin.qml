@@ -30,9 +30,10 @@ Item {
         return "bar"
     }
 
-    // Walk the parent chain to find the nearest BarDropdown.col that exposes
-    // contentVisible. Returns true when not inside any dropdown (always visible).
-    // Use this to gate timers/polling so they stop when the panel is closed.
+    // Walk the parent chain for the nearest ancestor that exposes contentVisible.
+    // Any component can implement this protocol by declaring a bool contentVisible
+    // property. Returns true when no such ancestor exists (plugin is always on-screen).
+    // Use this to gate timers/polling on whether the plugin is visible to the user.
     readonly property bool contentVisible: {
         var p = parent
         while (p) {

@@ -132,7 +132,8 @@ Item {
             // Expose _contentPrefix so popup children (BarPlugins inside a Row
             // inside this column) can find it via BarPlugin's parent chain walk.
             property string ipcPrefix:  root._contentPrefix
-            // Expose open state so children can gate timers/polling on visibility.
+            // Implements the contentVisible protocol — children read this via
+            // BarPlugin.contentVisible to gate timers/polling on panel open state.
             property bool   contentVisible:  root.open
             anchors {
                 top:    parent.top
