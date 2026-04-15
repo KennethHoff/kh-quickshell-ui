@@ -10,9 +10,9 @@ import QtQuick.Layouts
 Item {
     id: root
     anchors.fill: parent
-    property int    barHeight: parent ? parent.barHeight : 32
-    property var    barWindow: parent ? parent.barWindow : null
-    property string ipcPrefix: parent ? parent.ipcPrefix : "bar"
+    property int    barHeight: parent?.barHeight ?? 32
+    property var    barWindow: parent?.barWindow ?? null
+    property string ipcPrefix: parent?.ipcPrefix ?? "bar"
 
     default property alias content: _layout.data
 
