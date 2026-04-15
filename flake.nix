@@ -124,6 +124,8 @@
       cliphistConfig = mkAppConfig { name = "cliphist"; extraBins = { cliphistDecodeAll = toString cliphistDecodeAllScript; }; };
     in
     {
+      formatter.${system} = pkgs.nixfmt-tree;
+
       homeModules.default = import ./hm-module.nix self;
 
       devShells.${system}.default = pkgs.mkShell {
