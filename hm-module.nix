@@ -65,7 +65,7 @@ let
 in
 {
   options.programs.kh-ui = {
-    enable = lib.mkEnableOption "kh-ui shell UI";
+    enable = lib.mkEnableOption "kh-ui shell UI — prerequisite for all kh-ui options; activates nothing on its own. Enable individual components via their own enable options.";
 
     clipboard-history.enable = lib.mkOption {
       type = lib.types.bool;

@@ -48,11 +48,11 @@ The module requires [Stylix](https://github.com/nix-community/stylix) — colors
 
 ### 3. Enable the components
 
-Each component is opt-in. Enable only what you want:
+`programs.kh-ui.enable = true` is a prerequisite — it activates the module but starts nothing on its own. Each component must be explicitly enabled:
 
 ```nix
 programs.kh-ui = {
-  enable = true;
+  enable = true;        # required — unlocks all kh-ui options
   bar.enable = true;
   launcher.enable = true;
   clipboard-history.enable = true;
