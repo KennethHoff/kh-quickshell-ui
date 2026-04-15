@@ -16,11 +16,11 @@ Column {
 
     width:   parent.width
     spacing: 4
-    visible: source !== null && (source.connected || source.peers.length > 0)
+    visible: source !== null && source.connected && source.peers.length > 0
 
     DropdownDivider {
         dividerColor: _cfg.color.base02
-        visible:      source !== null && source.peers.length > 0
+        visible:      source !== null && source.connected && source.peers.length > 0
     }
 
     DropdownHeader {
