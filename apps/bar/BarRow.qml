@@ -10,8 +10,9 @@ import QtQuick.Layouts
 Item {
     id: root
     anchors.fill: parent
-    property int barHeight: parent ? parent.barHeight : 32
-    property var barWindow: parent ? parent.barWindow : null
+    property int    barHeight: parent ? parent.barHeight : 32
+    property var    barWindow: parent ? parent.barWindow : null
+    property string ipcPrefix: parent ? parent.ipcPrefix : "bar"
 
     default property alias content: _layout.data
 
@@ -24,8 +25,9 @@ Item {
         }
         spacing: 4
 
-        // Expose context to direct children (BarPlugin reads parent.barHeight / parent.barWindow).
-        property int barHeight: root.barHeight
-        property var barWindow: root.barWindow
+        // Expose context to direct children (BarPlugin reads parent.barHeight / parent.barWindow / parent.ipcPrefix).
+        property int    barHeight: root.barHeight
+        property var    barWindow: root.barWindow
+        property string ipcPrefix: root.ipcPrefix
     }
 }

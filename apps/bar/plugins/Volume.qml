@@ -41,7 +41,7 @@ BarPlugin {
     }
 
     IpcHandler {
-        target: "bar.volume"
+        target: ipcPrefix + ".volume"
 
         function getVolume(): real              { return functionality.getVolume() }
         function setVolume(v: int): void        { functionality.setVolume(v) }

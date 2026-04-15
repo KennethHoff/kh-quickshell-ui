@@ -37,7 +37,7 @@ BarPlugin {
     }
 
     IpcHandler {
-        target: "bar.media"
+        target: ipcPrefix + ".media"
 
         function isActive(): bool      { return state.active }
         function isPlaying(): bool     { return functionality.isPlaying() }

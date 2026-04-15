@@ -1,5 +1,6 @@
-// Tailscale status tile for use inside ControlPanel.
-// Extends ControlTile — place it in a Row alongside other panel tiles.
+// Tailscale status tile for use inside a BarGroup panel.
+// Extends BarPlugin so it participates in the ipcPrefix chain and is
+// individually addressable via IPC regardless of nesting depth.
 //
 // Polls `tailscale status --json` every 10 s. Clicking the tile runs
 // `tailscale up` or `tailscale down` and re-polls on exit.
@@ -12,15 +13,62 @@
 import QtQuick
 import Quickshell.Io
 
-ControlTile {
+BarPlugin {
+    id: root
     NixBins { id: bin }
 
+    // ── Sizing — use the tile's natural dimensions, not barHeight ──────────
+    implicitWidth:  _tile.implicitWidth
+    implicitHeight: _tile.implicitHeight
+
+    // ── State ──────────────────────────────────────────────────────────────
+    QtObject {
+        id: _state
+        property bool   connected: false
+        property string selfIp:    ""
+        property var    peers:     []
+    }
+
+    readonly property alias connected: _state.connected
+    readonly property alias selfIp:    _state.selfIp
+    readonly property alias peers:     _state.peers
+
+    // ── IPC ────────────────────────────────────────────────────────────────
+    IpcHandler {
+        target: ipcPrefix + ".tailscale"
+        function isConnected(): bool { return _state.connected }
+        function getSelfIp(): string { return _state.selfIp }
+        function toggle(): void      { functionality.toggle() }
+    }
+
+    // ── Tile visuals ───────────────────────────────────────────────────────
+    NixConfig { id: _cfg }
+
+    ControlTile {
+        id: _tile
+        anchors.fill: parent
+
+        label:              "tailscale"
+        sublabel:           _state.connected ? _state.selfIp : "off"
+        active:             _state.connected
+        activeColor:        _cfg.color.base0B
+        inactiveColor:      _cfg.color.base02
+        activeLabelColor:   _cfg.color.base00
+        inactiveLabelColor: _cfg.color.base05
+        sublabelColor:      _cfg.color.base03
+        fontFamily:         _cfg.fontFamily
+        fontSize:           _cfg.fontSize
+
+        onTileClicked: functionality.toggle()
+    }
+
+    // ── Logic ──────────────────────────────────────────────────────────────
     QtObject {
         id: functionality
 
         // ui+ipc
         function toggle(): void {
-            _toggle.command = _state.connected ? ["tailscale", "down"] : ["tailscale", "up"]
+            _toggle.command = _state.connected ? [bin.tailscale, "down"] : [bin.tailscale, "up"]
             _toggle.running = true
         }
         // ui only
@@ -48,45 +96,10 @@ ControlTile {
         function pollIfIdle(): void { if (!_proc.running) _proc.running = true }
     }
 
-    IpcHandler {
-        target: "bar.tailscale"
-        function isConnected(): bool { return _state.connected }
-        function getSelfIp(): string { return _state.selfIp }
-        function toggle(): void      { functionality.toggle() }
-    }
-    NixConfig { id: _cfg }
-
-    // ── State ──────────────────────────────────────────────────────────────
-    readonly property alias connected: _state.connected
-    readonly property alias selfIp:    _state.selfIp
-    readonly property alias peers:     _state.peers
-
-    QtObject {
-        id: _state
-        property bool   connected: false
-        property string selfIp:    ""
-        property var    peers:     []
-    }
-
-    // ── Tile appearance (auto-themed via NixConfig) ────────────────────────
-    label:              "tailscale"
-    sublabel:           _state.connected ? _state.selfIp : "off"
-    active:             _state.connected
-    activeColor:        _cfg.color.base0B
-    inactiveColor:      _cfg.color.base02
-    activeLabelColor:   _cfg.color.base00
-    inactiveLabelColor: _cfg.color.base05
-    sublabelColor:      _cfg.color.base03
-    fontFamily:         _cfg.fontFamily
-    fontSize:           _cfg.fontSize
-
-    onTileClicked: functionality.toggle()
-
-    // ── Processes ──────────────────────────────────────────────────────────
     Process {
         id: _proc
         running: true
-        command: ["tailscale", "status", "--json"]
+        command: [bin.tailscale, "status", "--json"]
         stdout: StdioCollector {
             onStreamFinished: functionality.onStreamFinished(text)
         }

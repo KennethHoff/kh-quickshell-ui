@@ -17,6 +17,19 @@ Item {
     property int barHeight: parent ? parent.barHeight : 32
     property var barWindow: parent ? parent.barWindow : null
 
+    // Walk the parent chain to find the nearest ancestor that exposes ipcPrefix.
+    // Direct parents may be plain layout items (Row, RowLayout) that don't carry
+    // ipcPrefix — the walk skips them and finds the nearest BarPlugin, BarRow, or
+    // BarDropdown.col that does. Static tree means non-reactive walk is fine.
+    readonly property string ipcPrefix: {
+        var p = parent
+        while (p) {
+            if (typeof p.ipcPrefix === 'string') return p.ipcPrefix
+            p = p.parent
+        }
+        return "bar"
+    }
+
     implicitHeight: barHeight
 
     // Row uses width/height, not implicit* — bind them so plugins size correctly.

@@ -47,8 +47,17 @@ Item {
     property bool open: false
 
     // Optional IPC name. When set, this dropdown is reachable as target
-    // "bar.<ipcName>" — e.g. `qs ipc call bar.controlcenter toggle`.
+    // "<ipcPrefix>.<ipcName>" — e.g. `qs ipc call bar.controlcenter toggle`.
     property string ipcName: ""
+
+    // Inherited prefix from the parent BarPlugin / BarRow chain.
+    property string ipcPrefix: parent?.ipcPrefix ?? "bar"
+
+    // The prefix exposed to popup content children — appends this dropdown's
+    // own segment so nested plugins get "bar.controlcenter.tailscale" etc.
+    readonly property string _contentPrefix: ipcName !== ""
+        ? ipcPrefix + "." + ipcName
+        : ipcPrefix
 
     QtObject {
         id: functionality
@@ -62,7 +71,7 @@ Item {
     }
 
     IpcHandler {
-        target: "bar." + root.ipcName
+        target:  root._contentPrefix
         enabled: root.ipcName !== ""
 
         function toggle(): void { functionality.toggle() }
@@ -120,6 +129,9 @@ Item {
 
         Column {
             id: col
+            // Expose _contentPrefix so popup children (BarPlugins inside a Row
+            // inside this column) can find it via BarPlugin's parent chain walk.
+            property string ipcPrefix: root._contentPrefix
             anchors {
                 top:    parent.top
                 left:   parent.left

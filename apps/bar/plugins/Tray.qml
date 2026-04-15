@@ -9,7 +9,7 @@ BarPlugin {
     NixConfig { id: cfg }
 
     IpcHandler {
-        target: "bar.tray"
+        target: ipcPrefix + ".tray"
 
         function list(): string {
             const titles = []

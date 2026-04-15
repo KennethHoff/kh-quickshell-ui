@@ -61,7 +61,7 @@ BarPlugin {
     }
 
     IpcHandler {
-        target: "bar.workspaces"
+        target: ipcPrefix + ".workspaces"
 
         function getFocused(): string               { return functionality.getFocused() }
         function list(): string                     { return functionality.list() }

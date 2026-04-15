@@ -158,7 +158,7 @@ A full status bar built in Quickshell, replacing Waybar.
       Clock {}
   }
   ```
-- [65] ⬜ Hierarchical IPC prefix — add `ipcPrefix` to `BarPlugin` propagated through the parent chain (same mechanism as `barHeight`/`barWindow`); each container appends its segment so a plugin automatically gets a target like `bar1.grouping1.tailscale` without manually specifying it; the root prefix comes from the bar's Nix config entry (e.g. `Bar { ipcName: "top" }`); implement before multi-bar support
+- [65] ✅ Hierarchical IPC prefix — `ipcPrefix` propagates through `BarPlugin` → `BarRow` → `BarDropdown.col` via parent chain walk; each `BarGroup`/`BarDropdown` appends its `ipcName` segment so plugins get targets like `bar.controlcenter.tailscale` automatically; root prefix is `ipcName` from `mkBarConfig` (default `"bar"`), exposed as `programs.kh-ui.bar.ipcName` in the hm-module; `EthernetPanel` and `TailscalePanel` converted from `ControlTile` to `BarPlugin` base so they join the prefix chain regardless of popup nesting depth
 - [66] ⬜ Multi-bar support — allow N bars at arbitrary screen edges (top, bottom, left, right); `mkBarConfig` accepts a list of `{ edge, structure }` entries; each bar gets its own `PanelWindow` and generated `BarLayout`; `BarDropdown` opens its popup toward the screen interior so it works on any edge
 
 ### Workspaces
