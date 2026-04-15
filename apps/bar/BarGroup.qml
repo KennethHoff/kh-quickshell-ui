@@ -2,7 +2,7 @@
 //
 // Place any bar plugin or panel component as a direct child — they appear
 // inside the dropdown panel column.  Use ipcName to expose toggle/open/close
-// via IPC (target "bar.<ipcName>").
+// via IPC (target "<ipcPrefix>.<ipcName>").
 //
 // Example:
 //   BarGroup {

@@ -22,8 +22,8 @@
 //
 // barWindow and barHeight are read automatically from the plugin wrapper.
 //
-// Set ipcName to expose this dropdown via IPC as target "bar.<ipcName>":
-//   qs ipc call bar.controlcenter toggle
+// Set ipcName to expose this dropdown via IPC as target "<ipcPrefix>.<ipcName>":
+//   qs ipc call bar.controlcenter toggle   (with default ipcName = "bar")
 //   qs ipc call bar.controlcenter isOpen
 import QtQuick
 import Quickshell
@@ -54,7 +54,7 @@ Item {
     property string ipcPrefix: parent?.ipcPrefix ?? "bar"
 
     // The prefix exposed to popup content children — appends this dropdown's
-    // own segment so nested plugins get "bar.controlcenter.tailscale" etc.
+    // own segment so nested plugins get "<ipcPrefix>.controlcenter.tailscale" etc.
     readonly property string _contentPrefix: ipcName !== ""
         ? ipcPrefix + "." + ipcName
         : ipcPrefix
