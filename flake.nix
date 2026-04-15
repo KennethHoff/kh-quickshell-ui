@@ -150,6 +150,7 @@
               MediaPlayer {}
               BarSpacer {}
               Tray {}
+              Notifications {}
               Clock {}
               Volume {}
               BarGroup {
