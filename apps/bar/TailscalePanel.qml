@@ -40,6 +40,8 @@ BarPlugin {
     readonly property alias exitNodeIp:      _state.exitNodeIp
     readonly property alias peers:           _state.peers
 
+    function setExitNode(ip: string): void { functionality.setExitNode(ip) }
+
     // ── IPC ────────────────────────────────────────────────────────────────
     IpcHandler {
         target: ipcPrefix + ".tailscale"
