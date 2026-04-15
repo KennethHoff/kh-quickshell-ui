@@ -217,89 +217,111 @@
           type = "app";
           program = toString (
             pkgs.writeShellScript "qs-screenshot" ''
-              set -e
-              run=/tmp/qs-screenshots/$(date +%Y%m%d-%H%M%S)
-              if [[ "$1" == --run ]]; then run=$2; shift 2; fi
-              app=$1; shift
-              case "$app" in
-                kh-bar)      config=${barConfig};      target=""        ;;
-                kh-cliphist) config=${cliphistConfig}; target=viewer   ;;
-                kh-launcher) config=${launcherConfig}; target=launcher ;;
-                kh-view)     config=${viewConfig};     target=""
-                  # Build the list file from KH_VIEW_FILE (or KH_VIEW_LIST if already set)
-                  if [[ -z "''${KH_VIEW_LIST:-}" && -n "''${KH_VIEW_FILE:-}" ]]; then
-                    _kv_list=$(mktemp); printf '%s\n' "$KH_VIEW_FILE" > "$_kv_list"
-                    export KH_VIEW_LIST="$_kv_list"
-                  fi
-                  ;;
-                *) echo "usage: screenshot [--run <dir>] <app> <name> [<ipc-call>...] [-- <name> [<ipc-call>...]]..." >&2; exit 1 ;;
-              esac
-              qs=${lib.getExe' pkgs.quickshell "quickshell"}
-              grim=${lib.getExe pkgs.grim}
-              sway=${lib.getExe pkgs.sway}
-              mkdir -p "$run"
+                            set -e
+                            run=/tmp/qs-screenshots/$(date +%Y%m%d-%H%M%S)
+                            if [[ "$1" == --run ]]; then run=$2; shift 2; fi
+                            app=$1; shift
+                            case "$app" in
+                              kh-bar)      config=${barConfig};      target=""        ;;
+                              kh-cliphist) config=${cliphistConfig}; target=viewer   ;;
+                              kh-launcher) config=${launcherConfig}; target=launcher ;;
+                              kh-view)     config=${viewConfig};     target=""
+                                # Build the list file from KH_VIEW_FILE (or KH_VIEW_LIST if already set)
+                                if [[ -z "''${KH_VIEW_LIST:-}" && -n "''${KH_VIEW_FILE:-}" ]]; then
+                                  _kv_list=$(mktemp); printf '%s\n' "$KH_VIEW_FILE" > "$_kv_list"
+                                  export KH_VIEW_LIST="$_kv_list"
+                                fi
+                                ;;
+                              *) echo "usage: screenshot [--run <dir>] <app> <name> [<ipc-call>...] [-- <name> [<ipc-call>...]]..." >&2; exit 1 ;;
+                            esac
+                            qs=${lib.getExe' pkgs.quickshell "quickshell"}
+                            grim=${lib.getExe pkgs.grim}
+                            sway=${lib.getExe pkgs.sway}
+                            mkdir -p "$run"
 
-              xdg_runtime=$(mktemp -d)
-              export XDG_RUNTIME_DIR=$xdg_runtime
-              export WLR_BACKENDS=headless WLR_RENDERER=pixman WLR_HEADLESS_OUTPUTS=1
-              sway_config=$(mktemp)
-              echo 'output HEADLESS-1 resolution 3840x2160' > "$sway_config"
-              "$sway" --config "$sway_config" >/dev/null 2>&1 &
-              SWAY_PID=$!
-              for i in $(seq 40); do
-                sleep 0.1
-                socket=$(ls "$xdg_runtime"/wayland-* 2>/dev/null | grep -v lock | head -1)
-                [[ -n "$socket" ]] && break
-              done
-              export WAYLAND_DISPLAY=$(basename "$socket")
+                            # Hermetic fontconfig: no system fonts, only what we ship.
+                            # Generated at runtime so $font_cache can be embedded as the cachedir.
+                            # DejaVu covers text (mapped as the monospace generic family);
+                            # Symbols Nerd Font provides icon glyph fallback.
+                            font_cache=$(mktemp -d)
+                            fonts_conf=$font_cache/fonts.conf
+                            cat > "$fonts_conf" << FONTSEOF
+              <?xml version="1.0"?>
+              <!DOCTYPE fontconfig SYSTEM "fonts.dtd">
+              <fontconfig>
+                <dir>${pkgs.dejavu_fonts}/share/fonts</dir>
+                <dir>${pkgs.nerd-fonts.symbols-only}/share/fonts</dir>
+                <alias>
+                  <family>monospace</family>
+                  <prefer><family>DejaVu Sans Mono</family></prefer>
+                </alias>
+                <cachedir>$font_cache/fc-cache</cachedir>
+              </fontconfig>
+              FONTSEOF
+                            export FONTCONFIG_FILE=$fonts_conf
+                            ${lib.getExe' pkgs.fontconfig "fc-cache"} --force 2>/dev/null || true
 
-              shoot() {
-                local name=$1; shift
-                local outfile=$run/$name.png
-                WAYLAND_DISPLAY=$WAYLAND_DISPLAY "$qs" -p "$config" >/dev/null 2>&1 &
-                local pid=$!
-                if [[ -n "$target" ]]; then
-                  for i in $(seq 30); do
-                    sleep 0.1
-                    "$qs" ipc --pid "$pid" call "$target" toggle >/dev/null 2>&1 && break
-                  done
-                else
-                  sleep 1.5
-                fi
-                for call in "$@"; do
-                  if [[ -z "$target" ]]; then
-                    # No fixed target — call string is "target function [arg]"
-                    read -ra _parts <<< "$call"
-                    "$qs" ipc --pid "$pid" call "''${_parts[@]}" >/dev/null 2>&1 || true
-                  else
-                    local fn="''${call%% *}"
-                    if [[ "$fn" == "$call" ]]; then
-                      "$qs" ipc --pid "$pid" call "$target" "$fn" >/dev/null 2>&1 || true
-                    else
-                      local arg="''${call#* }"
-                      "$qs" ipc --pid "$pid" call "$target" "$fn" "$arg" >/dev/null 2>&1 || true
-                    fi
-                  fi
-                done
-                sleep 0.4
-                WAYLAND_DISPLAY=$WAYLAND_DISPLAY "$grim" "$outfile"
-                echo "$outfile"
-                disown "$pid" 2>/dev/null; kill -9 "$pid" 2>/dev/null
-              }
+                            xdg_runtime=$(mktemp -d)
+                            export XDG_RUNTIME_DIR=$xdg_runtime
+                            export WLR_BACKENDS=headless WLR_RENDERER=pixman WLR_HEADLESS_OUTPUTS=1
+                            sway_config=$(mktemp)
+                            echo 'output HEADLESS-1 resolution 3840x2160' > "$sway_config"
+                            "$sway" --config "$sway_config" >/dev/null 2>&1 &
+                            SWAY_PID=$!
+                            for i in $(seq 40); do
+                              sleep 0.1
+                              socket=$(ls "$xdg_runtime"/wayland-* 2>/dev/null | grep -v lock | head -1)
+                              [[ -n "$socket" ]] && break
+                            done
+                            export WAYLAND_DISPLAY=$(basename "$socket")
 
-              # Split args on '--' and invoke shoot() for each group.
-              group=()
-              for arg in "$@" "--"; do
-                if [[ "$arg" == "--" ]]; then
-                  [[ ''${#group[@]} -gt 0 ]] && shoot "''${group[@]}"
-                  group=()
-                else
-                  group+=("$arg")
-                fi
-              done
+                            shoot() {
+                              local name=$1; shift
+                              local outfile=$run/$name.png
+                              WAYLAND_DISPLAY=$WAYLAND_DISPLAY "$qs" -p "$config" >/dev/null 2>&1 &
+                              local pid=$!
+                              if [[ -n "$target" ]]; then
+                                for i in $(seq 30); do
+                                  sleep 0.1
+                                  "$qs" ipc --pid "$pid" call "$target" toggle >/dev/null 2>&1 && break
+                                done
+                              else
+                                sleep 1.5
+                              fi
+                              for call in "$@"; do
+                                if [[ -z "$target" ]]; then
+                                  # No fixed target — call string is "target function [arg]"
+                                  read -ra _parts <<< "$call"
+                                  "$qs" ipc --pid "$pid" call "''${_parts[@]}" >/dev/null 2>&1 || true
+                                else
+                                  local fn="''${call%% *}"
+                                  if [[ "$fn" == "$call" ]]; then
+                                    "$qs" ipc --pid "$pid" call "$target" "$fn" >/dev/null 2>&1 || true
+                                  else
+                                    local arg="''${call#* }"
+                                    "$qs" ipc --pid "$pid" call "$target" "$fn" "$arg" >/dev/null 2>&1 || true
+                                  fi
+                                fi
+                              done
+                              sleep 0.4
+                              WAYLAND_DISPLAY=$WAYLAND_DISPLAY "$grim" "$outfile"
+                              echo "$outfile"
+                              disown "$pid" 2>/dev/null; kill -9 "$pid" 2>/dev/null
+                            }
 
-              kill -9 "$SWAY_PID" 2>/dev/null
-              rm -rf "$xdg_runtime"
+                            # Split args on '--' and invoke shoot() for each group.
+                            group=()
+                            for arg in "$@" "--"; do
+                              if [[ "$arg" == "--" ]]; then
+                                [[ ''${#group[@]} -gt 0 ]] && shoot "''${group[@]}"
+                                group=()
+                              else
+                                group+=("$arg")
+                              fi
+                            done
+
+                            kill -9 "$SWAY_PID" 2>/dev/null
+                            rm -rf "$xdg_runtime"
             ''
           );
         };
