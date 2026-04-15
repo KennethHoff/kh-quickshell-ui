@@ -91,8 +91,8 @@ A full status bar built in Quickshell, replacing Waybar.
   BarGroup {
       label: "●●●"
       EthernetPanel {}
-      TailscalePanel { id: _ts }
-      TailscalePeers { source: _ts }
+      TailscalePanel { id: ts }
+      TailscalePeers { source: ts }
       Volume {}
   }
 

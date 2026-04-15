@@ -2,20 +2,19 @@
 #
 # The structure string is inserted verbatim as children of the top-level
 # layout Item, which exposes barHeight and barWindow as required properties.
-# All layout and plugin types (BarLeft, BarRight, ControlCenter, Clock, …)
-# are resolved at runtime from the files copied into $out/ — no imports
-# or inlining needed here.
+# All layout and plugin types (BarRow, BarGroup, Clock, …) are resolved
+# at runtime from the files copied into $out/ — no imports or inlining
+# needed here.
 #
 # Usage:
 #   import ./bar-config.nix { inherit pkgs; structure = "..."; }
 #
 # Typical structure string:
-#   BarLeft {
+#   BarRow {
 #       Workspaces {}
 #       MediaPlayer {}
-#   }
-#   BarRight {
-#       ControlCenter {}
+#       BarSpacer {}
+#       BarGroup { label: "●●●"; ipcName: "controlcenter"; EthernetPanel {} }
 #       Clock {}
 #       Volume {}
 #       Tray {}

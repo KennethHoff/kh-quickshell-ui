@@ -103,7 +103,17 @@
                   Workspaces {}
                   MediaPlayer {}
                   BarSpacer {}
-                  ControlCenter {}
+                  BarGroup {
+                      label: "●●●"
+                      ipcName: "controlcenter"
+                      panelWidth: 300
+                      Row {
+                          spacing: 8
+                          EthernetPanel {}
+                          TailscalePanel { id: ts }
+                      }
+                      TailscalePeers { source: ts }
+                  }
                   Clock {}
                   Volume {}
                   Tray {}

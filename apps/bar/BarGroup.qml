@@ -11,8 +11,8 @@
 //       panelWidth: 300
 //
 //       EthernetPanel {}
-//       TailscalePanel { id: _ts }
-//       TailscalePeers { source: _ts }
+//       TailscalePanel { id: ts }
+//       TailscalePeers { source: ts }
 //       Volume {}
 //   }
 //

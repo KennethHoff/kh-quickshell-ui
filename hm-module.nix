@@ -92,7 +92,17 @@ in
                   Workspaces {}
                   MediaPlayer {}
                   BarSpacer {}
-                  ControlCenter {}
+                  BarGroup {
+                      label: "●●●"
+                      ipcName: "controlcenter"
+                      panelWidth: 300
+                      Row {
+                          spacing: 8
+                          EthernetPanel {}
+                          TailscalePanel { id: ts }
+                      }
+                      TailscalePeers { source: ts }
+                  }
                   Clock {}
                   Volume {}
                   Tray {}
@@ -108,20 +118,22 @@ in
           equivalent). Any QML type available in $out/ can be used — built-in
           plugins, lib components, and types from extraPluginDirs.
 
-          Built-in plugins: Workspaces, MediaPlayer, ControlCenter, Clock,
-          Volume, Tray.
+          Built-in plugins: Workspaces, MediaPlayer, Clock, Volume, Tray.
 
           Built-in layout / composition types:
-          BarRow, BarSpacer, BarDropdown, ControlPanel, ControlTile,
+          BarRow, BarSpacer, BarGroup, BarDropdown, ControlTile,
           TailscalePanel, EthernetPanel, TailscalePeers,
           DropdownHeader, DropdownDivider, DropdownItem.
 
-          Example — custom composition without ControlCenter:
+          Example — network + audio grouped behind one button:
           <programlisting>
           BarRow {
               Workspaces {}
               BarSpacer {}
-              ControlPanel {
+              BarGroup {
+                  label: "●●●"
+                  ipcName: "controlcenter"
+                  panelWidth: 300
                   Row {
                       spacing: 8
                       EthernetPanel {}
