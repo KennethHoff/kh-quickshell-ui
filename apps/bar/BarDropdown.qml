@@ -133,7 +133,7 @@ Item {
             // inside this column) can find it via BarPlugin's parent chain walk.
             property string ipcPrefix:  root._contentPrefix
             // Expose open state so children can gate timers/polling on visibility.
-            property bool   panelOpen:  root.open
+            property bool   contentVisible:  root.open
             anchors {
                 top:    parent.top
                 left:   parent.left

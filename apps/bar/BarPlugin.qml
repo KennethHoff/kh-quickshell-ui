@@ -31,12 +31,12 @@ Item {
     }
 
     // Walk the parent chain to find the nearest BarDropdown.col that exposes
-    // panelOpen. Returns true when not inside any dropdown (always visible).
+    // contentVisible. Returns true when not inside any dropdown (always visible).
     // Use this to gate timers/polling so they stop when the panel is closed.
-    readonly property bool panelOpen: {
+    readonly property bool contentVisible: {
         var p = parent
         while (p) {
-            if (typeof p.panelOpen === 'boolean') return p.panelOpen
+            if (typeof p.contentVisible === 'boolean') return p.contentVisible
             p = p.parent
         }
         return true
