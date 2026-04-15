@@ -249,7 +249,7 @@ A full status bar built in Quickshell, replacing Waybar.
 
 ### Notifications
 
-- [1] ⬜ Notifications indicator — bar plugin showing a bell icon; hidden when unread count is zero
+- [1] ✅ Notifications indicator — bar plugin showing a bell icon; hidden when unread count is zero
 - [2] ⬜ Unread badge — numeric badge overlaid on the bell showing unread notification count; sourced from `Quickshell.Services.Notifications`
 - [3] ⬜ Do Not Disturb indicator — bell icon reflects DND state (e.g. muted icon variant) when DND is active
 - [4] ⬜ Click to open panel — clicking the indicator toggles the Notification Center panel (to be implemented in the Notification Center section)
