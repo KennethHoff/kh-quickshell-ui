@@ -13,6 +13,8 @@ import QtQuick
 import Quickshell.Io
 
 ControlTile {
+    NixBins { id: bin }
+
     QtObject {
         id: functionality
 
