@@ -1,4 +1,4 @@
-# nixosTest Migration Roadmap
+# nixosTest Migration: Research & Implementation Guide
 
 Research on replacing the existing `nix run .#screenshot` testing infrastructure
 with one based on `nixosTest` / `build-vm`.
@@ -62,7 +62,7 @@ machine.fail("cmd")                                 # run, assert non-zero
 machine.wait_until_succeeds("cmd", timeout=60)      # retry until exit 0
 machine.wait_until_fails("cmd", timeout=60)         # retry until non-zero
 machine.screenshot("name")                          # QEMU framebuffer dump (not grim) → $out/name.png
-machine.copy_from_vm("/vm/path", "")               # copy file from VM into derivation $out
+machine.copy_from_vm("/vm/path")                    # copy file from VM into derivation $out
 machine.wait_for_text("regex")                      # OCR — requires enableOCR = true
 machine.send_key("ctrl-v")                          # send key event to VM framebuffer
 machine.send_chars("hello")                         # type string into VM
@@ -107,7 +107,7 @@ After `nix build`, `ls result/` shows the copied files. This is how screenshots 
 
 ```bash
 # Build the interactive driver:
-nix build .#checks.x86_64-linux.kh-osd-test.driverInteractive
+nix build .#checks.x86_64-linux.kh-osd-screenshot.driverInteractive
 
 # Run it:
 ./result/bin/nixos-test-driver --interactive
@@ -366,11 +366,11 @@ machine.succeed(
 Cliphist stores its database at `$XDG_DATA_HOME/cliphist/db` (default
 `~testuser/.local/share/cliphist/db`). You must have `cliphist` in `environment.systemPackages`.
 
-The IPC target is `viewer`:
+The IPC target is `cliphist`:
 
 ```python
 machine.wait_until_succeeds(
-    f"su testuser -c '{qs_env} quickshell ipc --pid {qs_pid} call viewer toggle'",
+    f"su testuser -c '{qs_env} quickshell ipc --pid {qs_pid} call cliphist toggle'",
     timeout=10
 )
 ```
@@ -470,7 +470,7 @@ Option A is recommended because `environment.etc` is idiomatic and the path is p
 
 ```nix
 # tests/lib.nix
-{ pkgs, lib }:
+{ pkgs }:
 
 let
   baseModule = { pkgs, ... }: {
@@ -510,14 +510,16 @@ let
 
 in
 {
-  mkVmTest = { name, appConfig, target, extraModule ? { }, testScript }:
+  mkVmTest = { name, appConfig, extraModule ? ({ ... }: { }), testScript }:
     pkgs.testers.nixosTest {
       inherit name;
-      nodes.machine = lib.mkMerge [
-        baseModule
-        ({ ... }: { environment.etc."qs-config".source = appConfig; })
-        extraModule
-      ];
+      nodes.machine = {
+        imports = [
+          baseModule
+          ({ ... }: { environment.etc."qs-config".source = appConfig; })
+          extraModule
+        ];
+      };
       testScript = swayBootstrap + testScript;
     };
 }
