@@ -161,7 +161,7 @@ machine.wait_for_unit("multi-user.target")
 machine.succeed("install -d -o testuser -m 700 /run/user/1000")
 
 # Sway config: headless output with fixed resolution
-machine.succeed("echo 'output HEADLESS-1 resolution 3840x2160' > /tmp/sway.conf")
+machine.succeed("echo 'output HEADLESS-1 resolution 1920x1080' > /tmp/sway.conf")
 
 # Start sway as testuser
 machine.succeed(
@@ -234,6 +234,9 @@ and you won't capture it.
 
 ```python
 machine.succeed(
+    # 'SCRIPT' quoting prevents shell variable expansion inside the heredoc.
+    # {wayland_display} below is Python f-string interpolation — it expands
+    # before the string reaches the shell, so the heredoc sees a literal value.
     "cat > /tmp/run-qs.sh << 'SCRIPT'\n"
     "#!/bin/sh\n"
     "export XDG_RUNTIME_DIR=/run/user/1000\n"
@@ -251,6 +254,8 @@ qs_pid = machine.succeed("cat /tmp/qs.pid").strip()
 
 ```python
 # mirrors: for i in $(seq 30); do sleep 0.1; qs ipc --pid $pid call target fn && break; done
+# Note: {qs_env} and {qs_pid} are Python f-string interpolations — they expand
+# before the string is passed to machine.succeed(), not inside the shell.
 machine.wait_until_succeeds(
     f"su testuser -c '"
     f"  env {qs_env}"
@@ -268,6 +273,7 @@ ensures the right UID.
 
 ```python
 # Settle delay — mirrors "sleep 0.4" in the screenshot script
+# If machine.sleep doesn't exist in your nixpkgs pin, use: import time; time.sleep(0.5)
 machine.sleep(0.5)
 
 machine.succeed(
@@ -328,8 +334,7 @@ machine.succeed(
     f"  {qs_env}"
     f"  KH_VIEW_LIST=/tmp/kh-view-list.txt"
     f"  quickshell -p /etc/kh-view-config"
-    f"' &>/tmp/qs.log &"
-    " echo $! > /tmp/qs.pid"
+    f"' &>/tmp/qs.log & echo $! > /tmp/qs.pid"
 )
 ```
 
@@ -475,7 +480,8 @@ let
       uid = 1000;
       extraGroups = [ "audio" "video" ];
     };
-    environment.systemPackages = [ pkgs.sway pkgs.grim pkgs.quickshell pkgs.cliphist ];
+    environment.systemPackages = [ pkgs.sway pkgs.grim pkgs.quickshell ];
+    # app-specific packages (e.g. pkgs.cliphist for kh-cliphist) go in extraModule
     fonts.packages = [ pkgs.dejavu_fonts pkgs.nerd-fonts.symbols-only ];
     fonts.fontconfig.defaultFonts.monospace = [ "DejaVu Sans Mono" ];
   };
@@ -589,7 +595,7 @@ pkgs.testers.nixosTest {
         timeout=15
     )
 
-    machine.sleep(0.5)
+    machine.sleep(0.5)  # if machine.sleep doesn't exist, use: import time; time.sleep(0.5)
 
     machine.succeed(f"su testuser -c 'env {qs_env} grim /tmp/osd-75.png'")
     machine.copy_from_vm("/tmp/osd-75.png")
@@ -598,7 +604,7 @@ pkgs.testers.nixosTest {
     machine.succeed(
         f"su testuser -c 'env {qs_env} quickshell ipc --pid {qs_pid} call osd showMuted'"
     )
-    machine.sleep(0.5)
+    machine.sleep(0.5)  # if machine.sleep doesn't exist, use: import time; time.sleep(0.5)
     machine.succeed(f"su testuser -c 'env {qs_env} grim /tmp/osd-mute.png'")
     machine.copy_from_vm("/tmp/osd-mute.png")
   '';
@@ -657,10 +663,11 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/nix-installer-action@v22
 
-      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - uses: DeterminateSystems/magic-nix-cache-action@v11
         # Free binary cache from Determinate — caches Nix closure builds in CI
+        # Note: magic-nix-cache-action is deprecated; migrate to FlakeHub Cache when ready
 
       - name: Run VM tests
         run: |
