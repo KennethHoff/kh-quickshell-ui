@@ -19,8 +19,8 @@ All keyboard actions are reachable via IPC. The canonical client is
 | `hasNext`      | bool   | `true` if `currentIndex < count - 1` or `wrap`  |
 
 ```bash
-qs ipc --pid $PID prop get viewer currentIndex
-qs ipc --pid $PID prop get viewer hasNext
+qs ipc --pid $PID prop get view currentIndex
+qs ipc --pid $PID prop get view hasNext
 ```
 
 ---
@@ -36,9 +36,9 @@ qs ipc --pid $PID prop get viewer hasNext
 | `seek(n)`  | Jump to file at index `n` (clamped to valid range; ignores `wrap`)   |
 
 ```bash
-qs ipc --pid $PID call viewer next
-qs ipc --pid $PID call viewer prev
-qs ipc --pid $PID call viewer seek 2
+qs ipc --pid $PID call view next
+qs ipc --pid $PID call view prev
+qs ipc --pid $PID call view seek 2
 ```
 
 ### View
@@ -50,11 +50,11 @@ qs ipc --pid $PID call viewer seek 2
 | `key(k)`              | Send a key by name (see table below)     |
 
 ```bash
-qs ipc --pid $PID call viewer setFullscreen true
-qs ipc --pid $PID call viewer setWrap true
-qs ipc --pid $PID call viewer key f        # toggle fullscreen
-qs ipc --pid $PID call viewer key h        # prev in fullscreen
-qs ipc --pid $PID call viewer key l        # next in fullscreen
+qs ipc --pid $PID call view setFullscreen true
+qs ipc --pid $PID call view setWrap true
+qs ipc --pid $PID call view key f        # toggle fullscreen
+qs ipc --pid $PID call view key h        # prev in fullscreen
+qs ipc --pid $PID call view key l        # next in fullscreen
 ```
 
 Supported key names for `key()`: `f`, `h`, `l`, `left`, `right`, `tab`,
@@ -67,7 +67,7 @@ Supported key names for `key()`: `f`, `h`, `l`, `left`, `right`, `tab`,
 | `quit()` | Close kh-view  |
 
 ```bash
-qs ipc --pid $PID call viewer quit
+qs ipc --pid $PID call view quit
 ```
 
 ---
@@ -81,7 +81,7 @@ KV_PID=$!
 # Poll until ready
 for i in $(seq 50); do
     sleep 0.2
-    qs ipc --pid $KV_PID prop get viewer count >/dev/null 2>&1 && break
+    qs ipc --pid $KV_PID prop get view count >/dev/null 2>&1 && break
 done
 ```
 
@@ -92,15 +92,15 @@ done
 Step through all files at a fixed interval, then quit.
 
 ```bash
-qs ipc --pid $KV_PID call viewer setFullscreen true
+qs ipc --pid $KV_PID call view setFullscreen true
 
 while true; do
     sleep 5
-    if [[ "$(qs ipc --pid $KV_PID prop get viewer hasNext)" == "false" ]]; then
-        qs ipc --pid $KV_PID call viewer quit
+    if [[ "$(qs ipc --pid $KV_PID prop get view hasNext)" == "false" ]]; then
+        qs ipc --pid $KV_PID call view quit
         break
     fi
-    qs ipc --pid $KV_PID call viewer next
+    qs ipc --pid $KV_PID call view next
 done
 
 wait $KV_PID

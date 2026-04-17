@@ -338,7 +338,7 @@ or stdin; shows all files side-by-side with Tab to cycle focus between panes.
 - [2] ✅ Image detection by extension (png/jpg/jpeg/gif/webp/bmp/svg)
 - [3] ✅ N files shown side-by-side in equal-width panes; Tab cycles focus; active divider highlights
 - [4] ✅ `q`/`Esc` quits
-- [5] ✅ IPC — `target: "viewer"`; `next()`/`prev()`/`seek(n)`/`quit()`/`setFullscreen(bool)`/`key(k)`; readable props `currentIndex`, `count`, `fullscreen`, `hasPrev`, `hasNext`
+- [5] ✅ IPC — `target: "view"`; `next()`/`prev()`/`seek(n)`/`quit()`/`setFullscreen(bool)`/`key(k)`; readable props `currentIndex`, `count`, `fullscreen`, `hasPrev`, `hasNext`
 - [6] ⬜ Optional pane labels — each pane optionally shows a header bar with a short name and description; `kh-view` accepts label metadata alongside each file via a sidecar format or extended list protocol *(implement together with Dev Tooling → screenshot skill labels)*
 - [7] ⬜ Monitor selection — `--monitor <name|index>` flag; defaults to the monitor containing the active window
 
