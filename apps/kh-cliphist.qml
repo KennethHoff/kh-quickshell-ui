@@ -1,7 +1,7 @@
 // Clipboard history viewer — orchestrator.
 //
 // Daemon: quickshell -p <config-dir>
-// Toggle: quickshell ipc -c kh-cliphist call viewer toggle
+// Toggle: quickshell ipc -c kh-cliphist call cliphist toggle
 //
 // This file owns: window, IPC, global paste/yank, focus routing, fullscreen
 // overlay, and HelpOverlay. All list and preview logic lives in ClipList and

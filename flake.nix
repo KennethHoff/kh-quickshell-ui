@@ -387,9 +387,9 @@
               QS_PID=$!
               for i in $(seq 30); do
                 sleep 0.1
-                "$qs" ipc --pid "$QS_PID" call viewer toggle 2>/dev/null && break
+                "$qs" ipc --pid "$QS_PID" call cliphist toggle 2>/dev/null && break
               done
-              while [[ "$("$qs" ipc --pid "$QS_PID" prop get viewer showing 2>/dev/null)" == "true" ]]; do
+              while [[ "$("$qs" ipc --pid "$QS_PID" prop get cliphist showing 2>/dev/null)" == "true" ]]; do
                 sleep 0.2
               done
               kill "$QS_PID" 2>/dev/null
