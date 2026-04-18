@@ -76,7 +76,7 @@ Item {
     property var    _pluginConfig:     ({})     // config object from registry (or {})
     property var    _allItems:       []       // [{ label, description, icon, callback, id }]
     property var    _filteredItems:  []
-    property string _mode:           "insert" // "insert" | "normal" | "actions"
+    property string _mode:           "normal" // "insert" | "normal" | "actions"
     property bool   _pendingG:       false
     property var    _actions:        []       // [{ name, exec }] for desktop-action sub-mode
     property var    _pluginItems:      ({})     // modeName → [parsed items] (persists across switches)
@@ -125,7 +125,7 @@ Item {
         _activePlugin    = name
         _pluginConfig    = _plugins[name] || {}
         _actions       = []
-        _mode          = "insert"
+        _mode          = "normal"
         _pendingG      = false
         searchField.text = ""
         list.currentIndex = 0
@@ -139,7 +139,6 @@ Item {
             _allItems      = existing
             _filteredItems = []
             impl.runFilter()
-            if (_mode === "insert") searchField.forceActiveFocus()
             return
         }
 
@@ -167,7 +166,7 @@ Item {
         _allItems      = []
         _filteredItems = []
         _actions       = []
-        _mode          = "insert"
+        _mode          = "normal"
         _pendingG      = false
         searchField.text = ""
         list.currentIndex = 0
@@ -271,7 +270,7 @@ Item {
         _itemBuf       = {}
         _scriptBuf     = []
         _actions       = []
-        _mode          = "insert"
+        _mode          = "normal"
         _pendingG      = false
         _lastSelection = ""
         searchField.text = ""
