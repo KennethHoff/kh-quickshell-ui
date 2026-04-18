@@ -204,11 +204,10 @@ Configuration:
 
 ```qml
 SonarrPanel {
-    host: "192.168.1.100"        // Sonarr hostname or IP (default: "localhost")
-    port: 8989                   // Sonarr port (default: 8989)
-    pollInterval: 120            // Poll interval in seconds (default: 120)
-    apiKeyEnv: "SONARR_API_KEY"  // Environment variable name for API key (required)
-    maxHistoryItems: 20          // Max items to display (default: 20)
+    baseUrl: "http://sonarr"         // Required: protocol://host[:port] (port defaults to 80 for http, 443 for https)
+    apiKeyEnv: "SONARR_API_KEY"      // Environment variable name for API key (required)
+    pollInterval: 120                // Poll interval in seconds (optional, default: 120)
+    maxHistoryItems: 20              // Max items to display (optional, default: 20)
 }
 ```
 
@@ -223,8 +222,8 @@ programs.kh-ui.bar = {
       Workspaces {}
       BarSpacer {}
       SonarrPanel {
-        host = "192.168.1.100"
-        apiKeyEnv = "SONARR_TV"
+        baseUrl: "http://192.168.1.100:8989"
+        apiKeyEnv: "SONARR_TV"
       }
       Clock {}
       Volume {}
@@ -252,11 +251,11 @@ To monitor multiple Sonarr servers, declare multiple `SonarrPanel` instances wit
 ```qml
 BarRow {
   SonarrPanel {
-    host: "192.168.1.100"
+    baseUrl: "http://sonarr:8989"
     apiKeyEnv: "SONARR_TV"
   }
   SonarrPanel {
-    host: "192.168.1.101"
+    baseUrl: "https://sonarr.100.x.x.x"
     apiKeyEnv: "SONARR_4K"
   }
 }
@@ -270,7 +269,7 @@ Each instance polls independently and reads from its own environment variable.
 - `recentGrabs: array` — Array of recent grab items (`{series, season, episode, title, timestamp}`)
 - `loading: bool` — Whether an API call is in progress
 - `error: string` — Runtime/API error from the last poll (empty on success)
-- `configError: string` — Newline-separated list of failed config checks (empty when the config is valid); set by `validateConfig()` on `Component.onCompleted` and whenever `host`/`port`/`pollInterval`/`apiKeyEnv` changes. Polling is skipped while non-empty
+- `configError: string` — Newline-separated list of failed config checks (empty when the config is valid); set by `validateConfig()` on `Component.onCompleted` and whenever `baseUrl`/`pollInterval`/`apiKeyEnv` changes. Polling is skipped while non-empty
 - `hasError: bool` — `configError !== "" || error !== ""`; drives the badge colour and the error `BarTooltip` visibility
 
 **Error surface:**

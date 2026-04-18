@@ -2,15 +2,15 @@
 // Displays recently grabbed episodes and upcoming releases.
 //
 // Polls the Sonarr API at a configurable interval while the panel is visible.
-// Supports multiple instances via distinct host/port and apiKeyEnv combinations.
+// Supports multiple instances via distinct baseUrl and apiKeyEnv combinations.
+// Supports both HTTP and HTTPS.
 //
 // Configuration:
 //   SonarrPanel {
-//       host: "192.168.1.100"
-//       port: 8989
-//       pollInterval: 120
+//       baseUrl: "http://sonarr:8989"  // or "https://sonarr.example.com" or "http://192.168.1.100:8989"
 //       apiKeyEnv: "SONARR_API_KEY"
-//       maxHistoryItems: 20
+//       pollInterval: 120  // optional, defaults to 120 seconds
+//       maxHistoryItems: 20  // optional, defaults to 20
 //   }
 
 import QtQuick
@@ -23,10 +23,9 @@ BarPlugin {
     NixBins { id: bin }
 
     // ── Properties ─────────────────────────────────────────────────────────
-    property string host: "localhost"
-    property int port: 8989
+    required property string baseUrl
+    required property string apiKeyEnv
     property int pollInterval: 120
-    property string apiKeyEnv: "SONARR_API_KEY"
     property int maxHistoryItems: 20
 
     // ── Sizing ─────────────────────────────────────────────────────────────
@@ -63,8 +62,7 @@ BarPlugin {
     }
 
     // ── Config validation ──────────────────────────────────────────────────
-    onHostChanged:         functionality.validateConfig()
-    onPortChanged:         functionality.validateConfig()
+    onBaseUrlChanged:      functionality.validateConfig()
     onPollIntervalChanged: functionality.validateConfig()
     onApiKeyEnvChanged:    functionality.validateConfig()
 
@@ -131,11 +129,21 @@ BarPlugin {
     QtObject {
         id: functionality
 
+        function normalizeBaseUrl(url: string): string {
+            if (!url) return url
+            // Add default port if missing
+            if (!/:\d+$/.test(url)) {
+                if (url.startsWith("https://")) return url + ":443"
+                if (url.startsWith("http://")) return url + ":80"
+            }
+            return url
+        }
+
         function validateConfig(): void {
             const prev = _state.configError
             const errs = []
-            if (!host) errs.push("host is empty")
-            if (port < 1 || port > 65535) errs.push("port " + port + " out of range (1..65535)")
+            if (!baseUrl) errs.push("baseUrl is empty")
+            else if (!/^https?:\/\/.+/.test(baseUrl)) errs.push("baseUrl must start with http:// or https://")
             if (pollInterval < 5) errs.push("pollInterval " + pollInterval + "s below minimum 5s")
             if (!apiKeyEnv) errs.push("apiKeyEnv property not set")
             // Only check env var resolution if apiKeyEnv is set — otherwise the
@@ -152,7 +160,7 @@ BarPlugin {
         }
 
         function makeApiCall(endpoint: string): void {
-            const url = "http://" + host + ":" + port + "/api/v3/" + endpoint
+            const url = normalizeBaseUrl(baseUrl) + "/api/v3/" + endpoint
             _proc.command = [
                 bin.bash, "-c",
                 bin.curl + " -s -H 'X-Api-Key: " + getApiKey() + "' '" + url + "' | " + bin.jq + " ."
