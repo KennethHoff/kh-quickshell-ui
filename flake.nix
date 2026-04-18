@@ -140,39 +140,59 @@
                   ipcName: "stats"
                   panelWidth: 320
 
-                  CpuUsage { id: cpuUsage }
-                  BarText { text: "cpu " + cpuUsage.usage + "%" }
-
-                  RamUsage { id: ramUsage }
-                  BarText { text: "ram " + ramUsage.percent + "%" }
-
-                  GpuUsage { id: gpuUsage }
-                  BarText {
-                      text: "gpu " + gpuUsage.busy + "% (" + gpuUsage.vramUsedMb + "M/" + gpuUsage.vramTotalMb + "M)"
-                  }
-
+                  // Data sources — plugins declared up top so the presentation
+                  // below is uncluttered. Each exposes readable properties for
+                  // the BarText bindings to pick up.
+                  CpuUsage  { id: cpuUsage }
+                  RamUsage  { id: ramUsage }
+                  GpuUsage  { id: gpuUsage }
                   DiskUsage { id: diskUsage }
-                  Repeater {
-                      model: diskUsage.results
-                      BarText {
-                          text: modelData.mount + " " + Math.round(modelData.usedB / 1e9) + "G/" + Math.round(modelData.totalB / 1e9) + "G"
+                  CpuTemp   { id: cpuTemp  }
+                  GpuTemp   { id: gpuTemp  }
+
+                  // Presentation — three labelled sections; each row uses a
+                  // middle-dot infix ( · ) to separate key from value so
+                  // identifiers like the "/" mount path read clearly.
+                  Column {
+                      spacing: 8
+
+                      Column {
+                          spacing: 2
+                          BarText { text: "usage";                                       color: mutedColor }
+                          BarText { text: "  cpu · " + cpuUsage.usage   + "%" }
+                          BarText { text: "  ram · " + ramUsage.percent + "%" }
+                          BarText { text: "  gpu · " + gpuUsage.busy    + "% (" + gpuUsage.vramUsedMb + "M/" + gpuUsage.vramTotalMb + "M)" }
                       }
-                  }
 
-                  CpuTemp { id: cpuTemp }
-                  BarText {
-                      text: "cpu " + cpuTemp.temp + "°"
-                      color: cpuTemp.temp >= 80 ? errorColor
-                           : cpuTemp.temp >= 60 ? warnColor
-                           :                      normalColor
-                  }
+                      Column {
+                          spacing: 2
+                          BarText { text: "temperature";                                 color: mutedColor }
+                          BarText {
+                              text:  "  cpu · " + cpuTemp.temp + "°"
+                              color: cpuTemp.temp >= 80 ? errorColor
+                                   : cpuTemp.temp >= 60 ? warnColor
+                                   :                      normalColor
+                          }
+                          BarText {
+                              text:  "  gpu · " + gpuTemp.temp + "°"
+                              color: gpuTemp.temp >= 80 ? errorColor
+                                   : gpuTemp.temp >= 60 ? warnColor
+                                   :                      normalColor
+                          }
+                      }
 
-                  GpuTemp { id: gpuTemp }
-                  BarText {
-                      text: "gpu " + gpuTemp.temp + "°"
-                      color: gpuTemp.temp >= 80 ? errorColor
-                           : gpuTemp.temp >= 60 ? warnColor
-                           :                      normalColor
+                      Column {
+                          spacing: 2
+                          BarText { text: "storage";                                     color: mutedColor }
+                          Repeater {
+                              model: diskUsage.results
+                              BarText {
+                                  text: "  " + modelData.mount + " · "
+                                      + Math.round(modelData.usedB  / 1e9) + "G/"
+                                      + Math.round(modelData.totalB / 1e9) + "G"
+                              }
+                          }
+                      }
                   }
               }
               Tray {}
