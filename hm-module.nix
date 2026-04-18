@@ -184,111 +184,118 @@ in
     };
   };
 
-  config = lib.mkMerge [
-    (lib.mkIf config.programs.kh-ui.enable {
-      programs.quickshell = {
-        enable = lib.mkDefault true;
-        configs =
-          lib.optionalAttrs config.programs.kh-ui.clipboard-history.enable {
-            kh-cliphist = mkAppConfig {
-              name = "cliphist";
-              extraBins = {
-                cliphistDecodeAll = toString cliphistDecodeAll;
-              };
-            };
-          }
-          // lib.optionalAttrs config.programs.kh-ui.bar.enable {
-            kh-bar = mkBarConfig {
-              inherit (config.programs.kh-ui.bar) structure extraPluginDirs;
-            };
-          }
-          // lib.optionalAttrs config.programs.kh-ui.launcher.enable {
-            kh-launcher = mkAppConfig {
-              name = "launcher";
-              extraBins = {
-                scanApps = toString scanAppsScript;
-                terminal = lib.getExe config.programs.kh-ui.launcher.terminal;
-              };
-            };
-          }
-          // lib.optionalAttrs config.programs.kh-ui.view.enable {
-            kh-view = mkAppConfig { name = "view"; };
-          }
-          // lib.optionalAttrs config.programs.kh-ui.osd.enable {
-            kh-osd = mkAppConfig { name = "osd"; };
-          };
-      };
-
-      home.packages =
-        lib.optionals config.programs.kh-ui.clipboard-history.enable [
-          (pkgs.writeShellScriptBin "kh-cliphist" ''
-            exec ${lib.getExe pkgs.quickshell} -c kh-cliphist "$@"
-          '')
-        ]
-        ++ lib.optionals config.programs.kh-ui.launcher.enable [
-          (pkgs.writeShellScriptBin "kh-launcher" ''
-            exec ${lib.getExe pkgs.quickshell} -c kh-launcher "$@"
-          '')
-        ]
-        ++ lib.optionals config.programs.kh-ui.bar.enable [
-          (pkgs.writeShellScriptBin "kh-bar" ''
-            exec ${lib.getExe pkgs.quickshell} -c kh-bar "$@"
-          '')
-        ]
-        ++ lib.optionals config.programs.kh-ui.view.enable [
-          (pkgs.writeShellScriptBin "kh-view" ''
-            exec ${lib.getExe pkgs.quickshell} -c kh-view "$@"
-          '')
-        ]
-        ++ lib.optionals config.programs.kh-ui.osd.enable [
-          (pkgs.writeShellScriptBin "kh-osd" ''
-            exec ${lib.getExe pkgs.quickshell} -c kh-osd "$@"
-          '')
-        ];
-    })
-
-    (lib.mkIf config.programs.kh-ui.enable {
-      systemd.user.services =
-        let
-          mkQsService = configName: {
-            Unit = {
-              Description = "Quickshell instance: ${configName}";
-              PartOf = [ "graphical-session.target" ];
-              After = [ "graphical-session.target" ];
-            };
-            Service = {
-              ExecStart = "${lib.getExe pkgs.quickshell} -c ${configName}";
-              Restart = "on-failure";
-              RestartSec = 2;
-            };
-            Install.WantedBy = [ "graphical-session.target" ];
-          };
-        in
+  config =
+    let
+      qsConfigs =
         lib.optionalAttrs config.programs.kh-ui.clipboard-history.enable {
-          kh-cliphist = mkQsService "kh-cliphist";
-          kh-cliphist-store = {
-            Unit = {
-              Description = "Clipboard history store (wl-paste -> cliphist)";
-              PartOf = [ "graphical-session.target" ];
-              After = [ "graphical-session.target" ];
+          kh-cliphist = mkAppConfig {
+            name = "cliphist";
+            extraBins = {
+              cliphistDecodeAll = toString cliphistDecodeAll;
             };
-            Service = {
-              ExecStart = "${lib.getExe' pkgs.wl-clipboard "wl-paste"} --watch ${lib.getExe pkgs.cliphist} store";
-              Restart = "on-failure";
-              RestartSec = 2;
-            };
-            Install.WantedBy = [ "graphical-session.target" ];
+          };
+        }
+        // lib.optionalAttrs config.programs.kh-ui.bar.enable {
+          kh-bar = mkBarConfig {
+            inherit (config.programs.kh-ui.bar) structure extraPluginDirs;
           };
         }
         // lib.optionalAttrs config.programs.kh-ui.launcher.enable {
-          kh-launcher = mkQsService "kh-launcher";
+          kh-launcher = mkAppConfig {
+            name = "launcher";
+            extraBins = {
+              scanApps = toString scanAppsScript;
+              terminal = lib.getExe config.programs.kh-ui.launcher.terminal;
+            };
+          };
         }
-        // lib.optionalAttrs config.programs.kh-ui.bar.enable {
-          kh-bar = mkQsService "kh-bar";
+        // lib.optionalAttrs config.programs.kh-ui.view.enable {
+          kh-view = mkAppConfig { name = "view"; };
         }
         // lib.optionalAttrs config.programs.kh-ui.osd.enable {
-          kh-osd = mkQsService "kh-osd";
+          kh-osd = mkAppConfig { name = "osd"; };
         };
-    })
-  ];
+    in
+    lib.mkMerge [
+      (lib.mkIf config.programs.kh-ui.enable {
+        programs.quickshell = {
+          enable = lib.mkDefault true;
+          configs = qsConfigs;
+        };
+
+        home.packages =
+          lib.optionals config.programs.kh-ui.clipboard-history.enable [
+            (pkgs.writeShellScriptBin "kh-cliphist" ''
+              exec ${lib.getExe pkgs.quickshell} -c kh-cliphist "$@"
+            '')
+          ]
+          ++ lib.optionals config.programs.kh-ui.launcher.enable [
+            (pkgs.writeShellScriptBin "kh-launcher" ''
+              exec ${lib.getExe pkgs.quickshell} -c kh-launcher "$@"
+            '')
+          ]
+          ++ lib.optionals config.programs.kh-ui.bar.enable [
+            (pkgs.writeShellScriptBin "kh-bar" ''
+              exec ${lib.getExe pkgs.quickshell} -c kh-bar "$@"
+            '')
+          ]
+          ++ lib.optionals config.programs.kh-ui.view.enable [
+            (pkgs.writeShellScriptBin "kh-view" ''
+              exec ${lib.getExe pkgs.quickshell} -c kh-view "$@"
+            '')
+          ]
+          ++ lib.optionals config.programs.kh-ui.osd.enable [
+            (pkgs.writeShellScriptBin "kh-osd" ''
+              exec ${lib.getExe pkgs.quickshell} -c kh-osd "$@"
+            '')
+          ];
+      })
+
+      (lib.mkIf config.programs.kh-ui.enable {
+        systemd.user.services =
+          let
+            mkQsService = configName: {
+              Unit = {
+                Description = "Quickshell instance: ${configName}";
+                PartOf = [ "graphical-session.target" ];
+                After = [ "graphical-session.target" ];
+              };
+              Service = {
+                # -p <store-path> instead of -c <name> so each QML change produces a
+                # new ExecStart, which sd-switch diffs to trigger a restart. With
+                # -c <name>, ExecStart only changes on a quickshell version bump.
+                ExecStart = "${lib.getExe pkgs.quickshell} -p ${qsConfigs.${configName}}";
+                Restart = "on-failure";
+                RestartSec = 2;
+              };
+              Install.WantedBy = [ "graphical-session.target" ];
+            };
+          in
+          lib.optionalAttrs config.programs.kh-ui.clipboard-history.enable {
+            kh-cliphist = mkQsService "kh-cliphist";
+            kh-cliphist-store = {
+              Unit = {
+                Description = "Clipboard history store (wl-paste -> cliphist)";
+                PartOf = [ "graphical-session.target" ];
+                After = [ "graphical-session.target" ];
+              };
+              Service = {
+                ExecStart = "${lib.getExe' pkgs.wl-clipboard "wl-paste"} --watch ${lib.getExe pkgs.cliphist} store";
+                Restart = "on-failure";
+                RestartSec = 2;
+              };
+              Install.WantedBy = [ "graphical-session.target" ];
+            };
+          }
+          // lib.optionalAttrs config.programs.kh-ui.launcher.enable {
+            kh-launcher = mkQsService "kh-launcher";
+          }
+          // lib.optionalAttrs config.programs.kh-ui.bar.enable {
+            kh-bar = mkQsService "kh-bar";
+          }
+          // lib.optionalAttrs config.programs.kh-ui.osd.enable {
+            kh-osd = mkQsService "kh-osd";
+          };
+      })
+    ];
 }
