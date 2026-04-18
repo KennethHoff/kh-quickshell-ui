@@ -378,6 +378,7 @@ The root target (`bar`) exposes bar-wide queries:
 | Plugin | Suffix | Functions / Properties |
 |---|---|---|
 | `Workspaces` | `.workspaces` | `getFocused()` -> string, `list()` -> newline-separated names, `switchTo(name)`, `showPreview(name)`, `hidePreview()` |
+| `Workspaces` preview tooltip | `.workspaces.ws<name>` | `pin()`, `unpin()`, `togglePin()`, `isPinned()` -> bool, `isVisible()` -> bool — one tooltip per workspace; pin lets multiple previews coexist |
 | `Volume` | `.volume` | `getVolume()` -> int (0-150), `setVolume(v)`, `adjustVolume(delta)`, `isMuted()` -> bool, `setMuted(muted)`, `toggleMute()` |
 | `MediaPlayer` | `.media` | `isActive()` -> bool, `isPlaying()` -> bool, `getTitle()`, `getArtist()`, `togglePlaying()`, `play()`, `pause()`, `next()`, `prev()` |
 | `Tray` | `.tray` | `list()` -> newline-separated titles, `activate(title)`, `showMenu(title)` |

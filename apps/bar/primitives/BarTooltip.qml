@@ -97,6 +97,15 @@ Item {
 
     readonly property bool _visible: (_state.hoverShown || _state.pinned) && root.active
 
+    // Public methods — callable from QML as `myTooltip.pin()` etc. IPC
+    // handlers and external plugins (e.g. Workspaces.showPreview) both
+    // go through these.
+    function pin(): void       { functionality.pin() }
+    function unpin(): void     { functionality.unpin() }
+    function togglePin(): void { functionality.togglePin() }
+    function isPinned(): bool  { return _state.pinned }
+    function isVisible(): bool { return root._visible }
+
     QtObject {
         id: functionality
 
@@ -115,11 +124,11 @@ Item {
             if (_hover.hovered && root.active) _state.hoverShown = true
         }
 
-        // ipc only
+        // ui+ipc
         function pin(): void       { _state.pinned = true }
-        // ipc only
+        // ui+ipc
         function unpin(): void     { _state.pinned = false }
-        // ipc only
+        // ui+ipc
         function togglePin(): void { _state.pinned = !_state.pinned }
     }
 
@@ -127,11 +136,11 @@ Item {
         target:  root.ipcPrefix
         enabled: root.ipcName !== "" && root.ipcPrefix !== ""
 
-        function pin(): void       { functionality.pin() }
-        function unpin(): void     { functionality.unpin() }
-        function togglePin(): void { functionality.togglePin() }
-        function isPinned(): bool  { return _state.pinned }
-        function isVisible(): bool { return root._visible }
+        function pin(): void       { root.pin() }
+        function unpin(): void     { root.unpin() }
+        function togglePin(): void { root.togglePin() }
+        function isPinned(): bool  { return root.isPinned() }
+        function isVisible(): bool { return root.isVisible() }
     }
 
     HoverHandler {

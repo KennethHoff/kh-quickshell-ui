@@ -1,6 +1,11 @@
 // Bar plugin: Hyprland workspace switcher with hover preview.
 // Shows all workspaces; highlights the focused one. Click to activate.
 // Hover for ~300 ms to show a live thumbnail of the workspace contents.
+//
+// Each workspace owns its own BarTooltip — hover/delay/dismiss are
+// handled by the tooltip primitive, and multiple previews can coexist
+// (e.g. via showPreview() IPC pins) because the popup is no longer
+// shared across delegates.
 import QtQuick
 import Quickshell
 import Quickshell.Hyprland
@@ -12,25 +17,11 @@ BarPlugin {
     ipcName: "workspaces"
     NixConfig { id: cfg }
 
-    // Hover-preview state — one shared popup for all workspace buttons.
-    QtObject {
-        id: state
-        property var  preview: null  // HyprlandWorkspace currently shown
-        property var  pending: null  // workspace queued during hover delay
-        property real btnX:   0      // button x for popup x-centering
-    }
-
     QtObject {
         id: functionality
 
         // ui+ipc
         function activateWorkspace(ws): void { ws.activate() }
-        // ui only
-        function hoverEnter(ws, btn): void { state.pending = ws; state.btnX = btn.mapToItem(null, 0, 0).x; timer.restart() }
-        // ui only
-        function hoverExit(): void { timer.stop(); state.pending = null; state.preview = null }
-        // ui only
-        function applyPendingPreview(): void { state.preview = state.pending }
         // ipc only
         function getFocused(): string {
             for (let i = 0; i < Hyprland.workspaces.values.length; i++)
@@ -51,14 +42,23 @@ BarPlugin {
                 if (Hyprland.workspaces.values[i].name === name)
                     { activateWorkspace(Hyprland.workspaces.values[i]); return }
         }
-        // ipc only
+        // ipc only — pin the matching workspace's BarTooltip.
         function showPreview(name: string): void {
-            for (let i = 0; i < Hyprland.workspaces.values.length; i++)
-                if (Hyprland.workspaces.values[i].name === name)
-                    { state.btnX = 0; state.preview = Hyprland.workspaces.values[i]; return }
+            for (let i = 0; i < _repeater.count; i++) {
+                const item = _repeater.itemAt(i)
+                if (item && item.ws && item.ws.name === name) {
+                    item.tooltip.pin()
+                    return
+                }
+            }
         }
-        // ipc only
-        function hidePreview(): void { timer.stop(); state.pending = null; state.preview = null }
+        // ipc only — unpin every BarTooltip.
+        function hidePreview(): void {
+            for (let i = 0; i < _repeater.count; i++) {
+                const item = _repeater.itemAt(i)
+                if (item && item.tooltip) item.tooltip.unpin()
+            }
+        }
     }
 
     IpcHandler {
@@ -70,14 +70,6 @@ BarPlugin {
         function hidePreview(): void                { functionality.hidePreview() }
     }
 
-    // 300 ms hover delay before the preview appears.
-    Timer {
-        id: timer
-        interval: 300
-        repeat: false
-        onTriggered: functionality.applyPendingPreview()
-    }
-
     implicitWidth: row.implicitWidth
 
     Row {
@@ -86,9 +78,17 @@ BarPlugin {
         spacing: 4
 
         Repeater {
+            id: _repeater
             model: Hyprland.workspaces
 
             delegate: Rectangle {
+                id: _delegate
+
+                // Exposed so the plugin-root functionality can find this
+                // delegate by workspace name and call tooltip.pin() on it.
+                readonly property var ws: modelData
+                readonly property alias tooltip: _tip
+
                 width: 28
                 height: 22
                 radius: 4
@@ -112,89 +112,73 @@ BarPlugin {
 
                 MouseArea {
                     anchors.fill: parent
-                    hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
                     onClicked: functionality.activateWorkspace(modelData)
-                    // parent is the delegate Rectangle; map to bar-window coords.
-                    onEntered: functionality.hoverEnter(modelData, parent)
-                    onExited:  functionality.hoverExit()
                 }
-            }
-        }
-    }
 
-    // ── Workspace preview popup ────────────────────────────────────────────
-    PopupWindow {
-        id: panel
-        anchor.window: root.barWindow
-        anchor.rect.x: root.barWindow
-            ? Math.max(0, Math.min(
-                Math.round(state.btnX + 14 - panel.implicitWidth / 2),
-                root.barWindow.width - panel.implicitWidth))
-            : 0
-        anchor.rect.y: root.barHeight + 4
+                // Per-delegate hover preview. BarTooltip's HoverHandler
+                // tracks the delegate's geometry; opens after 300 ms;
+                // dismisses on mouse leave unless pinned via IPC.
+                BarTooltip {
+                    id: _tip
+                    bg: cfg.color.base00           // darker bg for thumbnail contrast
+                    padding: 0                      // thumbnail fills to the borders
+                    ipcName: "ws" + modelData.name  // addressable as <prefix>.ws<name>
 
-        // Dimensions: 240 px wide, aspect-matched to the workspace's monitor.
-        // Monitor width/height are physical pixels; divide by scale to get
-        // logical pixels, which is the coordinate space used by lastIpcObject.
-        // Look up the monitor via Hyprland.monitors rather than workspace.monitor:
-        // workspace.monitor is only set while it is the active workspace on a monitor.
-        readonly property var mon: Hyprland.monitors.values.find(m => m.activeWorkspace === state.preview)
-        readonly property real mon_scale: mon?.scale ?? 1
-        readonly property real mon_w: (mon?.width  ?? 1920) / mon_scale
-        readonly property real mon_h: (mon?.height ?? 1080) / mon_scale
-        readonly property real scale: 240 / mon_w
+                    // Dimensions: 240 px wide, aspect-matched to the
+                    // workspace's monitor. Monitor width/height are physical
+                    // pixels; divide by scale to get logical pixels (the
+                    // coordinate space used by lastIpcObject).
+                    readonly property var mon: Hyprland.monitors.values.find(m => m.activeWorkspace === modelData)
+                    readonly property real mon_scale: mon?.scale ?? 1
+                    readonly property real mon_w: (mon?.width  ?? 1920) / mon_scale
+                    readonly property real mon_h: (mon?.height ?? 1080) / mon_scale
+                    readonly property real scale: 240 / mon_w
 
-        implicitWidth:  240
-        implicitHeight: Math.round(mon_h * scale)
-        color:  "transparent"
+                    Item {
+                        implicitWidth:  240
+                        implicitHeight: Math.round(_tip.mon_h * _tip.scale)
+                        clip: true
 
-        visible: state.preview !== null && root.barWindow !== null
+                        // ── Window thumbnails ─────────────────────────
+                        Repeater {
+                            model: modelData?.toplevels?.values ?? []
 
-        Rectangle {
-            anchors.fill: parent
-            color:        cfg.color.base00
-            border.color: cfg.color.base02
-            border.width: 1
-            radius: 4
-            clip: true
+                            delegate: Item {
+                                readonly property var ipc: modelData.lastIpcObject
+                                x: ipc && ipc.at
+                                    ? Math.round((ipc.at[0] - (_tip.mon?.x ?? 0)) * _tip.scale)
+                                    : 0
+                                y: ipc && ipc.at
+                                    ? Math.round((ipc.at[1] - (_tip.mon?.y ?? 0)) * _tip.scale)
+                                    : 0
+                                width:  ipc && ipc.size ? Math.round(ipc.size[0] * _tip.scale) : 0
+                                height: ipc && ipc.size ? Math.round(ipc.size[1] * _tip.scale) : 0
+                                clip: true
 
-            // ── Window thumbnails ─────────────────────────────────────────
-            Repeater {
-                model: state.preview?.toplevels?.values ?? []
+                                ScreencopyView {
+                                    anchors.fill: parent
+                                    captureSource: modelData.wayland ?? null
+                                    live: true
+                                }
+                            }
+                        }
 
-                delegate: Item {
-                    readonly property var ipc: modelData.lastIpcObject
-                    x: ipc && ipc.at
-                        ? Math.round((ipc.at[0] - (panel.mon?.x ?? 0)) * panel.scale)
-                        : 0
-                    y: ipc && ipc.at
-                        ? Math.round((ipc.at[1] - (panel.mon?.y ?? 0)) * panel.scale)
-                        : 0
-                    width:  ipc && ipc.size ? Math.round(ipc.size[0] * panel.scale) : 0
-                    height: ipc && ipc.size ? Math.round(ipc.size[1] * panel.scale) : 0
-                    clip: true
-
-                    ScreencopyView {
-                        anchors.fill: parent
-                        captureSource: modelData.wayland ?? null
-                        live: true
+                        // ── Workspace name badge ──────────────────────
+                        Text {
+                            anchors {
+                                right:  parent.right
+                                bottom: parent.bottom
+                                margins: 4
+                            }
+                            text:           _delegate.ws.name
+                            color:          cfg.color.base05
+                            font.family:    cfg.fontFamily
+                            font.pixelSize: cfg.fontSize - 3
+                            font.bold:      true
+                        }
                     }
                 }
-            }
-
-            // ── Workspace name badge ───────────────────────────────────────
-            Text {
-                anchors {
-                    right:  parent.right
-                    bottom: parent.bottom
-                    margins: 4
-                }
-                text:           state.preview ? state.preview.name : ""
-                color:          cfg.color.base05
-                font.family:    cfg.fontFamily
-                font.pixelSize: cfg.fontSize - 3
-                font.bold:      true
             }
         }
     }
