@@ -1,6 +1,6 @@
 # quickshell-ui
 
-QML shell components for [Quickshell](https://quickshell.outfoxxed.me/): a status bar (`kh-bar`), application launcher (`kh-launcher`), clipboard history viewer (`kh-cliphist`), file/image viewer (`kh-view`), and volume OSD (`kh-osd`).
+QML shell components for [Quickshell](https://quickshell.outfoxxed.me/): a status bar (`kh-bar`), extensible launcher (`kh-launcher`, app launcher by default, pluggable for any other selectable list), clipboard history viewer (`kh-cliphist`), file/image viewer (`kh-view`), and volume OSD (`kh-osd`).
 
 Everything controllable via keyboard is also controllable via [Quickshell IPC](https://quickshell.outfoxxed.me/docs/ipc/) — every navigation action, mode switch, plugin toggle, and value query has a corresponding IPC call. This makes all components fully scriptable and suitable for automation or agentic workflows.
 
@@ -9,7 +9,7 @@ Everything controllable via keyboard is also controllable via [Quickshell IPC](h
 | Name | Description | IPC target | Toggle call |
 |---|---|---|---|
 | `kh-bar` | Status bar (all monitors) | — | always visible |
-| `kh-launcher` | Application launcher overlay | `launcher` | `qs ipc call launcher toggle` |
+| `kh-launcher` | Launcher overlay (apps + user-defined plugins) | `launcher` | `qs ipc call launcher toggle` |
 | `kh-cliphist` | Clipboard history overlay | `cliphist` | `qs ipc call cliphist toggle` |
 | `kh-view` | File / image viewer overlay | `view` | `qs ipc call view toggle` |
 | `kh-osd` | Volume on-screen display | `osd` | reacts to PipeWire automatically |
@@ -72,7 +72,7 @@ programs.kh-ui = {
 | Component | Description | Docs |
 |---|---|---|
 | `kh-bar` | Status bar — layout, plugins, custom plugins, IPC | **[docs/bar.md](docs/bar.md)** |
-| `kh-launcher` | Launcher — mode system, custom modes, IPC | **[docs/launcher-modes.md](docs/launcher-modes.md)** |
+| `kh-launcher` | Launcher — plugin system, custom plugins, IPC | **[docs/launcher-plugins.md](docs/launcher-plugins.md)** |
 | `kh-cliphist` | Clipboard history — IPC | **[docs/clipboard-history.md](docs/clipboard-history.md)** |
 | `kh-view` | File/image viewer — IPC | **[docs/view.md](docs/view.md)** |
 | `kh-osd` | Volume OSD — configuration, keybinds, IPC | **[docs/osd.md](docs/osd.md)** |

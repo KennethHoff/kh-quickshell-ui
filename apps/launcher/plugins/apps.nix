@@ -1,9 +1,9 @@
 # Launcher plugin: apps
 #
-# Scans XDG .desktop files and registers an "apps" mode with frecency
+# Scans XDG .desktop files and registers an "apps" plugin with frecency
 # tracking and desktop-action support.
 #
-# Returns: { modes :: AttrSet }
+# Returns: { plugins :: AttrSet }
 {
   pkgs,
   lib,
@@ -108,14 +108,14 @@ let
     done | sort -t$'\t' -k1 -f
   '';
 
-  modeScript = pkgs.writeShellScript "kh-scan-apps-mode" ''
+  pluginScript = pkgs.writeShellScript "kh-scan-apps-plugin" ''
     exec ${scanScript} ${lib.getExe terminal}
   '';
 in
 {
-  modes = {
+  plugins = {
     apps = {
-      script = toString modeScript;
+      script = toString pluginScript;
       frecency = true;
       hasActions = true;
       placeholder = "Search applications...";

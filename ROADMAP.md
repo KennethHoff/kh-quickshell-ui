@@ -1,6 +1,6 @@
 # Quickshell Roadmap
 
-Features to implement. Each entry becomes its own Quickshell component or launcher mode.
+Features to implement. Each entry becomes its own Quickshell component or launcher plugin.
 
 **UX principles:**
 
@@ -91,36 +91,68 @@ list of clipboard entries from `cliphist`. SUPER+V toggles it via IPC.
 
 ## Launcher
 
-Searchable application launcher (`quickshell -c kh-launcher`).
+Extensible modal launcher (`quickshell -c kh-launcher`). Each **launcher plugin**
+registers a named item source (apps, open windows, emoji, …); `]` / `[` cycles
+between them, Enter picks an item. The built-in **Apps** plugin has no
+special-casing — it is registered alongside user-defined plugins through the
+same contract.
 
 ### Core
 
-- [1] ✅ Fuzzy search over installed apps by name and description; haystacks are `name + comment`
+Plugin-agnostic infrastructure shared by every plugin.
+
+- [1] ✅ Fuzzy search over item `label + description`
 - [2] ✅ Search filters: `'` exact match, `^` prefix, `$` suffix, `!` negation; space-separated tokens combine with AND
-- [3] ✅ Description shown in list (one line below app name)
-- [4] ✅ `j`/`k` navigate, `Enter` launch; opens in insert mode (search field focused)
-- [5] ✅ Ctrl+1–9 launches the selected app on workspace 1–9 via `hyprctl dispatch exec [workspace N]`
-- [6] ✅ `l` / Tab enters actions mode for the selected app (only switches if the app has actions)
-- [7] ✅ `j`/`k` navigate actions; `Enter` launches selected action
-- [8] ✅ `h` / Esc returns from actions mode to app list
-- [9] ✅ Apps with `Terminal=true` run wrapped in the configured terminal (`bin.terminal`)
-- [10] ✅ Window closes automatically after launching
-- [11] ✅ Flash animation (green) when an app or action is launched
-- [12] ✅ `?` toggles a searchable help overlay listing all keybinds; help sections are mode-aware (actions vs. normal/insert)
-- [13] ✅ App icons — display the icon image (not just name) in the list row
-- [14] ✅ App icons in actions mode — show the parent app's icon next to each desktop action entry
-- [15] ✅ Frequency-weighted results — per-app decayed launch counter persisted at `$XDG_DATA_HOME/kh-launcher/meta/frecency` (via shared `MetaStore`); fuzzy score gets a `3·log2(1+count)` boost so frequently-launched apps surface higher without swamping strong prefix matches; each count decays with a 14-day half-life so stale usage stops dominating; empty query sorts by decayed count then name
-- [16] ✅ Script mode — any external process can push a list of items (label, description, icon, callback command) into the launcher via IPC and receive the user's selection back; makes the launcher infinitely extensible without baking in every mode; Nix option to register named script modes that appear alongside built-in modes
-- [17] ⬜ Combi mode *(depends on 16)* — a named script mode that concatenates results from multiple sources (e.g. apps + open windows + system commands) into one unified search, rofi-`combi`-style; each source is tagged so rows show their origin (`[app]` / `[window]` / …) and can carry a per-source ranking bias; different Enter semantics per source (launch vs. focus vs. execute) routed by the source tag; opt-in — default modes stay single-source to keep rankings and Enter behaviour coherent
+- [3] ✅ Description shown in list (one line below the label)
+- [4] ✅ `j`/`k` navigate, `Enter` confirm; opens in insert mode (search field focused)
+- [5] ✅ Window closes automatically after a selection
+- [6] ✅ Flash animation (green) on selection
+- [7] ✅ `?` toggles a searchable help overlay listing all keybinds; help sections are state-aware (actions vs. normal/insert)
+- [8] ✅ Per-item icons — display the icon image (not just the label) in the list row
+- [9] ✅ Plugin switching — `]` / `[` cycle plugins; click a plugin chip to jump directly; `activatePlugin` / `nextPlugin` / `prevPlugin` / `returnToDefault` via IPC
+- [10] ✅ Script plugins — any external process can push items (label, description, icon, callback, optional id) into a named plugin via TSV stdout or IPC and receive the user's selection back; makes the launcher infinitely extensible without baking in every plugin; Nix option `programs.kh-ui.launcher.scriptPlugins` registers named plugins that appear alongside built-in ones, and runtime IPC (`registerPlugin` / `addItem` / `itemsReady`) supports ad-hoc push-based plugins
+- [11] ⬜ Combi plugin *(depends on 10)* — a named plugin that concatenates results from multiple sources (e.g. apps + open windows + system commands) into one unified search, rofi-`combi`-style; each source is tagged so rows show their origin (`[app]` / `[window]` / …) and can carry a per-source ranking bias; different Enter semantics per source (launch vs. focus vs. execute) routed by the source tag; opt-in — default plugins stay single-source to keep rankings and Enter behaviour coherent
+- [12] ⬜ Plugin-owned Enter semantics — `Ctrl+1–9` workspace-launch is currently wired directly into the common launch path, which only makes sense when the callback is a process-spawn command; it is nonsensical for plugins whose Enter means "focus" (window switcher), "copy to clipboard" (emoji), "execute" (system commands), etc. Move modifier-Enter handling into plugin-provided callbacks so each plugin defines its own semantics, and the apps plugin keeps `Ctrl+1–9 → hyprctl dispatch exec [workspace N] <command>` as a plugin-local behaviour
+- [13] ⬜ Plugin-owned ranking / frecency — the decayed-launch counter (`$XDG_DATA_HOME/kh-launcher/meta/frecency`, `3·log2(1+count)` boost, 14-day half-life) is currently the only ranking signal available and, in practice, only the apps plugin opts in. Other plugins want different semantics: window switcher should rank by recent-focus order sourced from Hyprland, system commands barely need ranking, snippets probably want alphabetical. Expose ranking as a plugin-provided hook (or a named strategy) rather than a single shared counter, so each plugin chooses its own scoring and tie-breaker
 
-### Modes
+### Plugins
 
-- [1] ⬜ Window switcher mode — fuzzy search over all open windows by app name or title, across all workspaces and monitors; Enter focuses the window and switches to its workspace
-- [2] ⬜ Emoji picker mode — fuzzy search emoji by name; Enter copies to clipboard
-- [3] ⬜ Snippets mode — text expansion triggered by abbreviation
-- [4] ⬜ System commands mode — lock, sleep, reboot, etc. as searchable actions
-- [5] ⬜ Color picker *(long term)* — screen dropper; Enter copies hex/rgb to clipboard
-- [6] ⬜ File search *(long term)* — fd/fzf over `$HOME`; Enter opens in default app
+#### Apps *(default, built-in)*
+
+Fuzzy search over installed `.desktop` applications; Enter launches.
+
+- [1] ✅ Haystack is `name + comment` from each `.desktop` entry
+- [2] ✅ App icons in the list row — XDG icon resolution with SVG / PNG fallback via the scan script; fallback glyph is the label's first letter
+- [3] ✅ Apps with `Terminal=true` run wrapped in the configured terminal (`bin.terminal`)
+- [4] ✅ Ctrl+1–9 launches the selected app on workspace 1–9 via `hyprctl dispatch exec [workspace N] <command>` *(currently wired into Core's launch path — see Core [12])*
+- [5] ✅ Frecency ranking — per-app decayed launch counter persisted at `$XDG_DATA_HOME/kh-launcher/meta/frecency` (via shared `MetaStore`); fuzzy score gets a `3·log2(1+count)` boost so frequently-launched apps surface higher without swamping strong prefix matches; each count decays with a 14-day half-life; empty query sorts by decayed count then name *(currently the only ranking hook any plugin can use — see Core [13])*
+- [6] ✅ `l` / Tab enters actions state for the selected app (only switches if the app has desktop actions)
+- [7] ✅ `j`/`k` navigate actions; `Enter` launches the selected action; `h` / Esc returns to the app list
+- [8] ✅ Action rows show the parent app's icon next to each desktop action
+
+#### Window switcher
+
+- [1] ⬜ Fuzzy search over all open windows by app name or title, across all workspaces and monitors; Enter focuses the window and switches to its workspace
+
+#### Emoji picker
+
+- [1] ⬜ Fuzzy search emoji by name; Enter copies to clipboard
+
+#### Snippets
+
+- [1] ⬜ Text expansion triggered by abbreviation
+
+#### System commands
+
+- [1] ⬜ Lock, sleep, reboot, etc. as searchable actions
+
+#### Color picker *(long term)*
+
+- [1] ⬜ Screen dropper; Enter copies hex/rgb to clipboard
+
+#### File search *(long term)*
+
+- [1] ⬜ `fd`/`fzf` over `$HOME`; Enter opens in default app
 
 ---
 
@@ -514,7 +546,7 @@ Ideas with clear value but no committed timeline.
 
 #### Launcher
 
-- **SSH launcher mode** — fuzzy-searches `~/.ssh/config` hosts; Enter opens kitty with `ssh <host>`
+- **SSH launcher plugin** — fuzzy-searches `~/.ssh/config` hosts; Enter opens kitty with `ssh <host>`
 - **Web search prefixes** — configurable prefix → URL mappings (e.g. `g <q>` → Google, `gh <q>` → GitHub, `mdn <q>` → MDN); defined in Nix; Enter opens in default browser
 - **Browser history** — fuzzy search Firefox/Chromium history by title and URL; reads from the browser's SQLite history database; Enter opens in browser; read-only, no write access to profile
 
@@ -545,8 +577,8 @@ Considered and deprioritised. Kept here to avoid re-litigating.
 
 #### Launcher
 
-- **Calculator mode** — evaluate expressions in the search field; Enter copies result to clipboard
-- **Recent files mode** — fuzzy search `recently-used.xbel`; Enter opens in default app
+- **Calculator plugin** — evaluate expressions in the search field; Enter copies result to clipboard
+- **Recent files plugin** — fuzzy search `recently-used.xbel`; Enter opens in default app
 - **Password generator** — generate and copy a random password
 - **IDE project picker** — fuzzy search project directories and open in editor; terminal workflow already covers this
 - **Dictionary** — inline word definition via WordNet; search engine covers the need

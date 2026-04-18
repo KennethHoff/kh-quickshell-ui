@@ -108,7 +108,7 @@ WlrLayershell {
 }
 ```
 
-## Sub-components (ModeList, ClipList)
+## Sub-components (PluginList, ClipList)
 
 Sub-components that don't expose IPC still use a `functionality` QtObject for internal handlers — search field text events, Escape/Return, Ctrl+* emacs bindings, and ListView `onCountChanged`:
 

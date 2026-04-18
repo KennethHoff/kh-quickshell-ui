@@ -103,21 +103,21 @@
         };
 
       viewConfig = mkAppConfig { name = "view"; };
-      launcherModeRegistry =
+      launcherPluginRegistry =
         let
-          allModes = appsPlugin.modes;
+          allPlugins = appsPlugin.plugins;
         in
-        pkgs.writeText "ModeRegistry.qml" ''
+        pkgs.writeText "PluginRegistry.qml" ''
           import QtQuick
           QtObject {
-              readonly property var modes: (${builtins.toJSON allModes})
+              readonly property var plugins: (${builtins.toJSON allPlugins})
           }
         '';
 
       launcherConfig = mkAppConfig {
         name = "launcher";
         generatedFiles = {
-          "ModeRegistry.qml" = launcherModeRegistry;
+          "PluginRegistry.qml" = launcherPluginRegistry;
         };
       };
 

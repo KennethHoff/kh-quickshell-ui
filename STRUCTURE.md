@@ -10,12 +10,12 @@ Nix options, README, ROADMAP, agent skills, commit messages, IPC target names:
 | **app** | Top-level Quickshell instance | `kh-bar`, `kh-launcher`, `kh-cliphist`, `kh-view` |
 | **plugin** | Extension to any app (general) | — |
 | **bar plugin** | Extension to the bar (`BarPlugin` subtype) | `Clock`, `Volume`, `Workspaces`, `ControlCenter` |
-| **launcher plugin** | Extension to the launcher (mode, result provider, …) | window switcher mode, emoji picker mode, script mode |
+| **launcher plugin** | Extension to the launcher — a named, selectable source of items | `apps`, `window switcher`, `emoji picker`, script plugins |
 | **popup** | Small transient near-widget thing | workspace preview thumbnail, help overlay (`?`) |
 | **panel** | Sizeable secondary content area that opens on demand | Control Center, Calendar, Sonarr, Docker |
 | **view** | Persistent content section within an app | cliphist detail view, diff viewer left/right views, file viewer panes |
 | **overlay** | Full-screen modal UI (`Overlay.qml` + dimmed backdrop) | `kh-launcher`, `kh-cliphist`, `kh-view`; also the help popup within those apps |
-| **mode** | Input/navigation state within an app | `insert`, `normal`, `visual`, `actions` |
+| **mode** | Input/navigation state within an app — *not* a launcher plugin | `insert`, `normal`, `visual`, `actions` |
 
 **Plugin** is the general extensibility term across all apps. Qualify it with
 the app name when the context is ambiguous — **bar plugin**, **launcher plugin**,
@@ -28,7 +28,8 @@ When updating existing files, sweep for stale synonyms and replace them:
 `BarWidget` → `BarPlugin` (rename file and all usages);
 `dropdown` (bar context) → **panel**;
 `detail panel`, `pane`, `side pane` → **view**;
-`window` (modal context) → **overlay**.
+`window` (modal context) → **overlay**;
+`launcher mode`, `script mode`, `mode` (launcher context) → **launcher plugin** — the word "mode" in the launcher belongs to navigation state only (insert / normal / actions).
 
 ---
 
@@ -75,7 +76,7 @@ apps/
     TailscalePeers.qml
 
   launcher/
-    ModeList.qml
+    PluginList.qml
     plugins/
       apps.nix
 
@@ -139,7 +140,7 @@ git mv lib/TailscalePeers.qml  apps/bar/TailscalePeers.qml
 
 # launcher components
 mkdir -p apps/launcher
-git mv apps/AppList.qml apps/launcher/ModeList.qml
+git mv apps/AppList.qml apps/launcher/PluginList.qml
 
 # cliphist components
 mkdir -p apps/cliphist
@@ -166,8 +167,8 @@ cp ${self}/apps/bar/plugins/*.qml $out/
 **`launcherConfig`**:
 ```nix
 # was: cp ${self}/qml/AppList.qml $out/
-cp ${self}/apps/launcher/ModeList.qml $out/
-cp ${self}/apps/launcher/ModeRegistry.qml $out/  # generated at build time
+cp ${self}/apps/launcher/PluginList.qml $out/
+cp ${self}/apps/launcher/PluginRegistry.qml $out/  # generated at build time
 ```
 
 **`cliphistConfig`**:

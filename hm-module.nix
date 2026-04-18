@@ -123,7 +123,7 @@ in
       enable = lib.mkOption {
         type = lib.types.bool;
         default = false;
-        description = "Enable the application launcher (kh-launcher).";
+        description = "Enable the launcher (kh-launcher) — built-in apps plugin plus user-defined script plugins.";
       };
       terminal = lib.mkOption {
         type = lib.types.package;
@@ -131,7 +131,7 @@ in
         defaultText = lib.literalExpression "pkgs.kitty";
         description = "Terminal emulator used to launch apps with Terminal=true in their .desktop entry.";
       };
-      scriptModes = lib.mkOption {
+      scriptPlugins = lib.mkOption {
         type = lib.types.attrsOf (
           lib.types.submodule {
             options = {
@@ -157,16 +157,16 @@ in
               placeholder = lib.mkOption {
                 type = lib.types.str;
                 default = "Search...";
-                description = "Placeholder text shown in the search field when this mode is active.";
+                description = "Placeholder text shown in the search field when this plugin is active.";
               };
             };
           }
         );
         default = { };
         description = ''
-          Named script modes that appear alongside the built-in apps mode.
-          Each mode is backed by an executable that outputs items as TSV.
-          Activate via IPC: <literal>qs ipc call launcher activateMode &lt;name&gt;</literal>.
+          Named script plugins that appear alongside the built-in apps plugin.
+          Each plugin is backed by an executable that outputs items as TSV.
+          Activate via IPC: <literal>qs ipc call launcher activatePlugin &lt;name&gt;</literal>.
         '';
       };
     };
@@ -273,16 +273,16 @@ in
               inherit pkgs lib;
               terminal = launcherCfg.terminal;
             };
-            userModes = lib.mapAttrs (_: cfg: {
+            userPlugins = lib.mapAttrs (_: cfg: {
               script = toString cfg.script;
               inherit (cfg) frecency hasActions placeholder;
               default = false;
-            }) launcherCfg.scriptModes;
-            allModes = appsPlugin.modes // userModes;
-            modeRegistryQml = pkgs.writeText "ModeRegistry.qml" ''
+            }) launcherCfg.scriptPlugins;
+            allPlugins = appsPlugin.plugins // userPlugins;
+            pluginRegistryQml = pkgs.writeText "PluginRegistry.qml" ''
               import QtQuick
               QtObject {
-                  readonly property var modes: (${builtins.toJSON allModes})
+                  readonly property var plugins: (${builtins.toJSON allPlugins})
               }
             '';
           in
@@ -290,7 +290,7 @@ in
             kh-launcher = mkAppConfig {
               name = "launcher";
               generatedFiles = {
-                "ModeRegistry.qml" = modeRegistryQml;
+                "PluginRegistry.qml" = pluginRegistryQml;
               };
             };
           }

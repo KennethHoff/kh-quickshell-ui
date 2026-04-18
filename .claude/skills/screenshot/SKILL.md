@@ -16,7 +16,7 @@ nix run .#screenshot -- [--show] [--run <dir>] <app> <name> [<ipc-call>...] [-- 
 - `--run <dir>` — reuse an existing run directory (useful for iterating on the same shot)
 - `<app>` — a package name from `packages.x86_64-linux` in `flake.nix`; check the flake for the current list
 - `<name>` — output filename without extension; saved to `<run-dir>/<name>.png`
-- `<ipc-call>` — function name with space-separated arguments in a single quoted string (e.g. `'registerMode system /bin/true false false Search...'`)
+- `<ipc-call>` — function name with space-separated arguments in a single quoted string (e.g. `'registerPlugin system /bin/true false false Search...'`)
 - `--` — separates multiple shots; all shots share one sway instance and one run directory
 
 The window is **opened automatically** (toggle is implicit) for each shot.

@@ -1,13 +1,18 @@
-# Launcher modes
+# Launcher plugins
 
-The launcher is a unified mode host — every mode (apps, window switcher, emoji
-picker, etc.) flows through the same item model, search, navigation, and launch
-path. The built-in "apps" mode is registered alongside user-defined modes with
-no special-casing.
+The launcher is a unified plugin host — every plugin (apps, window switcher,
+emoji picker, etc.) flows through the same item model, search, navigation, and
+launch path. The built-in "apps" plugin is registered alongside user-defined
+plugins with no special-casing.
+
+> Note: "plugin" here is the launcher's extensibility unit (item source). Do
+> not confuse it with the launcher's *input mode* (`insert` / `normal` /
+> `actions`), which is a separate concept — navigation state within whichever
+> plugin is currently active.
 
 ## Concepts
 
-A **mode** is a named item source. Each mode has:
+A **plugin** is a named item source. Each plugin has:
 
 | Field | Type | Description |
 |---|---|---|
@@ -15,7 +20,7 @@ A **mode** is a named item source. Each mode has:
 | `frecency` | bool | Track launch frequency and boost frequently-used items |
 | `hasActions` | bool | Enable desktop-action sub-mode (parses `[Desktop Action]` sections from `.desktop` files) |
 | `placeholder` | string | Search field placeholder text |
-| `default` | bool | Activate this mode on startup (first match wins) |
+| `default` | bool | Activate this plugin on startup (first match wins) |
 
 Items are 4- or 5-field tab-separated lines:
 
@@ -30,16 +35,16 @@ label\tdescription\ticon\tcallback[\tid]
 - **id** — optional; defaults to label. Used for frecency tracking and
   desktop-action parsing (must be a `.desktop` file path for `hasActions`)
 
-## Adding modes via Nix
+## Adding plugins via Nix
 
-Use `programs.kh-ui.launcher.scriptModes` in your home-manager config. Each
-entry becomes a mode alongside the built-in apps mode.
+Use `programs.kh-ui.launcher.scriptPlugins` in your home-manager config. Each
+entry becomes a plugin alongside the built-in apps plugin.
 
 ### Example: emoji picker
 
 ```nix
-programs.kh-ui.launcher.scriptModes.emoji = {
-  script = pkgs.writeShellScript "emoji-mode" ''
+programs.kh-ui.launcher.scriptPlugins.emoji = {
+  script = pkgs.writeShellScript "emoji-plugin" ''
     # Output: label (emoji + name), description, icon (empty), callback
     echo -e "😀 Grinning Face\t\t\techo 😀 | wl-copy"
     echo -e "🎉 Party Popper\t\t\techo 🎉 | wl-copy"
@@ -55,8 +60,8 @@ programs.kh-ui.launcher.scriptModes.emoji = {
 ### Example: system commands
 
 ```nix
-programs.kh-ui.launcher.scriptModes.system = {
-  script = pkgs.writeShellScript "system-mode" ''
+programs.kh-ui.launcher.scriptPlugins.system = {
+  script = pkgs.writeShellScript "system-plugin" ''
     echo -e "Lock\tLock the screen\t\tloginctl lock-session"
     echo -e "Suspend\tSuspend to RAM\t\tsystemctl suspend"
     echo -e "Reboot\tRestart the machine\t\tsystemctl reboot"
@@ -69,8 +74,8 @@ programs.kh-ui.launcher.scriptModes.system = {
 ### Example: window switcher (Hyprland)
 
 ```nix
-programs.kh-ui.launcher.scriptModes.windows = {
-  script = pkgs.writeShellScript "window-mode" ''
+programs.kh-ui.launcher.scriptPlugins.windows = {
+  script = pkgs.writeShellScript "window-plugin" ''
     ${lib.getExe pkgs.jq} -r '
       .[] | "\(.title)\t\(.class)\t\thyprctl dispatch focuswindow address:\(.address)"
     ' <<< "$(hyprctl clients -j)"
@@ -79,38 +84,38 @@ programs.kh-ui.launcher.scriptModes.windows = {
 };
 ```
 
-### Removing the default apps mode
+### Removing the default apps plugin
 
-The built-in apps mode is registered by the apps plugin. To remove it and
-only use your own modes, override the apps plugin output in your flake by
-providing a custom `ModeRegistry.qml` via `generatedFiles`. However, the
+The built-in apps plugin is registered by the apps plugin source. To remove it
+and only use your own plugins, override the apps plugin output in your flake
+by providing a custom `PluginRegistry.qml` via `generatedFiles`. However, the
 simplest approach is to remove it at runtime via IPC after startup:
 
 ```bash
-qs ipc -c kh-launcher call launcher removeMode apps
+qs ipc -c kh-launcher call launcher removePlugin apps
 ```
 
 Or set up a keybind/script that removes it on each session start if you
 never want it.
 
-## Adding modes via IPC (runtime)
+## Adding plugins via IPC (runtime)
 
-Modes can be registered and populated entirely at runtime without any Nix
+Plugins can be registered and populated entirely at runtime without any Nix
 configuration. There are two approaches:
 
-### Script-backed mode
+### Script-backed plugin
 
-Register a mode with a script path. The launcher runs the script and parses
-its TSV output, just like Nix-configured modes:
+Register a plugin with a script path. The launcher runs the script and parses
+its TSV output, just like Nix-configured plugins:
 
 ```bash
-qs ipc -c kh-launcher call launcher registerMode \
+qs ipc -c kh-launcher call launcher registerPlugin \
   "bookmarks" "/path/to/bookmarks-script.sh" false false "Search bookmarks..."
 ```
 
-Arguments to `registerMode`:
-1. `name` (string) — mode name
-2. `script` (string) — path to executable (empty string for push-based modes)
+Arguments to `registerPlugin`:
+1. `name` (string) — plugin name
+2. `script` (string) — path to executable (empty string for push-based plugins)
 3. `frecency` (bool) — enable frecency tracking
 4. `hasActions` (bool) — enable desktop-action sub-mode
 5. `placeholder` (string) — search field placeholder
@@ -118,18 +123,18 @@ Arguments to `registerMode`:
 Then activate it:
 
 ```bash
-qs ipc -c kh-launcher call launcher activateMode bookmarks
+qs ipc -c kh-launcher call launcher activatePlugin bookmarks
 ```
 
-### Push-based mode (no script)
+### Push-based plugin (no script)
 
-Register a mode with an empty script, then push items via IPC. This is useful
-for modes where the caller controls the item list — e.g. an external fuzzy
+Register a plugin with an empty script, then push items via IPC. This is useful
+for plugins where the caller controls the item list — e.g. an external fuzzy
 finder, a daemon that streams results, or a test harness:
 
 ```bash
-# Register an empty mode
-qs ipc -c kh-launcher call launcher registerMode \
+# Register an empty plugin
+qs ipc -c kh-launcher call launcher registerPlugin \
   "picker" "" false false "Pick an item..."
 
 # Push items (each call adds one item to the buffer)
@@ -142,12 +147,12 @@ qs ipc -c kh-launcher call launcher addItem \
 # Signal that all items have been pushed (displays them)
 qs ipc -c kh-launcher call launcher itemsReady picker
 
-# Activate the mode (if not already active)
-qs ipc -c kh-launcher call launcher activateMode picker
+# Activate the plugin (if not already active)
+qs ipc -c kh-launcher call launcher activatePlugin picker
 ```
 
 Items can be pre-populated before activation — they display instantly when the
-mode is activated, with no flicker. `addItemWithId` accepts a 6th `id` argument
+plugin is activated, with no flicker. `addItemWithId` accepts a 6th `id` argument
 for frecency tracking:
 
 ```bash
@@ -155,40 +160,40 @@ qs ipc -c kh-launcher call launcher addItemWithId \
   "picker" "Option A" "First choice" "" "echo picked-a" "option-a"
 ```
 
-### Removing modes at runtime
+### Removing plugins at runtime
 
 ```bash
-# Remove a specific mode (returns to default if it was active)
-qs ipc -c kh-launcher call launcher removeMode picker
+# Remove a specific plugin (returns to default if it was active)
+qs ipc -c kh-launcher call launcher removePlugin picker
 
-# List all registered modes
-qs ipc -c kh-launcher call launcher listModes
+# List all registered plugins
+qs ipc -c kh-launcher call launcher listPlugins
 ```
 
-## Mode navigation
+## Plugin navigation
 
 ### Keyboard (when launcher is open)
 
-| Key | Mode | Action |
+| Key | Input mode | Action |
 |---|---|---|
-| `]` | normal | Next mode |
-| `[` | normal | Previous mode |
-| Click mode chip | any | Activate that mode |
+| `]` | normal | Next plugin |
+| `[` | normal | Previous plugin |
+| Click plugin chip | any | Activate that plugin |
 
 ### IPC
 
 ```bash
-qs ipc -c kh-launcher call launcher nextMode
-qs ipc -c kh-launcher call launcher prevMode
-qs ipc -c kh-launcher call launcher activateMode <name>
+qs ipc -c kh-launcher call launcher nextPlugin
+qs ipc -c kh-launcher call launcher prevPlugin
+qs ipc -c kh-launcher call launcher activatePlugin <name>
 qs ipc -c kh-launcher call launcher returnToDefault
 ```
 
 ## Querying state
 
 ```bash
-# Current active mode name
-qs ipc -c kh-launcher prop get launcher activeMode
+# Current active plugin name
+qs ipc -c kh-launcher prop get launcher activePlugin
 
 # Number of filtered items
 qs ipc -c kh-launcher prop get launcher itemCount
@@ -209,22 +214,23 @@ qs ipc -c kh-launcher prop get launcher lastSelection
 
 | Function | Arguments | Description |
 |---|---|---|
-| `activateMode` | `name` | Switch to a named mode |
-| `returnToDefault` | — | Switch to the default mode |
-| `nextMode` | — | Cycle to the next registered mode |
-| `prevMode` | — | Cycle to the previous registered mode |
-| `registerMode` | `name, script, frecency, hasActions, placeholder` | Register or replace a runtime mode |
-| `removeMode` | `name` | Remove a mode (returns to default if active) |
-| `listModes` | — | Returns space-separated list of mode names |
-| `addItem` | `mode, label, description, icon, callback` | Push an item into a mode's buffer |
-| `addItemWithId` | `mode, label, description, icon, callback, id` | Push an item with explicit id |
-| `itemsReady` | `mode` | Flush the buffer and display items |
+| `activatePlugin` | `name` | Switch to a named plugin |
+| `returnToDefault` | — | Switch to the default plugin |
+| `nextPlugin` | — | Cycle to the next registered plugin |
+| `prevPlugin` | — | Cycle to the previous registered plugin |
+| `registerPlugin` | `name, script, frecency, hasActions, placeholder` | Register or replace a runtime plugin |
+| `removePlugin` | `name` | Remove a plugin (returns to default if active) |
+| `listPlugins` | — | Returns space-separated list of plugin names |
+| `addItem` | `plugin, label, description, icon, callback` | Push an item into a plugin's buffer |
+| `addItemWithId` | `plugin, label, description, icon, callback, id` | Push an item with explicit id |
+| `itemsReady` | `plugin` | Flush the buffer and display items |
 
 ### Properties (read-only)
 
 | Property | Type | Description |
 |---|---|---|
-| `activeMode` | string | Name of the current mode |
+| `activePlugin` | string | Name of the current plugin |
+| `mode` | string | Input mode (`insert` / `normal` / `actions`) |
 | `itemCount` | int | Number of visible (filtered) items |
 | `selectedLabel` | string | Label of the highlighted item |
 | `selectedCallback` | string | Callback of the highlighted item |
