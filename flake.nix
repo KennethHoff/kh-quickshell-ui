@@ -193,7 +193,12 @@
     {
       formatter.${system} = pkgs.nixfmt-tree;
 
-      homeModules.default = import ./hm-module.nix self;
+      homeModules.default = {
+        imports = [
+          (import ./hm-module.nix self)
+          ./stylix-integration.nix
+        ];
+      };
 
       devShells.${system}.default = pkgs.mkShell {
         packages = [ pkgs.qt6.qtdeclarative ];
