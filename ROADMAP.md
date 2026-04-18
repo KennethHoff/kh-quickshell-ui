@@ -296,6 +296,51 @@ IPC/keybind.
 
 ---
 
+## Patchbay
+
+PipeWire graph editor, replacing `qpwgraph`/`Helvum`. Visualises all PipeWire
+nodes (audio, MIDI, video) as boxes with input/output ports, and the links
+between them. Keyboard-first — every connect/disconnect that can be done with
+a mouse drag must also be doable with vim-style motion + action bindings and
+via IPC. Toggle via IPC/keybind.
+
+### Core
+
+- [1] ⬜ Node graph — all PipeWire nodes rendered as boxes with their name, media class (Audio/Sink, Audio/Source, Stream/Output/Audio, Midi/Bridge, Video/Source, …), and port list; sourced from `pw-dump` or the `libpipewire` Quickshell bindings if available
+- [2] ⬜ Port rows — each node shows input ports on the left edge and output ports on the right edge, labelled with channel/port name
+- [3] ⬜ Links — bezier/orthogonal edges drawn between connected output and input ports; colour-coded by media type (audio / MIDI / video)
+- [4] ⬜ Live updates — subscribe to PipeWire registry events so node add/remove/link/unlink is reflected in the graph without polling
+- [5] ⬜ Media type filter — toggle audio / MIDI / video visibility independently; hidden types dim their nodes and links
+- [6] ⬜ IPC — `target: "patchbay"`; `toggle()`, `open()`, `close()`, `nav(dir)`, `key(k)`, `connect(srcNode, srcPort, dstNode, dstPort)`, `disconnect(...)`, `listNodes()`, `listLinks()`
+
+### Navigation
+
+- [1] ⬜ Modal normal/insert — opens in normal mode; `j`/`k`/`h`/`l` move focus between nodes by spatial adjacency; `/` enters insert mode with a search field filtering nodes by name
+- [2] ⬜ Port selection — once a node is focused, `Tab`/`Shift+Tab` cycles through its ports; selected port visually highlighted
+- [3] ⬜ Follow link — `gd` on a connected port jumps focus to the peer port on the other side of the link
+- [4] ⬜ Zoom and pan — `+`/`-` zoom, `Ctrl+hjkl` pan the viewport; `gg` centres the graph; `z.` centres on the focused node
+
+### Editing
+
+- [1] ⬜ Connect — with an output port selected, press `c` (or Enter) to enter "target mode"; navigate to an input port and confirm to create the link; Escape cancels
+- [2] ⬜ Disconnect — `d` on a selected link deletes it; confirmation popup for bulk operations
+- [3] ⬜ Visual link select — `v` enters visual mode; select multiple links by walking the graph; `d` disconnects all selected links
+- [4] ⬜ Auto-layout — `=` re-runs the layout algorithm (topological left-to-right, sources → sinks) to untangle edges after heavy editing
+
+### Layout
+
+- [1] ⬜ Automatic layout — topological sort from sources to sinks with per-column stacking; collision-free edge routing
+- [2] ⬜ Manual node positions — drag (or `m` + hjkl in normal mode) to move a node; positions persisted to `$XDG_DATA_HOME/kh-patchbay/layout.json` keyed by node name so reconnecting a device restores its position
+- [3] ⬜ Group nodes — collapse all nodes belonging to the same application (e.g. Firefox streams, Chromium streams) into a single expandable group node to reduce clutter
+
+### Patches
+
+- [1] ⬜ Save patch — `:w <name>` writes the current link set to `$XDG_DATA_HOME/kh-patchbay/patches/<name>.json`; records each link as `(srcNode, srcPort, dstNode, dstPort)` so it can be restored even after a reboot
+- [2] ⬜ Load patch — `:e <name>` (or fuzzy-searchable load dialog) re-creates saved links; missing nodes are reported via the plugin error surface
+- [3] ⬜ Auto-apply on device reconnect — watch for node additions and re-apply any saved patch whose endpoints match; useful for USB audio interfaces that get different IDs on reconnect
+
+---
+
 ## OSD
 
 Transient overlay that appears briefly on system events such as volume
