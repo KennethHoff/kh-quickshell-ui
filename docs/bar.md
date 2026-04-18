@@ -75,7 +75,7 @@ programs.kh-ui.bar = {
 };
 ```
 
-Plugins read these variables via `StandardPaths.getenv()`. See individual plugin documentation for which variables are required.
+Plugins read these variables via `Quickshell.env()`. See individual plugin documentation for which variables are required.
 
 ## Plugins
 

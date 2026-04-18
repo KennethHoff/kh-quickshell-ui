@@ -14,6 +14,7 @@
 //   }
 
 import QtQuick
+import Quickshell
 import Quickshell.Io
 
 BarPlugin {
@@ -37,20 +38,34 @@ BarPlugin {
         property var recentGrabs: []
         property bool loading: false
         property string error: ""
+        // Populated by functionality.validateConfig(); non-empty means the plugin
+        // is misconfigured and must not poll. Separate from `error` (which
+        // captures runtime/API failures) so a property change that fixes the
+        // config doesn't silently clobber a legitimate runtime error.
+        property string configError: ""
     }
 
     readonly property alias newCount: _state.newCount
     readonly property alias recentGrabs: _state.recentGrabs
     readonly property alias loading: _state.loading
     readonly property alias error: _state.error
+    readonly property alias configError: _state.configError
+    readonly property bool hasError: _state.configError !== "" || _state.error !== ""
 
     // ── IPC ────────────────────────────────────────────────────────────────
     IpcHandler {
         target: ipcPrefix + ".sonarr"
         function getNewCount(): int { return _state.newCount }
         function getRecentGrabs(): var { return _state.recentGrabs }
-        function getError(): string { return _state.error }
+        function getError(): string { return _state.configError || _state.error }
+        function getConfigError(): string { return _state.configError }
     }
+
+    // ── Config validation ──────────────────────────────────────────────────
+    onHostChanged:         functionality.validateConfig()
+    onPortChanged:         functionality.validateConfig()
+    onPollIntervalChanged: functionality.validateConfig()
+    onApiKeyEnvChanged:    functionality.validateConfig()
 
     // ── Badge visuals ──────────────────────────────────────────────────────
     NixConfig { id: _cfg }
@@ -64,7 +79,7 @@ BarPlugin {
             id: _icon
             anchors.verticalCenter: parent.verticalCenter
             glyph: "\u{F0839}" // mdi-television
-            color: _state.error
+            color: root.hasError
                        ? _cfg.color.base08
                        : _state.newCount > 0 ? _cfg.color.base0B
                                              : _cfg.color.base03
@@ -72,9 +87,9 @@ BarPlugin {
 
         Text {
             anchors.verticalCenter: parent.verticalCenter
-            visible: _state.newCount > 0 || _state.error !== ""
-            text: _state.error ? "!" : _state.newCount.toString()
-            color: _state.error ? _cfg.color.base08 : _cfg.color.base0B
+            visible: _state.newCount > 0 || root.hasError
+            text: root.hasError ? "!" : _state.newCount.toString()
+            color: root.hasError ? _cfg.color.base08 : _cfg.color.base0B
             font.family:    _cfg.fontFamily
             font.pixelSize: _cfg.fontSize - 2
         }
@@ -92,22 +107,35 @@ BarPlugin {
     QtObject {
         id: functionality
 
+        function validateConfig(): void {
+            const prev = _state.configError
+            let err = ""
+            if (!host) {
+                err = "host is empty"
+            } else if (port < 1 || port > 65535) {
+                err = "port " + port + " out of range (1..65535)"
+            } else if (pollInterval < 5) {
+                err = "pollInterval " + pollInterval + "s below minimum 5s"
+            } else if (!apiKeyEnv) {
+                err = "apiKeyEnv property not set"
+            } else if (!Quickshell.env(apiKeyEnv)) {
+                err = apiKeyEnv + " env var is empty or unset"
+            }
+            _state.configError = err
+            // Config just became valid — poll immediately instead of waiting
+            // out a full pollInterval for the timer's first tick.
+            if (prev !== "" && err === "") poll()
+        }
+
         function getApiKey(): string {
-            return StandardPaths.getenv(apiKeyEnv)
+            return Quickshell.env(apiKeyEnv)
         }
 
         function makeApiCall(endpoint: string): void {
-            const apiKey = getApiKey()
-            if (!apiKey) {
-                _state.error = "API key not set"
-                _state.loading = false
-                return
-            }
-
             const url = "http://" + host + ":" + port + "/api/v3/" + endpoint
             _proc.command = [
                 bin.bash, "-c",
-                bin.curl + " -s -H 'X-Api-Key: " + apiKey + "' '" + url + "' | " + bin.jq + " ."
+                bin.curl + " -s -H 'X-Api-Key: " + getApiKey() + "' '" + url + "' | " + bin.jq + " ."
             ]
             _state.loading = true
             _state.error = ""
@@ -159,6 +187,7 @@ BarPlugin {
         }
 
         function poll(): void {
+            if (_state.configError !== "") return
             if (!_proc.running) {
                 makeApiCall("queue")
             }
@@ -178,13 +207,13 @@ BarPlugin {
     Timer {
         id: _timer
         interval: pollInterval * 1000
-        running: root.contentVisible
+        running: root.contentVisible && _state.configError === ""
         repeat: true
         onTriggered: functionality.poll()
     }
 
     Component.onCompleted: {
-        // Start polling immediately on creation
+        functionality.validateConfig()
         functionality.poll()
     }
 }
