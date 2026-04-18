@@ -249,12 +249,19 @@ programs.kh-ui.bar = {
 Each plugin registers at a suffix derived from its type. The full target path is built from the nesting in your `structure`:
 
 ```
+bar                                              (root)
 bar.<plugin>
 bar.<group-ipcName>.<plugin>
 bar.<group-ipcName>.<nested-group-ipcName>.<plugin>
 ```
 
 For example, a `TailscalePanel` inside `BarGroup { ipcName: "net" }` is reachable as `bar.net.tailscale`.
+
+The root target (`bar`) exposes bar-wide queries:
+
+| Target | Functions |
+|---|---|
+| `bar` | `getHeight()` -> int (visible bar footprint in px — bar height plus the tallest currently-open dropdown popup), `getWidth()` -> int (bar width in px) |
 
 | Plugin | Suffix | Functions / Properties |
 |---|---|---|

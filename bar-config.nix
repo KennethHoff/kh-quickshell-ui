@@ -43,6 +43,36 @@ pkgs.writeText "BarLayout.qml" ''
       required property var barWindow
       property string ipcPrefix: "${ipcName}"
 
+      // Walk the layout's object tree and return the tallest currently-
+      // visible PopupWindow. Popups live in a parent's `data` (Item's
+      // `children` is Items-only; PopupWindow is a Window), and have an
+      // `anchor` property plain Items don't — checking for that is enough
+      // to spot them without BarDropdown having to cooperate.
+      function _maxVisiblePopupHeight(item) {
+          let max = 0
+          if (item && item.anchor !== undefined && item.visible === true && item.height > 0) {
+              max = item.height
+          }
+          const d = (item && item.data) ? item.data : []
+          for (let i = 0; i < (d.length || 0); i++) {
+              const h = layout._maxVisiblePopupHeight(d[i])
+              if (h > max) max = h
+          }
+          return max
+      }
+
+      IpcHandler {
+          target: layout.ipcPrefix
+          // Visible bar footprint in px: the bar plus the tallest currently-
+          // open popup (popups are anchored flush to the bar's bottom edge,
+          // so multiple open popups don't stack — max wins).
+          function getHeight(): int {
+              return layout.barHeight + layout._maxVisiblePopupHeight(layout)
+          }
+          // Bar width in px (follows the screen since the bar anchors left+right).
+          function getWidth(): int { return layout.width }
+      }
+
   ${structure}
   }
 ''
