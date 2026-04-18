@@ -9,7 +9,7 @@ Stage and commit the current changes using [Conventional Commits](https://www.co
 ## Steps
 
 1. **Format** — If any `.nix` files are changed, run `nix fmt` before doing anything else. Stage the formatting changes alongside the rest of the work.
-2. **Verify** — If any `.nix` or `.qml` files are changed, invoke the `validate-changes` skill using the Skill tool. Do not commit if verification fails.
+2. **Verify** — If any `.nix` or `.qml` files are changed, invoke the `validate-changes` skill using the Skill tool. Do not commit if verification fails. If any `.qml` files add or modify event/IPC handlers, also invoke the `event-handler-delegation` skill and confirm handlers are pure single-line delegations to a `functionality.*` object.
 3. **Plan** — Run `git diff` and `git diff --cached` to see all unstaged and already-staged changes. Other agents may be working in this repo concurrently — only commit files that belong to your task. **Never run `git add` without first reviewing `git diff --cached`** — already-staged files will be included in your commit even if you only add one file.
 4. **Stage** — Stage one logical group at a time. Use `git add -p <file>` to stage only the specific hunks that belong to your task. Do not use `git add -A`.
 5. **Commit** — Commit the staged group with a message following the conventions below. Repeat steps 4–5 for each remaining group.
