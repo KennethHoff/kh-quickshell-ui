@@ -192,6 +192,9 @@ BarPlugin {
                 makeApiCall("queue")
             }
         }
+
+        // ui only
+        function onProcExited(): void { _state.loading = false }
     }
 
     Process {
@@ -199,9 +202,7 @@ BarPlugin {
         stdout: StdioCollector {
             onStreamFinished: functionality.onStreamFinished(text)
         }
-        onExited: {
-            _state.loading = false
-        }
+        onExited: functionality.onProcExited()
     }
 
     Timer {

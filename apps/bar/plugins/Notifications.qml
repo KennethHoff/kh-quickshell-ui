@@ -14,7 +14,7 @@ BarPlugin {
         imageSupported: false
         persistenceSupported: false
 
-        onNotification: notification => { notification.tracked = true }
+        onNotification: notification => functionality.onNotification(notification)
     }
 
     QtObject {
@@ -25,6 +25,8 @@ BarPlugin {
     QtObject {
         id: functionality
 
+        // ui only
+        function onNotification(notification): void { notification.tracked = true }
         // ipc only
         function getCount(): int { return state.unreadCount }
         // ipc only

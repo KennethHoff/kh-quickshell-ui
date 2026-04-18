@@ -39,10 +39,10 @@ ShellRoot {
 
         // Suppress the initial binding evaluation on startup.
         property bool ready: false
-        Component.onCompleted: ready = true
+        Component.onCompleted: functionality.onAudioReady()
 
-        onMutedChanged: if (ready) functionality.onMutedChanged(muted)
-        onVolChanged:   if (ready && !muted) functionality.onVolumeChanged(vol)
+        onMutedChanged: functionality.onMutedChanged(muted)
+        onVolChanged:   functionality.onVolumeChanged(vol)
     }
 
     // ── State ─────────────────────────────────────────────────────────────────
@@ -68,13 +68,17 @@ ShellRoot {
         }
 
         // ui only
+        function onAudioReady(): void { audio.ready = true }
+        // ui only
         function onVolumeChanged(vol: real): void {
+            if (!audio.ready || audio.muted) return
             trigger(Math.round(vol * 100), iconForVol(vol))
         }
         // ui only
         function onMutedChanged(muted: bool): void {
+            if (!audio.ready) return
             if (muted) trigger(0, "volume-mute")
-            else       onVolumeChanged(audio.vol)
+            else       trigger(Math.round(audio.vol * 100), iconForVol(audio.vol))
         }
         // ipc only
         function showVolume(value: int): void { trigger(value, iconForVol(value / 100)) }
