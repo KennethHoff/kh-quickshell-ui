@@ -10,24 +10,7 @@
       pkgs = nixpkgs.legacyPackages.${system};
       lib = pkgs.lib;
 
-      stubColors = {
-        base00 = "000000";
-        base01 = "111111";
-        base02 = "222222";
-        base03 = "333333";
-        base04 = "444444";
-        base05 = "555555";
-        base06 = "666666";
-        base07 = "777777";
-        base08 = "888888";
-        base09 = "999999";
-        base0A = "aaaaaa";
-        base0B = "bbbbbb";
-        base0C = "cccccc";
-        base0D = "dddddd";
-        base0E = "eeeeee";
-        base0F = "ffffff";
-      };
+      defaultColors = import ./themes/default-dark.nix;
 
       # Named QML module directories for qmltestrunner / devShell.
       nixGenDir = pkgs.runCommand "nix-gen-dir" { } ''
@@ -38,9 +21,9 @@
         cp ${
           import ./config.nix {
             inherit pkgs;
-            colors = stubColors;
-            fontName = "TestFont";
-            fontSize = 12;
+            colors = defaultColors;
+            fontName = "monospace";
+            fontSize = 14;
           }
         } $out/NixConfig/NixConfig.qml
 
@@ -61,24 +44,7 @@
 
       nixConfigQml = import ./config.nix {
         inherit pkgs;
-        colors = {
-          base00 = "1e1e2e";
-          base01 = "181825";
-          base02 = "313244";
-          base03 = "45475a";
-          base04 = "585b70";
-          base05 = "cdd6f4";
-          base06 = "f5c2e7";
-          base07 = "b4befe";
-          base08 = "f38ba8";
-          base09 = "fab387";
-          base0A = "f9e2af";
-          base0B = "a6e3a1";
-          base0C = "94e2d5";
-          base0D = "89b4fa";
-          base0E = "cba6f7";
-          base0F = "f2cdcd";
-        };
+        colors = defaultColors;
         fontName = "monospace";
         fontSize = 14;
       };
