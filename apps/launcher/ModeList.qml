@@ -704,13 +704,13 @@ Item {
                 width: modeLabel.implicitWidth + 12
                 height: 22
                 radius: 4
-                color: modeList._mode === "actions" ? cfg.color.base0B + "33" : cfg.color.base02
+                color: modeList._mode === "actions" ? "#33" + cfg.color.base0D.slice(1) : cfg.color.base02
 
                 Text {
                     id: modeLabel
                     anchors.centerIn: parent
                     text: modeList.modeText
-                    color: modeList._mode === "actions" ? cfg.color.base0B : cfg.color.base0D
+                    color: cfg.color.base0D
                     font.family: cfg.fontFamily
                     font.pixelSize: cfg.fontSize - 3
                     font.bold: true
@@ -782,7 +782,7 @@ Item {
                         width: chipLabel.implicitWidth + 16
                         height: 22
                         radius: 6
-                        color: modelData === modeList._activeMode ? cfg.color.base0D + "33" : cfg.color.base02
+                        color: modelData === modeList._activeMode ? "#33" + cfg.color.base0D.slice(1) : cfg.color.base02
 
                         MouseArea {
                             anchors.fill: parent
