@@ -284,10 +284,10 @@ Low-level building blocks for custom plugins and panels (no import needed):
 |---|---|
 | `BarText` | Pre-styled `Text` (theme font + default foreground); exposes `normalColor` / `warnColor` / `errorColor` / `mutedColor` for overrides without a separate `NixConfig` reference |
 | `BarIcon` | Pre-styled `Text` bound to the bundled nerd-font via `cfg.iconFontFile`; set `glyph:` to the PUA codepoint; same `normalColor` / `warnColor` / `errorColor` / `mutedColor` overrides as `BarText` |
-| `ControlTile` | Styled toggle pill for custom panel tiles |
-| `DropdownHeader` | Muted section heading |
-| `DropdownDivider` | 1 px horizontal rule |
-| `DropdownItem` | Row with dot indicator, primary label, secondary label |
+| `BarControlTile` | Styled toggle pill for custom panel tiles |
+| `BarDropdownHeader` | Muted section heading |
+| `BarHorizontalDivider` | 1 px horizontal rule |
+| `BarDropdownItem` | Row with dot indicator, primary label, secondary label |
 | `NixConfig` | Theme colors (`color.baseXX`), font family and size |
 
 ## Writing a custom plugin

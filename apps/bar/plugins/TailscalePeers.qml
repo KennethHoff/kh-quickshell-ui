@@ -29,12 +29,11 @@ Column {
 
     // ── Peers ──────────────────────────────────────────────────────────────
 
-    DropdownDivider {
-        dividerColor: _cfg.color.base02
-        visible:      source !== null && source.connected && source.peers.length > 0
+    BarHorizontalDivider {
+        visible: source !== null && source.connected && source.peers.length > 0
     }
 
-    DropdownHeader {
+    BarDropdownHeader {
         text:       source && source.selfIp
                         ? "tailscale: " + source.selfIp
                         : "tailscale not connected"
@@ -111,7 +110,7 @@ Column {
                 visible:      _mouse.containsMouse
             }
 
-            DropdownItem {
+            BarDropdownItem {
                 id: _item
                 dotColor:       modelData.online ? _cfg.color.base0B : _cfg.color.base03
                 primaryText:    modelData.hostname
@@ -137,12 +136,11 @@ Column {
 
     property var _exitPeers: source ? source.peers.filter(p => p.exitNodeOption) : []
 
-    DropdownDivider {
-        dividerColor: _cfg.color.base02
-        visible:      _exitPeers.length > 0
+    BarHorizontalDivider {
+        visible: _exitPeers.length > 0
     }
 
-    DropdownHeader {
+    BarDropdownHeader {
         text:       "exit nodes"
         textColor:  _cfg.color.base04
         fontFamily: _cfg.fontFamily
@@ -168,7 +166,7 @@ Column {
                 visible:      _exitMouse.containsMouse
             }
 
-            DropdownItem {
+            BarDropdownItem {
                 id: _exitItem
                 dotColor:       _active ? _cfg.color.base0A : _cfg.color.base03
                 primaryText:    modelData.hostname

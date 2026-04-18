@@ -35,7 +35,7 @@ BarPlugin {
     }
 
     // ── Tile visuals ───────────────────────────────────────────────────────
-    ControlTile {
+    BarControlTile {
         id: _tile
         anchors.fill: parent
 

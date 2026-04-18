@@ -56,7 +56,7 @@ BarPlugin {
     // ── Tile visuals ───────────────────────────────────────────────────────
     NixConfig { id: _cfg }
 
-    ControlTile {
+    BarControlTile {
         id: _tile
         anchors.fill: parent
 

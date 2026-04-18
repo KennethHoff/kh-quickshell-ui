@@ -15,9 +15,9 @@
 //       fontSize:    cfg.fontSize
 //       panelWidth:  280
 //
-//       DropdownHeader { text: "section heading" ; ... }
-//       DropdownItem   { primaryText: "foo"; secondaryText: "bar"; ... }
-//       DropdownDivider {}
+//       BarDropdownHeader { text: "section heading" ; ... }
+//       BarDropdownItem   { primaryText: "foo"; secondaryText: "bar"; ... }
+//       BarHorizontalDivider {}
 //   }
 //
 // barWindow and barHeight are read automatically from the plugin wrapper.

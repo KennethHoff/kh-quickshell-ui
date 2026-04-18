@@ -40,7 +40,7 @@ Each QML file that uses `bin.*` must declare its own instance. QML ids are docum
 import QtQuick
 import Quickshell.Io
 
-ControlTile {          // or BarPlugin, Item, etc.
+BarControlTile {       // or BarPlugin, Item, etc.
     NixBins   { id: bin }
     NixConfig { id: cfg }   // if theming is also needed
 
