@@ -133,7 +133,11 @@ Fuzzy search over installed `.desktop` applications; Enter launches.
 
 #### Window switcher
 
-- [1] ⬜ Fuzzy search over all open windows by app name or title, across all workspaces and monitors; Enter focuses the window and switches to its workspace
+Plugins in this section are compositor-specific — each compositor needs its own
+data source and focus dispatch, so they ship as separate plugins rather than
+one abstracted "window switcher".
+
+- [1] ✅ **Hyprland window switcher** — Hyprland-only. IPC key `hyprland-windows`, chip label `Windows` (via the new plugin-`label` concept — stable key stays compositor-qualified for future peers, but the UI stays terse). Fuzzy search over all open windows by app name or title, across all workspaces and monitors; Enter runs `hyprctl dispatch focuswindow address:<addr>` which focuses the window and switches to its workspace; windows are listed most-recently-focused first (Hyprland `focusHistoryID`); icons resolved from each window's WM class via `StartupWMClass` in `.desktop` files with a fallback to the class name and then `application-x-executable`; exits cleanly with no items outside a Hyprland session
 
 #### Emoji picker
 

@@ -78,29 +78,26 @@ programs.kh-ui.launcher.scriptPlugins.system = {
 The attribute name (`emoji`, `system`) is the stable IPC identifier; `label`
 is purely cosmetic. If `label` is omitted, the chip shows the attribute name.
 
-### Example: window switcher (Hyprland)
+> A **Hyprland-only** window switcher plugin is built in. Its IPC key is
+> `hyprland-windows` (what you pass to `activatePlugin` etc.), and it shows
+> up on the chip as **Windows**. It lists every open Hyprland window sorted
+> by most-recently-focused, with icons resolved from each window's WM class,
+> and Enter runs `hyprctl dispatch focuswindow` (Hyprland switches to the
+> window's workspace automatically). Under any other compositor the plugin
+> stays registered but lists nothing, since it depends on
+> `hyprctl clients -j`. Activate via
+> `qs ipc -c kh-launcher call launcher activatePlugin hyprland-windows`.
 
-```nix
-programs.kh-ui.launcher.scriptPlugins.windows = {
-  script = pkgs.writeShellScript "window-plugin" ''
-    ${lib.getExe pkgs.jq} -r '
-      .[] | "\(.title)\t\(.class)\t\thyprctl dispatch focuswindow address:\(.address)"
-    ' <<< "$(hyprctl clients -j)"
-  '';
-  label = "Windows";
-  placeholder = "Switch window...";
-};
-```
+### Removing a built-in plugin
 
-### Removing the default apps plugin
-
-The built-in apps plugin is registered by the apps plugin source. To remove it
-and only use your own plugins, override the apps plugin output in your flake
-by providing a custom `PluginRegistry.qml` via `generatedFiles`. However, the
-simplest approach is to remove it at runtime via IPC after startup:
+Built-in plugins (`apps`, `hyprland-windows`) are registered by their plugin
+sources. To remove one and only use your own plugins, override
+`PluginRegistry.qml` via `generatedFiles` in your flake. The simplest
+approach is to remove it at runtime via IPC after startup:
 
 ```bash
 qs ipc -c kh-launcher call launcher removePlugin apps
+qs ipc -c kh-launcher call launcher removePlugin hyprland-windows
 ```
 
 Or set up a keybind/script that removes it on each session start if you

@@ -10,7 +10,7 @@
 //
 // Properties out:
 //   selectedItem      — { label, description, icon, callback, id } or null
-//   activePluginName  — current plugin name (e.g. "apps", "windows")
+//   activePluginName  — current plugin name (e.g. "apps", "hyprland-windows")
 //   mode              — "insert" | "normal" | "actions" (navigation state)
 //   hintText          — footer hint for the current state
 //   filteredCount     — number of visible items

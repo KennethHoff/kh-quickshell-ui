@@ -41,6 +41,9 @@
         inherit pkgs lib;
         terminal = pkgs.kitty;
       };
+      hyprlandWindowsPlugin = import ./apps/launcher/plugins/hyprland-windows.nix {
+        inherit pkgs lib;
+      };
 
       nixConfigQml = import ./config.nix {
         inherit pkgs;
@@ -105,7 +108,7 @@
       viewConfig = mkAppConfig { name = "view"; };
       launcherPluginRegistry =
         let
-          allPlugins = appsPlugin.plugins;
+          allPlugins = appsPlugin.plugins // hyprlandWindowsPlugin.plugins;
         in
         pkgs.writeText "PluginRegistry.qml" ''
           import QtQuick

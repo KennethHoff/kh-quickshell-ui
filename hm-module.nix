@@ -285,12 +285,15 @@ in
               inherit pkgs lib;
               terminal = launcherCfg.terminal;
             };
+            hyprlandWindowsPlugin = import (src + "/apps/launcher/plugins/hyprland-windows.nix") {
+              inherit pkgs lib;
+            };
             userPlugins = lib.mapAttrs (_: cfg: {
               script = toString cfg.script;
               inherit (cfg) frecency hasActions placeholder label;
               default = false;
             }) launcherCfg.scriptPlugins;
-            allPlugins = appsPlugin.plugins // userPlugins;
+            allPlugins = appsPlugin.plugins // hyprlandWindowsPlugin.plugins // userPlugins;
             pluginRegistryQml = pkgs.writeText "PluginRegistry.qml" ''
               import QtQuick
               QtObject {
