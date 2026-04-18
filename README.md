@@ -48,7 +48,7 @@ Import it alongside your other home-manager modules (e.g. in `sharedModules` or 
 imports = [ inputs.kh-quickshell-ui.homeModules.default ];
 ```
 
-The module requires [Stylix](https://github.com/nix-community/stylix) — colors and fonts are read from `config.lib.stylix` at build time.
+If [Stylix](https://github.com/nix-community/stylix) is present, colors and fonts are picked up automatically. Otherwise a built-in dark palette and monospace font are used. You can override any theme value explicitly — see `programs.kh-ui.theme`.
 
 ### 3. Enable the components
 

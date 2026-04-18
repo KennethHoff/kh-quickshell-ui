@@ -1,6 +1,8 @@
 # Home-manager module for kh-ui quickshell components.
 #
-# Requires Stylix (colors and fonts are read from config.lib.stylix / config.stylix).
+# Theme resolution: explicit options > Stylix auto-detect > built-in defaults.
+# Stylix is no longer required — colors and fonts are auto-detected when
+# available, but work out of the box without it.
 #
 # Usage (after importing this module):
 #   programs.kh-ui.enable = true;
@@ -17,11 +19,72 @@ let
 
   cliphistDecodeAll = import (src + "/scripts/cliphist-decode-all.nix") { inherit pkgs lib; };
 
+  # Resolve theme: explicit options > Stylix auto-detect > defaults.
+  stylixAvailable =
+    (config ? lib)
+    && (config.lib ? stylix)
+    && (config.lib.stylix ? colors)
+    && (config ? stylix)
+    && (config.stylix ? fonts);
+
+  defaultColors = {
+    base00 = "181818";
+    base01 = "282828";
+    base02 = "383838";
+    base03 = "585858";
+    base04 = "b8b8b8";
+    base05 = "d8d8d8";
+    base06 = "e8e8e8";
+    base07 = "f8f8f8";
+    base08 = "ab4642";
+    base09 = "dc9656";
+    base0A = "f7ca88";
+    base0B = "a1b56c";
+    base0C = "86c1b9";
+    base0D = "7cafc2";
+    base0E = "ba8baf";
+    base0F = "a16946";
+  };
+
+  resolvedColors =
+    let
+      explicit = config.programs.kh-ui.theme.colors;
+      hasExplicit = builtins.any (k: explicit.${k} != null) (builtins.attrNames explicit);
+    in
+    if hasExplicit then
+      lib.mapAttrs (_: v: if v != null then v else defaultColors.${_}) explicit
+    else if stylixAvailable then
+      config.lib.stylix.colors
+    else
+      defaultColors;
+
+  resolvedFontName =
+    let
+      v = config.programs.kh-ui.theme.fontName;
+    in
+    if v != null then
+      v
+    else if stylixAvailable then
+      config.stylix.fonts.sansSerif.name
+    else
+      "monospace";
+
+  resolvedFontSize =
+    let
+      v = config.programs.kh-ui.theme.fontSize;
+    in
+    if v != null then
+      v
+    else if stylixAvailable then
+      config.stylix.fonts.sizes.applications
+    else
+      14;
+
   nixConfig = import (src + "/config.nix") {
     inherit pkgs;
-    colors = config.lib.stylix.colors;
-    fontName = config.stylix.fonts.sansSerif.name;
-    fontSize = config.stylix.fonts.sizes.applications;
+    colors = resolvedColors;
+    fontName = resolvedFontName;
+    fontSize = resolvedFontSize;
     inherit (config.programs.kh-ui) volumeMax;
   };
 
@@ -72,6 +135,52 @@ in
 {
   options.programs.kh-ui = {
     enable = lib.mkEnableOption "kh-ui shell UI — prerequisite for all kh-ui options; activates nothing on its own. Enable individual components via their own enable options.";
+
+    theme = {
+      colors = lib.mkOption {
+        type = lib.types.attrsOf (lib.types.nullOr lib.types.str);
+        default = lib.genAttrs [
+          "base00"
+          "base01"
+          "base02"
+          "base03"
+          "base04"
+          "base05"
+          "base06"
+          "base07"
+          "base08"
+          "base09"
+          "base0A"
+          "base0B"
+          "base0C"
+          "base0D"
+          "base0E"
+          "base0F"
+        ] (_: null);
+        description = ''
+          Base16 color palette (hex strings without #). When null (the default),
+          colors are auto-detected from Stylix if available, otherwise a built-in
+          dark palette is used. Set any color to override — unset slots still fall
+          back to Stylix or the default.
+        '';
+      };
+      fontName = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        description = ''
+          Font family name. When null, auto-detected from Stylix
+          (sansSerif font) if available, otherwise "monospace".
+        '';
+      };
+      fontSize = lib.mkOption {
+        type = lib.types.nullOr lib.types.int;
+        default = null;
+        description = ''
+          Font size in pixels. When null, auto-detected from Stylix
+          (applications size) if available, otherwise 14.
+        '';
+      };
+    };
 
     volumeMax = lib.mkOption {
       type = lib.types.float;
