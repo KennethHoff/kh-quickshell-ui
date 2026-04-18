@@ -21,11 +21,11 @@ screenshots".
 
 | App | Config package | IPC target | Default crop | Notes |
 |---|---|---|---|---|
-| kh-bar | `.#kh-bar` | (per-plugin; no app-level toggle) | `0,0 3840x40` | Widen crop to `3840x500` when opening a dropdown. Dev bar uses ipcPrefix `dev-bar`. |
+| kh-bar | `.#kh-bar` | `dev-bar` (root + per-plugin) | dynamic | See [references/kh-bar.md](references/kh-bar.md) for crop sizing, settling, and readiness probe. |
 | kh-cliphist | `.#kh-cliphist` | `cliphist` (`toggle`) | full screen | |
 | kh-launcher | `.#kh-launcher` | `launcher` (`toggle`) | full screen | |
 | kh-osd | `.#kh-osd` | `osd` (`showVolume N`, `showMuted`) | `1720,2000 400x100` | OSD fades; screenshot before it disappears. |
-| kh-view | `.#kh-view` | — | full screen | Needs `KH_VIEW_LIST=<file>` env pointing at a newline-separated list of paths. |
+| kh-view | `.#kh-view` | — | full screen | Accepts file **or directory** paths (dirs expand to image files). Or set `KH_VIEW_LIST=<file>` — newline-separated paths. |
 
 ## Pipeline (single shot)
 
@@ -66,9 +66,10 @@ done
 # settle — see timing guidance below
 sleep 0.5
 
-# capture
+# capture — pick a crop per the app table. For kh-bar, size the crop from
+# the live IPC (see references/kh-bar.md).
 out=$run/myshot.png
-"$grim" -g "0,0 3840x500" "$out"   # adjust crop per app
+"$grim" -g "0,0 3840x500" "$out"
 echo "$out"
 
 # teardown
@@ -98,6 +99,9 @@ as the probe — it returns a value without side effects.
 Short sleeps before grim are the most common cause of "the dropdown didn't
 appear in my shot." When in doubt, 1.0s.
 
+For kh-bar, prefer polling `dev-bar getHeight` until it stabilises instead
+of a fixed sleep — see [references/kh-bar.md](references/kh-bar.md).
+
 ## Multi-shot
 
 Keep `$SPID` and `$QPID` alive across multiple `grim` calls. Change IPC state
@@ -126,7 +130,7 @@ using the pinned known-good commit. Pass all paths as arguments — they
 open side-by-side.
 
 ```bash
-nix run "git+file://$PWD?rev=3724687a0e01b0d60db759ae528e087694353a56#kh-view" -- <path1> [<path2> ...]
+nix run "git+file://$PWD?rev=0d90a3bdc2de0046587e9bb2197a414989e16bab#kh-view" -- <path1> [<path2> ...]
 ```
 
 Update the pinned commit when kh-view reaches a new stable state.
