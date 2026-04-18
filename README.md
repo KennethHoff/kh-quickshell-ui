@@ -277,17 +277,23 @@ Custom plugins inside a group get their prefix automatically — use `ipcPrefix 
 
 ## Launcher (`kh-launcher`)
 
+The launcher is a unified mode host. The built-in "apps" mode is just another registered mode — you can add custom modes (emoji picker, window switcher, system commands, etc.) via Nix or at runtime via IPC, and remove the defaults.
+
+See **[docs/launcher-modes.md](docs/launcher-modes.md)** for the full guide on adding, removing, and scripting modes.
+
 ### IPC
 
 | Target | Functions / Properties |
 |---|---|
 | `launcher` | `toggle()`, `open()`, `close()`, `launch()`, `launchOnWorkspace(n)`, `enterActionsMode()`, `setMode(m)`, `nav(dir)`, `key(k)`, `type(text)` |
-| | **Props:** `showing` → bool, `mode` → string, `selectedAppName` → string, `selectedAppExec` → string |
+| | `activateMode(name)`, `returnToDefault()`, `nextMode()`, `prevMode()`, `registerMode(...)`, `removeMode(name)`, `listModes()` |
+| | `addItem(mode, ...)`, `addItemWithId(mode, ...)`, `itemsReady(mode)` |
+| | **Props:** `showing` → bool, `mode` → string, `activeMode` → string, `selectedLabel` → string, `selectedCallback` → string, `itemCount` → int, `lastSelection` → string |
 
 ```bash
-qs ipc -c kh-launcher call launcher launch
-qs ipc -c kh-launcher call launcher launchOnWorkspace 2
-qs ipc -c kh-launcher prop get launcher selectedAppName
+qs ipc -c kh-launcher call launcher toggle
+qs ipc -c kh-launcher call launcher activateMode emoji
+qs ipc -c kh-launcher prop get launcher activeMode
 ```
 
 ---
