@@ -351,6 +351,11 @@ in
           configs = qsConfigs;
         };
 
+        home.packages = lib.optionals config.programs.kh-ui.view.enable [
+          (pkgs.writeShellScriptBin "kh-view" (
+            toString (import (src + "/scripts/kh-view-wrapper.nix") { inherit pkgs lib; })
+          ))
+        ];
       })
 
       (lib.mkIf config.programs.kh-ui.enable {

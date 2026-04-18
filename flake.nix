@@ -360,27 +360,11 @@
         };
         kh-view = {
           type = "app";
-          # Usage: nix run .#kh-view -- <file> [<file2> ...]
-          #        <cmd> | nix run .#kh-view
           program = toString (
-            pkgs.writeShellScript "run-kh-view" ''
-              set -e
-              qs=${lib.getExe' pkgs.quickshell "quickshell"}
-              list=$(mktemp)
-              trap 'rm -f "$list"' EXIT
-              if [[ $# -ge 1 ]]; then
-                for f in "$@"; do printf '%s\n' "$f" >> "$list"; done
-                export KH_VIEW_LIST="$list"
-                exec "$qs" -p ${viewConfig}
-              else
-                tmp=$(mktemp)
-                trap 'rm -f "$tmp"' EXIT
-                cat > "$tmp"
-                printf '%s\n' "$tmp" >> "$list"
-                export KH_VIEW_LIST="$list"
-                "$qs" -p ${viewConfig}
-              fi
-            ''
+            import ./scripts/kh-view-wrapper.nix {
+              inherit pkgs lib;
+              viewConfigPath = viewConfig;
+            }
           );
         };
       };
