@@ -150,9 +150,12 @@ BarPlugin {
             // "env var is empty" message is a duplicate of the previous line.
             else if (!Quickshell.env(apiKeyEnv)) errs.push(apiKeyEnv + " env var is empty or unset")
             _state.configError = errs.join("\n")
-            // Config just became valid — poll immediately instead of waiting
-            // out a full pollInterval for the timer's first tick.
-            if (prev !== "" && _state.configError === "") poll()
+            if (_state.configError) {
+                console.log("[SonarrPanel] Config error: " + _state.configError)
+            } else if (prev !== "") {
+                console.log("[SonarrPanel] Config now valid, polling immediately")
+                poll()
+            }
         }
 
         function getApiKey(): string {
@@ -160,7 +163,9 @@ BarPlugin {
         }
 
         function makeApiCall(endpoint: string): void {
-            const url = normalizeBaseUrl(baseUrl) + "/api/v3/" + endpoint
+            const normalizedUrl = normalizeBaseUrl(baseUrl)
+            const url = normalizedUrl + "/api/v3/" + endpoint
+            console.log("[SonarrPanel] Calling API: " + url)
             _proc.command = [
                 bin.bash, "-c",
                 bin.curl + " -s -H 'X-Api-Key: " + getApiKey() + "' '" + url + "' | " + bin.jq + " ."
@@ -174,15 +179,19 @@ BarPlugin {
             _state.loading = false
 
             if (!text || text.length === 0) {
+                console.log("[SonarrPanel] API returned empty response")
                 _state.error = "Empty response"
                 return
             }
+
+            console.log("[SonarrPanel] API response: " + text.substring(0, 100) + (text.length > 100 ? "..." : ""))
 
             try {
                 const data = JSON.parse(text)
 
                 // Check if it's an error response
                 if (data.error !== undefined) {
+                    console.log("[SonarrPanel] API error: " + (data.message || "unknown error"))
                     _state.error = data.message || "API error"
                     _state.newCount = 0
                     _state.recentGrabs = []
@@ -191,6 +200,7 @@ BarPlugin {
 
                 // For queue endpoint: count new items
                 if (Array.isArray(data)) {
+                    console.log("[SonarrPanel] Successfully parsed " + data.length + " queue items")
                     _state.newCount = data.length
                     _state.recentGrabs = data
                         .slice(0, maxHistoryItems)
@@ -203,11 +213,13 @@ BarPlugin {
                         }))
                     _state.error = ""
                 } else {
+                    console.log("[SonarrPanel] Unexpected response format: not an array")
                     _state.error = "Unexpected response format"
                     _state.newCount = 0
                     _state.recentGrabs = []
                 }
             } catch (e) {
+                console.log("[SonarrPanel] Parse error: " + e)
                 _state.error = "Parse error"
                 _state.newCount = 0
                 _state.recentGrabs = []
@@ -215,8 +227,12 @@ BarPlugin {
         }
 
         function poll(): void {
-            if (_state.configError !== "") return
+            if (_state.configError !== "") {
+                console.log("[SonarrPanel] Skipping poll: config error")
+                return
+            }
             if (!_proc.running) {
+                console.log("[SonarrPanel] Polling...")
                 makeApiCall("queue")
             }
         }
