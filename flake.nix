@@ -54,7 +54,10 @@
       '';
 
       cliphistDecodeAllScript = import ./scripts/cliphist-decode-all.nix { inherit pkgs lib; };
-      scanAppsScript = import ./scripts/scan-apps.nix { inherit pkgs lib; };
+      appsPlugin = import ./apps/launcher/plugins/apps.nix {
+        inherit pkgs lib;
+        terminal = pkgs.kitty;
+      };
 
       nixConfigQml = import ./config.nix {
         inherit pkgs;
@@ -104,7 +107,7 @@
           cp ${self}/lib/*.qml $out/lib/
           cp ${self}/apps/kh-${name}.qml $out/shell.qml
           ${lib.optionalString (builtins.pathExists appDir) "cp ${appDir}/*.qml $out/"}
-          ${lib.optionalString (builtins.pathExists pluginsDir) "cp ${pluginsDir}/*.qml $out/"}
+          ${lib.optionalString (builtins.pathExists pluginsDir) "cp ${pluginsDir}/*.qml $out/ 2>/dev/null || true"}
           ${lib.concatStrings (lib.mapAttrsToList (dest: src: "cp ${src} $out/${dest}\n") generatedFiles)}
           ${lib.concatMapStrings (d: "cp ${toString d}/*.qml $out/\n") extraPluginDirs}
           cp ${nixConfigQml} $out/NixConfig.qml
@@ -134,11 +137,21 @@
         };
 
       viewConfig = mkAppConfig { name = "view"; };
+      launcherModeRegistry =
+        let
+          allModes = appsPlugin.modes;
+        in
+        pkgs.writeText "ModeRegistry.qml" ''
+          import QtQuick
+          QtObject {
+              readonly property var modes: (${builtins.toJSON allModes})
+          }
+        '';
+
       launcherConfig = mkAppConfig {
         name = "launcher";
-        extraBins = {
-          scanApps = toString scanAppsScript;
-          terminal = lib.getExe pkgs.kitty;
+        generatedFiles = {
+          "ModeRegistry.qml" = launcherModeRegistry;
         };
       };
 
@@ -198,7 +211,6 @@
         kh-osd = osdConfig;
         kh-view = viewConfig;
         kh-launcher = launcherConfig;
-        scanApps = scanAppsScript;
       };
 
       apps.${system} = {

@@ -17,8 +17,6 @@ let
 
   cliphistDecodeAll = import (src + "/scripts/cliphist-decode-all.nix") { inherit pkgs lib; };
 
-  scanAppsScript = import (src + "/scripts/scan-apps.nix") { inherit pkgs lib; };
-
   nixConfig = import (src + "/config.nix") {
     inherit pkgs;
     colors = config.lib.stylix.colors;
@@ -44,7 +42,7 @@ let
       cp ${src}/lib/*.qml $out/lib/
       cp ${src}/apps/kh-${name}.qml $out/shell.qml
       ${lib.optionalString (builtins.pathExists appDir) "cp ${appDir}/*.qml $out/"}
-      ${lib.optionalString (builtins.pathExists pluginsDir) "cp ${pluginsDir}/*.qml $out/"}
+      ${lib.optionalString (builtins.pathExists pluginsDir) "cp ${pluginsDir}/*.qml $out/ 2>/dev/null || true"}
       ${lib.concatStrings (lib.mapAttrsToList (dest: path: "cp ${path} $out/${dest}\n") generatedFiles)}
       ${lib.concatMapStrings (d: "cp ${toString d}/*.qml $out/\n") extraPluginDirs}
       cp ${nixConfig} $out/NixConfig.qml
@@ -102,6 +100,44 @@ in
         default = pkgs.kitty;
         defaultText = lib.literalExpression "pkgs.kitty";
         description = "Terminal emulator used to launch apps with Terminal=true in their .desktop entry.";
+      };
+      scriptModes = lib.mkOption {
+        type = lib.types.attrsOf (
+          lib.types.submodule {
+            options = {
+              script = lib.mkOption {
+                type = lib.types.path;
+                description = ''
+                  Executable that outputs items as 4- or 5-field TSV to stdout:
+                  <literal>label\tdescription\ticon\tcallback[\tid]</literal>.
+                  The id field is optional and defaults to label; it is used for
+                  frecency tracking and desktop-action parsing when enabled.
+                '';
+              };
+              frecency = lib.mkOption {
+                type = lib.types.bool;
+                default = false;
+                description = "Track launch frequency and boost frequently-used items in search results.";
+              };
+              hasActions = lib.mkOption {
+                type = lib.types.bool;
+                default = false;
+                description = "Enable desktop-action sub-mode (l/Tab) — parses [Desktop Action] sections from the item's id field (must be a .desktop file path).";
+              };
+              placeholder = lib.mkOption {
+                type = lib.types.str;
+                default = "Search...";
+                description = "Placeholder text shown in the search field when this mode is active.";
+              };
+            };
+          }
+        );
+        default = { };
+        description = ''
+          Named script modes that appear alongside the built-in apps mode.
+          Each mode is backed by an executable that outputs items as TSV.
+          Activate via IPC: <literal>qs ipc call launcher activateMode &lt;name&gt;</literal>.
+        '';
       };
     };
 
@@ -200,15 +236,35 @@ in
             inherit (config.programs.kh-ui.bar) structure extraPluginDirs;
           };
         }
-        // lib.optionalAttrs config.programs.kh-ui.launcher.enable {
-          kh-launcher = mkAppConfig {
-            name = "launcher";
-            extraBins = {
-              scanApps = toString scanAppsScript;
-              terminal = lib.getExe config.programs.kh-ui.launcher.terminal;
+        // lib.optionalAttrs config.programs.kh-ui.launcher.enable (
+          let
+            launcherCfg = config.programs.kh-ui.launcher;
+            appsPlugin = import (src + "/apps/launcher/plugins/apps.nix") {
+              inherit pkgs lib;
+              terminal = launcherCfg.terminal;
             };
-          };
-        }
+            userModes = lib.mapAttrs (_: cfg: {
+              script = toString cfg.script;
+              inherit (cfg) frecency hasActions placeholder;
+              default = false;
+            }) launcherCfg.scriptModes;
+            allModes = appsPlugin.modes // userModes;
+            modeRegistryQml = pkgs.writeText "ModeRegistry.qml" ''
+              import QtQuick
+              QtObject {
+                  readonly property var modes: (${builtins.toJSON allModes})
+              }
+            '';
+          in
+          {
+            kh-launcher = mkAppConfig {
+              name = "launcher";
+              generatedFiles = {
+                "ModeRegistry.qml" = modeRegistryQml;
+              };
+            };
+          }
+        )
         // lib.optionalAttrs config.programs.kh-ui.view.enable {
           kh-view = mkAppConfig { name = "view"; };
         }
