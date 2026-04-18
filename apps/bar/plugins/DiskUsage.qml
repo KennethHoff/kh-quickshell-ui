@@ -1,16 +1,18 @@
-// Bar plugin: disk usage for one or more configured mount points.
-// Shells out to `df -B1 <mount>...` on a slow interval (disk fills change slowly).
-// Display is "<mount> <used>/<total>" per mount, comma-joined.
+// Bar plugin (data source): disk usage for one or more configured mount points.
+// Shells out to `df -B1 <mount>...` every `interval`. Exposes `results` as
+// [{ mount, usedB, totalB }]. No visuals — compose with a sibling Text
+// (or a Repeater over `results`) to render.
 import QtQuick
 import Quickshell.Io
 
 BarPlugin {
     id: root
-    NixBins   { id: bin }
-    NixConfig { id: cfg }
+    NixBins { id: bin }
 
     property var mounts:   ["/"]
     property int interval: 60000
+
+    readonly property alias results: state.results
 
     QtObject {
         id: state
@@ -34,20 +36,6 @@ BarPlugin {
                 })
             }
             state.results = res
-        }
-        // ui only
-        function fmtGb(bytes: real): string {
-            const gb = bytes / 1024 / 1024 / 1024
-            return gb >= 10 ? gb.toFixed(0) + "G" : gb.toFixed(1) + "G"
-        }
-        // ui only
-        function labelText(): string {
-            const out = []
-            for (let i = 0; i < state.results.length; i++) {
-                const r = state.results[i]
-                out.push(r.mount + " " + fmtGb(r.usedB) + "/" + fmtGb(r.totalB))
-            }
-            return out.join(", ")
         }
         // ui only
         function pollIfIdle(): void { if (!_proc.running) _proc.running = true }
@@ -86,15 +74,7 @@ BarPlugin {
         onTriggered: functionality.pollIfIdle()
     }
 
-    visible: state.results.length > 0
-    implicitWidth: visible ? _label.implicitWidth + 16 : 0
-
-    Text {
-        id: _label
-        anchors.centerIn: parent
-        color:          cfg.color.base05
-        font.family:    cfg.fontFamily
-        font.pixelSize: cfg.fontSize - 1
-        text: functionality.labelText()
-    }
+    implicitWidth:  0
+    implicitHeight: 0
+    visible:        false
 }

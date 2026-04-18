@@ -139,11 +139,41 @@
                   label: "stats"
                   ipcName: "stats"
                   panelWidth: 320
-                  Cpu {}
-                  Ram {}
-                  Gpu {}
-                  Disk {}
-                  Temps {}
+
+                  CpuUsage { id: cpuUsage }
+                  BarText { text: "cpu " + cpuUsage.usage + "%" }
+
+                  RamUsage { id: ramUsage }
+                  BarText { text: "ram " + ramUsage.percent + "%" }
+
+                  GpuUsage { id: gpuUsage }
+                  BarText {
+                      text: "gpu " + gpuUsage.busy + "% (" + gpuUsage.vramUsedMb + "M/" + gpuUsage.vramTotalMb + "M)"
+                  }
+
+                  DiskUsage { id: diskUsage }
+                  Repeater {
+                      model: diskUsage.results
+                      BarText {
+                          text: modelData.mount + " " + Math.round(modelData.usedB / 1e9) + "G/" + Math.round(modelData.totalB / 1e9) + "G"
+                      }
+                  }
+
+                  CpuTemp { id: cpuTemp }
+                  BarText {
+                      text: "cpu " + cpuTemp.temp + "°"
+                      color: cpuTemp.temp >= 80 ? errorColor
+                           : cpuTemp.temp >= 60 ? warnColor
+                           :                      normalColor
+                  }
+
+                  GpuTemp { id: gpuTemp }
+                  BarText {
+                      text: "gpu " + gpuTemp.temp + "°"
+                      color: gpuTemp.temp >= 80 ? errorColor
+                           : gpuTemp.temp >= 60 ? warnColor
+                           :                      normalColor
+                  }
               }
               Tray {}
               Notifications {}

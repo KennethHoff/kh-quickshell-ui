@@ -220,10 +220,13 @@ in
           equivalent). Any QML type available in $out/ can be used — built-in
           plugins, lib components, and types from extraPluginDirs.
 
-          Built-in plugins: Workspaces, MediaPlayer, Clock, Volume, Tray.
+          Built-in plugins: Workspaces, MediaPlayer, Clock, Volume, Tray,
+          Notifications, CpuUsage, RamUsage, GpuUsage, DiskUsage, CpuTemp,
+          GpuTemp. The *Usage / *Temp plugins are data-only — compose with
+          BarText (or any other component) to render their values.
 
           Built-in layout / composition types:
-          BarRow, BarSpacer, BarGroup, BarDropdown, ControlTile,
+          BarRow, BarSpacer, BarGroup, BarDropdown, BarText, ControlTile,
           TailscalePanel, EthernetPanel, TailscalePeers,
           DropdownHeader, DropdownDivider, DropdownItem.
 

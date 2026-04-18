@@ -267,11 +267,16 @@ A full status bar built in Quickshell, replacing Waybar.
 
 ### System Stats
 
-- [1] ✅ CPU usage — `Cpu` plugin samples `/proc/stat` every 2 s and renders a rolling (non-idle / total) %; `hideBelow: int` hides the plugin when usage is below the threshold (default 0 = always visible)
-- [2] ✅ RAM usage — `Ram` plugin reads `/proc/meminfo` and renders `MemTotal − MemAvailable`; `format: "absolute" | "percent"` switches between `4.2G/16G` and `27%`
-- [3] ✅ AMD GPU stats — `Gpu` plugin reads `/sys/class/drm/<card>/device/{gpu_busy_percent,mem_info_vram_used,mem_info_vram_total}`; `cardPath` is configurable; `hideBelow` hides when idle. Nvidia support deferred — would need `nvidia-smi` via `extraBins` and no Nvidia hardware is available to test against
-- [4] ✅ Disk usage — `Disk` plugin shells out to `df -B1 <mounts>` every 60 s (`mounts` and `interval` configurable); displays `<mount> <used>/<total>` per mount, comma-joined
-- [5] ✅ Temperature — `Temps` plugin walks `/sys/class/hwmon/hwmon*` (via `bash`) matching `cpuSensor` / `gpuSensor` against each `name` file and reads `temp1_input`; colour-coded via `warmAt` / `hotAt` thresholds (defaults 60 / 80 °C) against `base09` / `base08`
+Stats plugins are **data-only**: each polls a source and exposes readable
+properties; users compose them with a sibling `BarText` (or any other
+component) to render the value. Plugins never know their parent and contain
+no presentation logic.
+
+- [1] ✅ CPU usage — `CpuUsage` samples `/proc/stat` and exposes `usage: int`
+- [2] ✅ RAM usage — `RamUsage` reads `/proc/meminfo`; exposes `totalKb`, `availableKb`, `usedKb`, `percent`
+- [3] ✅ AMD GPU stats — `GpuUsage` reads `/sys/class/drm/<card>/device/{gpu_busy_percent,mem_info_vram_used,mem_info_vram_total}` (configurable `cardPath`); exposes `busy`, `vramUsedB`, `vramTotalB`, `vramUsedMb`, `vramTotalMb`. Nvidia deferred — needs `nvidia-smi` via `extraBins`, no hardware on this host
+- [4] ✅ Disk usage — `DiskUsage` shells out to `df -B1 <mounts>` every 60 s; exposes `results: [{ mount, usedB, totalB }]`
+- [5] ✅ Temperature — `CpuTemp` and `GpuTemp` walk `/sys/class/hwmon/hwmon*` (via `bash`) matching their `sensor` property (defaults `"zenpower"` / `"amdgpu"`) against each `name` file and read `temp1_input`; expose `temp: int` (°C). Users colour-code in their `BarText` binding via `warnColor` / `errorColor`
 
 ### Docker
 

@@ -1,15 +1,15 @@
-// Bar plugin: aggregate CPU utilisation %.
-// Samples /proc/stat on a timer and computes the delta (non-idle / total).
-// Hide the plugin when usage is below `hideBelow` (default 0 — always visible).
+// Bar plugin (data source): aggregate CPU utilisation %.
+// Samples /proc/stat and exposes `usage` for consumers (e.g. Text) to bind.
+// No visuals of its own — compose with a sibling Text to render.
 import QtQuick
 import Quickshell.Io
 
 BarPlugin {
     id: root
-    NixConfig { id: cfg }
 
-    property int interval:  2000
-    property int hideBelow: 0
+    property int interval: 2000
+
+    readonly property alias usage: state.usage
 
     QtObject {
         id: state
@@ -17,8 +17,6 @@ BarPlugin {
         property int prevIdle:  0
         property int prevTotal: 0
     }
-
-    readonly property alias usage: state.usage
 
     QtObject {
         id: functionality
@@ -62,15 +60,7 @@ BarPlugin {
         onTriggered: functionality.tick()
     }
 
-    visible: state.usage >= root.hideBelow
-    implicitWidth: visible ? _label.implicitWidth + 16 : 0
-
-    Text {
-        id: _label
-        anchors.centerIn: parent
-        color:          cfg.color.base05
-        font.family:    cfg.fontFamily
-        font.pixelSize: cfg.fontSize - 1
-        text: "cpu: " + state.usage + "%"
-    }
+    implicitWidth:  0
+    implicitHeight: 0
+    visible:        false
 }

@@ -75,50 +75,83 @@ PipeWire volume control. Scroll to adjust volume, click to toggle mute. Hidden w
 
 StatusNotifierItem system tray. Left-click activates an item, right-click shows its native context menu. Hidden when no tray items are present.
 
-### `Cpu`
+### System-stats data sources
 
-Aggregate CPU utilisation %. Samples `/proc/stat` on `interval` (default 2 s) and renders a rolling delta. Set `hideBelow` to an int percentage to hide the plugin when idle:
+`CpuUsage`, `RamUsage`, `GpuUsage`, `DiskUsage`, `CpuTemp`, `GpuTemp` are
+**data-only** plugins — they poll their sources and expose readable properties
+for you to bind against. They have no visuals of their own. Pair each with a
+`BarText` (or any other component) to render the value however you like:
 
 ```qml
-Cpu { hideBelow: 5 }   // hidden while usage < 5 %
+CpuUsage { id: cpuUsage }
+BarText { text: "cpu " + cpuUsage.usage + "%" }
 ```
 
-### `Ram`
+| Plugin | Source | Poll | Exposed properties |
+|---|---|---|---|
+| `CpuUsage` | `/proc/stat` | `interval` (2 s) | `usage: int` (%) |
+| `RamUsage` | `/proc/meminfo` | `interval` (2 s) | `totalKb`, `availableKb`, `usedKb`, `percent` |
+| `GpuUsage` | `/sys/class/drm/<card>/device/` | `interval` (2 s) | `busy`, `vramUsedB`, `vramTotalB`, `vramUsedMb`, `vramTotalMb` |
+| `DiskUsage` | `df -B1 <mounts>` | `interval` (60 s) | `results: [{ mount, usedB, totalB }]` |
+| `CpuTemp` | `/sys/class/hwmon/hwmon*/{name,temp1_input}` | `interval` (5 s) | `temp: int` (°C) |
+| `GpuTemp` | `/sys/class/hwmon/hwmon*/{name,temp1_input}` | `interval` (5 s) | `temp: int` (°C) |
 
-RAM usage from `/proc/meminfo` (`MemTotal - MemAvailable`). Default display is absolute (`ram: 4.2G/16G`); set `format: "percent"` for `ram: 27%`.
+Key configuration:
 
-### `Gpu`
+- `GpuUsage.cardPath` — default `/sys/class/drm/card1/device`. Nvidia is not yet
+  supported — see the ROADMAP's "System Stats → GPU stats" entry.
+- `DiskUsage.mounts` — default `["/"]`; list of paths to pass to `df`.
+- `CpuTemp.sensor` / `GpuTemp.sensor` — default `"zenpower"` / `"amdgpu"`.
+  Inspect your machine with
+  `for d in /sys/class/hwmon/hwmon*; do echo "$d $(cat "$d/name")"; done`.
+  Common alternatives: `coretemp` (Intel), `k10temp` (older Ryzen), `nvidia`.
 
-AMD GPU utilisation and VRAM use from `/sys/class/drm/<card>/device/`. Defaults to `card1`; override via `cardPath`:
-
-```qml
-Gpu { cardPath: "/sys/class/drm/card0/device"; hideBelow: 5 }
-```
-
-Nvidia is not yet supported — see the ROADMAP's "System Stats → GPU stats" entry.
-
-### `Disk`
-
-Disk used/total for one or more configured mount points. Shells out to `df -B1` on `interval` (default 60 s):
-
-```qml
-Disk { mounts: ["/", "/home"]; interval: 120000 }
-```
-
-### `Temps`
-
-CPU and GPU temperatures from `/sys/class/hwmon`. Sensors are matched by their `name` file (inspect with `for d in /sys/class/hwmon/hwmon*; do echo "$d $(cat "$d/name")"; done`). Defaults match a Ryzen + AMD GPU system:
+Example panel with all six:
 
 ```qml
-Temps {
-    cpuSensor: "zenpower"   // e.g. "coretemp" on Intel, "k10temp" on older Ryzen
-    gpuSensor: "amdgpu"
-    warmAt: 60              // base09 colour above this
-    hotAt:  80              // base08 colour above this
+BarGroup {
+    label: "stats"
+    panelWidth: 320
+
+    CpuUsage { id: cpuUsage }
+    BarText  { text: "cpu " + cpuUsage.usage + "%" }
+
+    RamUsage { id: ramUsage }
+    BarText  { text: "ram " + ramUsage.percent + "%" }
+
+    GpuUsage { id: gpuUsage }
+    BarText  {
+        text: "gpu " + gpuUsage.busy + "% ("
+            + gpuUsage.vramUsedMb + "M/" + gpuUsage.vramTotalMb + "M)"
+    }
+
+    DiskUsage { id: diskUsage; mounts: ["/", "/home"] }
+    Repeater {
+        model: diskUsage.results
+        BarText {
+            text: modelData.mount + " "
+                + Math.round(modelData.usedB  / 1e9) + "G/"
+                + Math.round(modelData.totalB / 1e9) + "G"
+        }
+    }
+
+    CpuTemp { id: cpuTemp }
+    BarText {
+        text:  "cpu " + cpuTemp.temp + "°"
+        color: cpuTemp.temp >= 80 ? errorColor
+             : cpuTemp.temp >= 60 ? warnColor
+             :                      normalColor
+    }
+
+    GpuTemp { id: gpuTemp }
+    BarText {
+        text:  "gpu " + gpuTemp.temp + "°"
+        color: gpuTemp.temp >= 80 ? errorColor
+             : gpuTemp.temp >= 60 ? warnColor
+             :                      normalColor
+    }
 }
 ```
-
-Hidden entirely when neither sensor is found.
 
 ### `TailscalePanel`
 
@@ -149,6 +182,7 @@ Low-level building blocks for custom plugins and panels (no import needed):
 
 | Component | Purpose |
 |---|---|
+| `BarText` | Pre-styled `Text` (theme font + default foreground); exposes `normalColor` / `warnColor` / `errorColor` / `mutedColor` for overrides without a separate `NixConfig` reference |
 | `ControlTile` | Styled toggle pill for custom panel tiles |
 | `DropdownHeader` | Muted section heading |
 | `DropdownDivider` | 1 px horizontal rule |
@@ -228,11 +262,12 @@ For example, a `TailscalePanel` inside `BarGroup { ipcName: "net" }` is reachabl
 | `Tray` | `.tray` | `list()` -> newline-separated titles, `activate(title)`, `showMenu(title)` |
 | `TailscalePanel` | `.tailscale` | `isConnected()` -> bool, `getSelfIp()` -> string, `toggle()` |
 | `EthernetPanel` | `.ethernet` | `isConnected()` -> bool, `getIface()` -> string |
-| `Cpu` | `.cpu` | `getUsage()` -> int |
-| `Ram` | `.ram` | `getUsedMb()` -> int, `getTotalMb()` -> int, `getPercent()` -> int |
-| `Gpu` | `.gpu` | `getBusy()` -> int, `getVramUsedMb()` -> int, `getVramTotalMb()` -> int |
-| `Disk` | `.disk` | `list()` -> `[{ mount, usedB, totalB }]` |
-| `Temps` | `.temps` | `getCpu()` -> int, `getGpu()` -> int |
+| `CpuUsage` | `.cpu` | `getUsage()` -> int |
+| `RamUsage` | `.ram` | `getUsedMb()` -> int, `getTotalMb()` -> int, `getPercent()` -> int |
+| `GpuUsage` | `.gpu` | `getBusy()` -> int, `getVramUsedMb()` -> int, `getVramTotalMb()` -> int |
+| `DiskUsage` | `.disk` | `list()` -> tab-separated `mount\tusedB\ttotalB` per line; `count()` -> int |
+| `CpuTemp` | `.cpuTemp` | `getTemp()` -> int (°C) |
+| `GpuTemp` | `.gpuTemp` | `getTemp()` -> int (°C) |
 | `BarGroup` / `BarDropdown` | `.<ipcName>` | `toggle()`, `open()`, `close()`, `isOpen()` -> bool |
 
 ### Dropdown IPC for custom plugins
