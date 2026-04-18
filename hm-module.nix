@@ -247,21 +247,48 @@ in
         ];
     })
 
-    (lib.mkIf (config.programs.kh-ui.enable && config.wayland.windowManager.hyprland.enable) {
-      wayland.windowManager.hyprland.settings.exec-once =
-        lib.optionals config.programs.kh-ui.clipboard-history.enable [
-          "${lib.getExe pkgs.quickshell} -c kh-cliphist"
-          "${lib.getExe' pkgs.wl-clipboard "wl-paste"} --watch ${lib.getExe pkgs.cliphist} store"
-        ]
-        ++ lib.optionals config.programs.kh-ui.launcher.enable [
-          "${lib.getExe pkgs.quickshell} -c kh-launcher"
-        ]
-        ++ lib.optionals config.programs.kh-ui.bar.enable [
-          "${lib.getExe pkgs.quickshell} -c kh-bar"
-        ]
-        ++ lib.optionals config.programs.kh-ui.osd.enable [
-          "${lib.getExe pkgs.quickshell} -c kh-osd"
-        ];
+    (lib.mkIf config.programs.kh-ui.enable {
+      systemd.user.services =
+        let
+          mkQsService = configName: {
+            Unit = {
+              Description = "Quickshell instance: ${configName}";
+              PartOf = [ "graphical-session.target" ];
+              After = [ "graphical-session.target" ];
+            };
+            Service = {
+              ExecStart = "${lib.getExe pkgs.quickshell} -c ${configName}";
+              Restart = "on-failure";
+              RestartSec = 2;
+            };
+            Install.WantedBy = [ "graphical-session.target" ];
+          };
+        in
+        lib.optionalAttrs config.programs.kh-ui.clipboard-history.enable {
+          kh-cliphist = mkQsService "kh-cliphist";
+          kh-cliphist-store = {
+            Unit = {
+              Description = "Clipboard history store (wl-paste -> cliphist)";
+              PartOf = [ "graphical-session.target" ];
+              After = [ "graphical-session.target" ];
+            };
+            Service = {
+              ExecStart = "${lib.getExe' pkgs.wl-clipboard "wl-paste"} --watch ${lib.getExe pkgs.cliphist} store";
+              Restart = "on-failure";
+              RestartSec = 2;
+            };
+            Install.WantedBy = [ "graphical-session.target" ];
+          };
+        }
+        // lib.optionalAttrs config.programs.kh-ui.launcher.enable {
+          kh-launcher = mkQsService "kh-launcher";
+        }
+        // lib.optionalAttrs config.programs.kh-ui.bar.enable {
+          kh-bar = mkQsService "kh-bar";
+        }
+        // lib.optionalAttrs config.programs.kh-ui.osd.enable {
+          kh-osd = mkQsService "kh-osd";
+        };
     })
   ];
 }

@@ -374,9 +374,22 @@ qs ipc -c kh-osd call osd showMuted
 
 ---
 
-## Autostart and keybinds (Hyprland)
+## Autostart and keybinds
 
-When `wayland.windowManager.hyprland.enable` is true the module automatically adds `exec-once` entries for all enabled components. You only need to add keybinds:
+The module registers each enabled component as a `systemd` **user service** bound to `graphical-session.target`. That means:
+
+- Autostart works on any compositor that integrates with the systemd user session.
+- Crashed processes are restarted automatically (`Restart=on-failure`).
+- On `home-manager switch`, Home Manager's `sd-switch` strategy restarts any service whose `ExecStart` path changed — so a rebuild swaps in the new version without a logout.
+- You can inspect / control instances via standard tooling:
+
+  ```bash
+  systemctl --user status kh-bar
+  systemctl --user restart kh-cliphist
+  journalctl --user -u kh-osd -f
+  ```
+
+You only need to add keybinds. Example for Hyprland:
 
 ```nix
 wayland.windowManager.hyprland.settings.bind = [

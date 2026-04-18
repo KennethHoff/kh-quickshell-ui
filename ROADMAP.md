@@ -20,7 +20,7 @@ Hardcoded assumptions that should be user-configurable.
 
 - [1] ✅ **Configurable terminal** — `programs.kh-ui.launcher.terminal` option (defaults to `pkgs.kitty`); injected as `bin.terminal` into the launcher's `NixBins.qml` via `extraBins`; `kh-launcher.qml` uses `bin.terminal` instead of `bin.kitty`
 - [2] ✅ **`kitty` removed from universal `ffi.nix` bins** — moved to launcher-specific `extraBins` as `terminal`; no longer injected into bar, cliphist, or view configs
-- [3] ⬜ **Hyprland-only `exec-once` wiring** — `hm-module.nix` only adds apps to `exec-once` when `wayland.windowManager.hyprland.enable` is true; users on Sway or other compositors get no autostart integration; needs a generic autostart mechanism or at minimum a `programs.kh-ui.autostart` option the user can wire up themselves
+- [3] ✅ **Compositor-agnostic autostart** — `hm-module.nix` registers each enabled component as a `systemd.user.services` unit bound to `graphical-session.target`; works on any compositor with systemd-user integration, adds `Restart=on-failure` for crash recovery, and benefits from Home Manager's `sd-switch` strategy (services auto-restart when the store path changes on rebuild)
 
 ---
 
