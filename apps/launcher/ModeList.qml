@@ -1,25 +1,29 @@
-// Application list for kh-launcher.
+// Mode list for kh-launcher.
 //
-// Owns: app loading, search field, filtering, normal/insert/actions mode.
+// Unified mode host — every mode (apps, window switcher, emoji, etc.) flows
+// through the same item model, search, navigation, and launch path.  The
+// built-in "apps" mode is registered in ModeRegistry.qml by Nix alongside
+// any user-defined script modes; there is no app-specific logic here.
 //
-// The orchestrator holds keyboard focus on a dedicated handler and calls
-// appList.handleKey(event) in the "list active" branch of its dispatch chain.
-// For insert mode, the orchestrator calls appList.enterInsertMode(), which
-// transfers focus to the internal search field.
+// Owns: mode activation, item loading (registered script or ad-hoc IPC push),
+// search field, filtering, normal/insert/actions input modes, navigation.
 //
 // Properties out:
-//   selectedApp     — { _filePath, name, exec, comment, terminal, icon } or null
+//   selectedItem    — { label, description, icon, callback, id } or null
+//   activeModeName  — current mode name (e.g. "apps", "windows")
 //   mode            — "insert" | "normal" | "actions"
 //   hintText        — footer hint for the current state
-//   filteredCount   — number of visible apps
+//   filteredCount   — number of visible items
+//   lastSelection   — label of the last launched item
+//   placeholder     — search field placeholder for the active mode
 //
 // Signals:
-//   launchRequested(string exec, bool terminal, int workspace)
+//   launchRequested(string callback, int workspace)
 //   closeRequested()
 //   searchEscapePressed()   — Esc in insert mode; orchestrator reclaims focus
 //
 // handleKey(event) → bool
-//   Processes normal / actions mode key events. Returns false for '?' so it
+//   Processes normal / actions mode key events.  Returns false for '?' so it
 //   propagates to the orchestrator's help handler.
 //
 // handleIpcKey(k) → bool
@@ -29,14 +33,15 @@ import Quickshell.Io
 import "./lib"
 
 Item {
-    id: appList
+    id: modeList
 
-    NixConfig  { id: cfg }
-    NixBins    { id: bin }
-    FuzzyScore { id: fuzzy }
+    NixConfig      { id: cfg }
+    NixBins        { id: bin }
+    FuzzyScore     { id: fuzzy }
+    ModeRegistry   { id: registry }
 
-    // Frecency store: filePath → "<count>:<lastLaunchEpoch>" — decayed launch
-    // counter blended into search scores (see impl.frecencyBoost / runFilter).
+    // Frecency store: id → "<count>:<lastLaunchEpoch>" — decayed launch
+    // counter blended into search scores for modes that opt in.
     MetaStore {
         id: frecencyStore
         bash:     bin.bash
@@ -44,63 +49,225 @@ Item {
         storeKey: "frecency"
     }
 
-    // Half-life for decayed launch counts (seconds). After this much time with
-    // no launches, a count halves — so stale apps eventually stop dominating
-    // the ranking even if they were heavily used long ago.
+    // Half-life for decayed launch counts (seconds).
     readonly property int _frecencyHalfLifeSec: 14 * 86400
 
+    // ── Runtime mode registry ─────────────────────────────────────────────────
+    // Seeded from ModeRegistry (Nix) at startup.  Mutable at runtime via
+    // registerMode / removeMode.  Each entry:
+    //   { script, frecency, hasActions, placeholder, default }
+    property var _modes: ({})
+
+    // Seed the runtime registry from Nix-generated ModeRegistry on startup.
+    Component.onCompleted: {
+        frecencyStore.load()
+        const seed = {}
+        const src = registry.modes
+        for (const name in src) {
+            seed[name] = src[name]
+        }
+        _modes = seed
+    }
+
     // ── Private state ─────────────────────────────────────────────────────────
-    property var    _allApps:       []
-    property var    _filteredApps:  []
-    property string _mode:          "insert"  // "insert" | "normal" | "actions"
-    property bool   _pendingG:      false
-    property var    _actions:       []        // [{ name, exec }]
-    property var    _appBuf:        []        // scratch buffer for listProcess
+    property string _activeMode:     ""       // current mode name
+    property var    _modeConfig:     ({})     // config object from registry (or {})
+    property var    _allItems:       []       // [{ label, description, icon, callback, id }]
+    property var    _filteredItems:  []
+    property string _mode:           "insert" // "insert" | "normal" | "actions"
+    property bool   _pendingG:       false
+    property var    _actions:        []       // [{ name, exec }] for desktop-action sub-mode
+    property var    _modeItems:      ({})     // modeName → [parsed items] (persists across switches)
+    property var    _itemBuf:        ({})     // modeName → [item objects] (in-progress IPC push)
+    property var    _scriptBuf:      []       // raw lines from the active mode's script process
+    property string _lastSelection:  ""       // label of last launched item
 
     // ── Properties out ────────────────────────────────────────────────────────
-    readonly property var selectedApp: {
+    readonly property var selectedItem: {
         const idx = list.currentIndex
-        const apps = _filteredApps
-        return (idx >= 0 && idx < apps.length) ? apps[idx] : null
+        const items = _filteredItems
+        return (idx >= 0 && idx < items.length) ? items[idx] : null
     }
+    readonly property string activeModeName: _activeMode
     readonly property string mode: _mode
     readonly property string modeText: _mode === "normal" ? "NOR" : _mode === "actions" ? "ACT" : ""
     readonly property string hintText: {
         if (_mode === "actions")
             return "j/k navigate  \u00b7  Enter launch action  \u00b7  h / Esc back  \u00b7  ? help"
         if (_mode === "normal")
-            return "j/k navigate  \u00b7  Enter launch  \u00b7  l / Tab actions  \u00b7  Ctrl+1\u20139 workspace  \u00b7  / search  \u00b7  ? help  \u00b7  Esc close"
+            return "j/k navigate  \u00b7  Enter launch  \u00b7  " +
+                   (_modeConfig.hasActions ? "l / Tab actions  \u00b7  " : "") +
+                   (Object.keys(_modes).length > 1 ? "[ / ] switch mode  \u00b7  " : "") +
+                   "Ctrl+1\u20139 workspace  \u00b7  / search  \u00b7  ? help  \u00b7  Esc close"
         return "Esc  normal mode  \u00b7  ? help"
     }
-    readonly property int filteredCount: _filteredApps.length
+    readonly property int filteredCount: _filteredItems.length
+    readonly property string lastSelection: _lastSelection
+    readonly property string placeholder: _modeConfig.placeholder || "Search..."
+    readonly property var modeNames: Object.keys(_modes)
 
     // ── Signals ───────────────────────────────────────────────────────────────
-    signal launchRequested(string exec, bool terminal, int workspace)
+    signal launchRequested(string callback, int workspace)
     signal closeRequested()
     signal searchEscapePressed()
     signal flashRequested(int idx)
 
-    // Load the persisted frecency counts once at startup; subsequent writes
-    // happen on launch and the in-memory `values` map stays authoritative.
-    Component.onCompleted: frecencyStore.load()
-
     // ── Public API ────────────────────────────────────────────────────────────
-    function reset() {
-        _mode     = "insert"
-        _pendingG = false
-        _actions  = []
-        _appBuf   = []
+
+    // Activate a mode by name.  If the mode already has buffered items (from
+    // a prior addItem+itemsReady), displays them immediately.  If the name is
+    // in the registry and has a script, runs it to (re)populate items.
+    // Otherwise creates an empty ad-hoc mode (caller pushes items via
+    // addItem + itemsReady).
+    function activateMode(name) {
+        _activeMode    = name
+        _modeConfig    = _modes[name] || {}
+        _actions       = []
+        _mode          = "insert"
+        _pendingG      = false
         searchField.text = ""
         list.currentIndex = 0
         actionList.currentIndex = 0
         searchDebounce.stop()
         gTimer.stop()
+
+        // If items were pre-populated via addItem+itemsReady, show them.
+        const existing = _modeItems[name]
+        if (existing && existing.length > 0) {
+            _allItems      = existing
+            _filteredItems = []
+            impl.runFilter()
+            if (_mode === "insert") searchField.forceActiveFocus()
+            return
+        }
+
+        _allItems      = []
+        _filteredItems = []
+
+        if (_modeConfig.script) {
+            modeProcess.command = [_modeConfig.script]
+            modeProcess.running = true
+        }
     }
 
-    function load() {
-        _allApps      = []
-        _filteredApps = []
-        listProcess.running = true
+    // Activate the default mode (the one with default: true in the registry).
+    // If the registry is empty, clears the UI.
+    function activateDefaultMode() {
+        const modes = _modes
+        for (const name in modes) {
+            if (modes[name]["default"]) { activateMode(name); return }
+        }
+        // Fallback: activate first available mode
+        for (const name in modes) { activateMode(name); return }
+        // No modes at all — clear the UI
+        _activeMode    = ""
+        _modeConfig    = {}
+        _allItems      = []
+        _filteredItems = []
+        _actions       = []
+        _mode          = "insert"
+        _pendingG      = false
+        searchField.text = ""
+        list.currentIndex = 0
+    }
+
+    // Push an item into a named mode's buffer.  The mode does not need to be
+    // active — items accumulate until itemsReady(mode) is called.
+    function addItem(mode, label, description, icon, callback, id) {
+        const buf = _itemBuf
+        if (!buf[mode]) buf[mode] = []
+        buf[mode].push({
+            label:       label       || "",
+            description: description || "",
+            icon:        icon        || "",
+            callback:    callback    || "",
+            id:          id          || label || ""
+        })
+        _itemBuf = buf
+    }
+
+    // Signal that all items for the named mode have been pushed.  Stores the
+    // parsed items and, if that mode is currently active, refreshes the display.
+    function itemsReady(mode) {
+        const buf = _itemBuf
+        const items = (buf[mode] || []).slice()
+        delete buf[mode]
+        _itemBuf = buf
+
+        const mi = {}
+        for (const k in _modeItems) mi[k] = _modeItems[k]
+        mi[mode] = items
+        _modeItems = mi
+
+        if (_activeMode === mode) {
+            _allItems = items
+            impl.runFilter()
+            if (_mode === "insert") searchField.forceActiveFocus()
+        }
+    }
+
+    // Register (or replace) a mode in the runtime registry.
+    function registerMode(name, script, frecency, hasActions, placeholder) {
+        const m = {}
+        for (const k in _modes) m[k] = _modes[k]
+        m[name] = {
+            script:      script      || "",
+            frecency:    !!frecency,
+            hasActions:  !!hasActions,
+            placeholder: placeholder || "Search...",
+            "default":   false
+        }
+        _modes = m
+    }
+
+    // Remove a mode from the runtime registry.  If the removed mode is
+    // currently active, returns to the default mode.
+    function removeMode(name) {
+        if (!(name in _modes)) return
+        const m = {}
+        for (const k in _modes) { if (k !== name) m[k] = _modes[k] }
+        _modes = m
+        if (_activeMode === name) activateDefaultMode()
+    }
+
+    // Return a space-separated list of registered mode names.
+    function listModes() {
+        return Object.keys(_modes).join(" ")
+    }
+
+    // Cycle to the next registered mode.
+    function nextMode() {
+        const names = Object.keys(_modes)
+        if (names.length <= 1) return
+        const idx = names.indexOf(_activeMode)
+        activateMode(names[(idx + 1) % names.length])
+    }
+
+    // Cycle to the previous registered mode.
+    function prevMode() {
+        const names = Object.keys(_modes)
+        if (names.length <= 1) return
+        const idx = names.indexOf(_activeMode)
+        activateMode(names[(idx - 1 + names.length) % names.length])
+    }
+
+    function reset() {
+        _activeMode    = ""
+        _modeConfig    = {}
+        _allItems      = []
+        _filteredItems = []
+        _modeItems     = {}
+        _itemBuf       = {}
+        _scriptBuf     = []
+        _actions       = []
+        _mode          = "insert"
+        _pendingG      = false
+        _lastSelection = ""
+        searchField.text = ""
+        list.currentIndex = 0
+        actionList.currentIndex = 0
+        searchDebounce.stop()
+        gTimer.stop()
     }
 
     function enterInsertMode() {
@@ -113,7 +280,6 @@ Item {
         _pendingG = false
     }
 
-    // Returns false if no actions; orchestrator does nothing extra.
     function typeText(text) {
         if (_mode !== "insert") enterInsertMode()
         searchField.text += text
@@ -122,11 +288,12 @@ Item {
     }
 
     function enterActionsMode() {
-        const app = selectedApp
-        if (!app) return false
+        if (!_modeConfig.hasActions) return false
+        const item = selectedItem
+        if (!item || !item.id) return false
 
-        const fv = Qt.createQmlObject('import Quickshell.Io; FileView { blockAllReads: true }', appList)
-        fv.path = app._filePath
+        const fv = Qt.createQmlObject('import Quickshell.Io; FileView { blockAllReads: true }', modeList)
+        fv.path = item.id
         const actions = []
         let inAction = false, name = "", exec = ""
         for (const line of fv.text().split("\n")) {
@@ -200,7 +367,7 @@ Item {
         }
         if (lk === "enter" || lk === "return") {
             if (_mode === "actions") { impl.launchAction(0); return true }
-            impl.launchApp(0); return true
+            impl.launchItem(0); return true
         }
         return false
     }
@@ -209,8 +376,7 @@ Item {
     QtObject {
         id: impl
 
-        // Parse a frecency store value "count:lastLaunchEpoch" → { count, last }.
-        // Returns zeros for missing / malformed entries so callers don't branch.
+        // ── Frecency ─────────────────────────────────────────────────────────
         function parseFrecency(raw: string): var {
             if (!raw) return { count: 0, last: 0 }
             const colon = raw.indexOf(":")
@@ -220,57 +386,56 @@ Item {
             return { count: isFinite(count) ? count : 0, last: isFinite(last) ? last : 0 }
         }
 
-        // Effective count at `nowSec`, applying exponential decay since last launch.
-        function effectiveCount(filePath: string, nowSec: int): real {
-            const entry = parseFrecency(frecencyStore.values[filePath] || "")
+        function effectiveCount(id: string, nowSec: int): real {
+            const entry = parseFrecency(frecencyStore.values[id] || "")
             if (entry.count <= 0) return 0
             const dt = Math.max(0, nowSec - entry.last)
-            return entry.count * Math.exp(-dt * Math.LN2 / appList._frecencyHalfLifeSec)
+            return entry.count * Math.exp(-dt * Math.LN2 / modeList._frecencyHalfLifeSec)
         }
 
-        // Log-scaled boost added to raw fuzzy score. Tuned so a frequently-used
-        // app (count ~= 8) adds ~9 points — enough to beat close fuzzy ties but
-        // not to swamp strong prefix matches.
-        function frecencyBoost(filePath: string, nowSec: int): real {
-            const c = effectiveCount(filePath, nowSec)
+        function frecencyBoost(id: string, nowSec: int): real {
+            const c = effectiveCount(id, nowSec)
             return c > 0 ? 3 * (Math.log(1 + c) / Math.LN2) : 0
         }
 
-        function recordLaunch(filePath: string): void {
-            if (!filePath) return
+        function recordLaunch(id: string): void {
+            if (!id) return
             const now = Math.floor(Date.now() / 1000)
-            const entry = parseFrecency(frecencyStore.values[filePath] || "")
+            const entry = parseFrecency(frecencyStore.values[id] || "")
             const dt = Math.max(0, now - entry.last)
-            const decayed = entry.count * Math.exp(-dt * Math.LN2 / appList._frecencyHalfLifeSec)
-            frecencyStore.set(filePath, (decayed + 1).toFixed(4) + ":" + now)
+            const decayed = entry.count * Math.exp(-dt * Math.LN2 / modeList._frecencyHalfLifeSec)
+            frecencyStore.set(id, (decayed + 1).toFixed(4) + ":" + now)
         }
 
-        function launchApp(workspace): void {
-            const app = selectedApp
-            if (!app) return
-            const terminal = (app.terminal === "true" || app.terminal === "True")
-            recordLaunch(app._filePath)
+        // ── Launch ───────────────────────────────────────────────────────────
+        function launchItem(workspace): void {
+            const item = modeList.selectedItem
+            if (!item) return
+            if (modeList._modeConfig.frecency) recordLaunch(item.id)
+            modeList._lastSelection = item.label
             flash(list.currentIndex)
-            launchRequested(app.exec.trim(), terminal, workspace)
+            launchRequested(item.callback.trim(), workspace)
         }
 
         function launchAction(workspace): void {
             const idx = actionList.currentIndex
-            if (idx < 0 || idx >= appList._actions.length) return
-            const action = appList._actions[idx]
-            const app = selectedApp
-            if (app) recordLaunch(app._filePath)
+            if (idx < 0 || idx >= modeList._actions.length) return
+            const action = modeList._actions[idx]
+            const item = modeList.selectedItem
+            if (item && modeList._modeConfig.frecency) recordLaunch(item.id)
+            modeList._lastSelection = action.name
             flash(actionList.currentIndex)
-            launchRequested(action.exec.trim(), false, workspace)
+            launchRequested(action.exec.trim(), workspace)
         }
 
+        // ── Key dispatch ─────────────────────────────────────────────────────
         function handleNormalKey(event): bool {
             if (event.text === "?") return false   // propagate → orchestrator opens help
             if (event.key === Qt.Key_Escape || event.text === "q") {
                 closeRequested(); return true
             }
             if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                launchApp(0); return true
+                launchItem(0); return true
             }
             if (event.key === Qt.Key_J || event.key === Qt.Key_Down) {
                 navDown(); return true
@@ -282,8 +447,8 @@ Item {
                 navBottom(); return true
             }
             if (event.key === Qt.Key_G) {
-                if (appList._pendingG) { gTimer.stop(); navTop(); appList._pendingG = false }
-                else                   { appList._pendingG = true; gTimer.restart() }
+                if (modeList._pendingG) { gTimer.stop(); navTop(); modeList._pendingG = false }
+                else                    { modeList._pendingG = true; gTimer.restart() }
                 return true
             }
             if (event.key === Qt.Key_D && (event.modifiers & Qt.ControlModifier)) {
@@ -292,16 +457,22 @@ Item {
             if (event.key === Qt.Key_U && (event.modifiers & Qt.ControlModifier)) {
                 navHalfUp(); return true
             }
-            if (event.key === Qt.Key_Tab || event.text === "l") {
+            if ((event.key === Qt.Key_Tab || event.text === "l") && modeList._modeConfig.hasActions) {
                 enterActionsMode(); return true
             }
             if (event.key === Qt.Key_Slash) {
                 enterInsertMode(); return true
             }
+            if (event.key === Qt.Key_BracketRight) {
+                modeList.nextMode(); return true
+            }
+            if (event.key === Qt.Key_BracketLeft) {
+                modeList.prevMode(); return true
+            }
             // Ctrl+1–9: launch on workspace N
             if (event.modifiers & Qt.ControlModifier) {
                 const n = event.key - Qt.Key_1 + 1
-                if (n >= 1 && n <= 9) { launchApp(n); return true }
+                if (n >= 1 && n <= 9) { launchItem(n); return true }
             }
             return false
         }
@@ -324,8 +495,8 @@ Item {
                 navBottom(); return true
             }
             if (event.key === Qt.Key_G) {
-                if (appList._pendingG) { gTimer.stop(); navTop(); appList._pendingG = false }
-                else                   { appList._pendingG = true; gTimer.restart() }
+                if (modeList._pendingG) { gTimer.stop(); navTop(); modeList._pendingG = false }
+                else                    { modeList._pendingG = true; gTimer.restart() }
                 return true
             }
             if (event.key === Qt.Key_D && (event.modifiers & Qt.ControlModifier)) {
@@ -342,23 +513,26 @@ Item {
             return false
         }
 
+        // ── Filter ───────────────────────────────────────────────────────────
         // Supports: fuzzy (default), ' exact, ^ prefix, $ suffix, ! negation.
-        // Space-separated tokens combine with AND. Fuzzy scores get a
-        // frecency boost so frequently-used apps surface higher (and dominate
-        // empty-query ordering).
+        // Space-separated tokens combine with AND.  Modes with frecency
+        // enabled get a log-scaled boost so frequently-used items rank higher.
         function runFilter(): void {
             const q = searchField.text.trim().toLowerCase()
             const nowSec = Math.floor(Date.now() / 1000)
+            const useFrecency = !!modeList._modeConfig.frecency
 
             if (!q) {
-                const apps = appList._allApps.slice()
-                apps.sort((a, b) => {
-                    const cb = effectiveCount(b._filePath, nowSec)
-                    const ca = effectiveCount(a._filePath, nowSec)
-                    if (cb !== ca) return cb - ca
-                    return a.name.localeCompare(b.name)
-                })
-                appList._filteredApps = apps
+                const items = modeList._allItems.slice()
+                if (useFrecency) {
+                    items.sort((a, b) => {
+                        const cb = effectiveCount(b.id, nowSec)
+                        const ca = effectiveCount(a.id, nowSec)
+                        if (cb !== ca) return cb - ca
+                        return a.label.localeCompare(b.label)
+                    })
+                }
+                modeList._filteredItems = items
                 list.currentIndex = 0
                 return
             }
@@ -366,9 +540,9 @@ Item {
             const tokens = q.split(/\s+/).filter(t => t.length > 0)
             const scored = []
 
-            for (const app of appList._allApps) {
-                const nameLow = app.name.toLowerCase()
-                const haystack = nameLow + " " + app.comment.toLowerCase()
+            for (const item of modeList._allItems) {
+                const labelLow = item.label.toLowerCase()
+                const haystack = labelLow + " " + item.description.toLowerCase()
                 let totalScore = 0
                 let matched = true
 
@@ -387,11 +561,11 @@ Item {
                     } else if (token.startsWith("^")) {
                         const needle = token.slice(1)
                         if (!needle) continue
-                        if (!nameLow.startsWith(needle)) { matched = false; break }
+                        if (!labelLow.startsWith(needle)) { matched = false; break }
                     } else if (token.startsWith("$")) {
                         const needle = token.slice(1)
                         if (!needle) continue
-                        if (!nameLow.endsWith(needle)) { matched = false; break }
+                        if (!labelLow.endsWith(needle)) { matched = false; break }
                     } else {
                         const score = fuzzy.fuzzyScore(token, haystack)
                         if (score < 0) { matched = false; break }
@@ -399,23 +573,26 @@ Item {
                     }
                 }
 
-                if (matched) scored.push({ app, score: totalScore + frecencyBoost(app._filePath, nowSec) })
+                if (matched) {
+                    const boost = useFrecency ? frecencyBoost(item.id, nowSec) : 0
+                    scored.push({ item, score: totalScore + boost })
+                }
             }
 
             scored.sort((a, b) => b.score - a.score)
-            appList._filteredApps = scored.map(s => s.app)
+            modeList._filteredItems = scored.map(s => s.item)
             list.currentIndex = 0
         }
     }
 
-    // ── Processes ─────────────────────────────────────────────────────────────
+    // ── Process — runs the mode's script ──────────────────────────────────────
     Process {
-        id: listProcess
-        command: [bin.scanApps]
+        id: modeProcess
+        command: []
         stdout: SplitParser {
-            onRead: (line) => functionality.onAppRead(line)
+            onRead: (line) => functionality.onItemRead(line)
         }
-        onExited: functionality.onAppsLoaded()
+        onExited: functionality.onItemsLoaded()
     }
 
     Timer {
@@ -439,7 +616,7 @@ Item {
         // ui only — search field text change
         function onSearchTextChanged(): void { list.currentIndex = 0; searchDebounce.restart() }
         // ui only — Esc/Return in insert mode
-        function searchEscape(): void        { appList._mode = "normal"; appList.searchEscapePressed() }
+        function searchEscape(): void        { modeList._mode = "normal"; modeList.searchEscapePressed() }
         // ui only — Ctrl+* emacs bindings in search field
         function handleSearchCtrlKey(event): void {
             if (!(event.modifiers & Qt.ControlModifier)) return
@@ -464,32 +641,44 @@ Item {
         function clampListIndex(): void    { if (list.count > 0 && list.currentIndex < 0) list.currentIndex = 0 }
         // ui only — clamp actionList currentIndex on model count change
         function clampActionIndex(): void  { if (actionList.count > 0 && actionList.currentIndex < 0) actionList.currentIndex = 0 }
-        // ui only — accumulate one line from the app list process
-        function onAppRead(line: string): void { if (line !== "") appList._appBuf.push(line) }
-        // ui only — parse buffered app lines and populate the app list
-        function onAppsLoaded(): void {
-            const apps = []
-            for (const line of appList._appBuf) {
+        // ui only — accumulate one line from the mode script
+        function onItemRead(line: string): void { if (line !== "") modeList._scriptBuf.push(line) }
+        // ui only — mode chip clicked
+        function onModeChipClicked(name: string): void { modeList.activateMode(name) }
+        // ui only — parse buffered lines and populate the item list for the active mode
+        function onItemsLoaded(): void {
+            const mode = modeList._activeMode
+            const items = []
+            for (const line of modeList._scriptBuf) {
                 const parts = line.split("\t")
                 if (parts.length < 2) continue
-                apps.push({
-                    _filePath: parts[0] || "",
-                    name:      parts[1] || "",
-                    exec:      parts[2] || "",
-                    comment:   parts[3] || "",
-                    terminal:  parts[4] || "false",
-                    icon:      parts[5] || ""
+                items.push({
+                    label:       parts[0] || "",
+                    description: parts[1] || "",
+                    icon:        parts[2] || "",
+                    callback:    parts[3] || "",
+                    id:          parts[4] || parts[0] || ""
                 })
             }
-            appList._allApps = apps
-            appList._appBuf  = []
-            impl.runFilter()
-            if (appList._mode === "insert") searchField.forceActiveFocus()
+            modeList._scriptBuf = []
+
+            // Store in per-mode cache
+            const mi = {}
+            for (const k in modeList._modeItems) mi[k] = modeList._modeItems[k]
+            mi[mode] = items
+            modeList._modeItems = mi
+
+            // If still the active mode, display
+            if (modeList._activeMode === mode) {
+                modeList._allItems = items
+                impl.runFilter()
+                if (modeList._mode === "insert") searchField.forceActiveFocus()
+            }
         }
         // ui only — run the filter (called by debounce timer)
         function runFilter(): void { impl.runFilter() }
         // ui only — clear the pending-G double-tap flag
-        function clearPendingG(): void { appList._pendingG = false }
+        function clearPendingG(): void { modeList._pendingG = false }
     }
 
     // ── UI ────────────────────────────────────────────────────────────────────
@@ -511,17 +700,17 @@ Item {
                 anchors.left: parent.left
                 anchors.leftMargin: 10
                 anchors.verticalCenter: parent.verticalCenter
-                visible: appList._mode !== "insert"
+                visible: modeList._mode !== "insert"
                 width: modeLabel.implicitWidth + 12
                 height: 22
                 radius: 4
-                color: appList._mode === "actions" ? cfg.color.base0B + "33" : cfg.color.base02
+                color: modeList._mode === "actions" ? cfg.color.base0B + "33" : cfg.color.base02
 
                 Text {
                     id: modeLabel
                     anchors.centerIn: parent
-                    text: appList.modeText
-                    color: appList._mode === "actions" ? cfg.color.base0B : cfg.color.base0D
+                    text: modeList.modeText
+                    color: modeList._mode === "actions" ? cfg.color.base0B : cfg.color.base0D
                     font.family: cfg.fontFamily
                     font.pixelSize: cfg.fontSize - 3
                     font.bold: true
@@ -531,31 +720,31 @@ Item {
             TextInput {
                 id: searchField
                 anchors.fill: parent
-                anchors.leftMargin: appList._mode !== "insert" ? modeTag.width + 18 : 14
+                anchors.leftMargin: modeList._mode !== "insert" ? modeTag.width + 18 : 14
                 anchors.rightMargin: 14
-                color: appList._mode === "actions" ? "transparent" : cfg.color.base05
+                color: modeList._mode === "actions" ? "transparent" : cfg.color.base05
                 font.family: cfg.fontFamily
                 font.pixelSize: cfg.fontSize
                 clip: true
                 verticalAlignment: TextInput.AlignVCenter
-                readOnly: appList._mode !== "insert"
+                readOnly: modeList._mode !== "insert"
 
                 Text {
                     anchors.fill: parent
-                    visible: !searchField.text && appList._mode === "insert"
-                    text: "Search applications..."
+                    visible: !searchField.text && modeList._mode === "insert"
+                    text: modeList.placeholder
                     color: cfg.color.base03
                     font.family: cfg.fontFamily
                     font.pixelSize: cfg.fontSize
                     verticalAlignment: Text.AlignVCenter
                 }
 
-                // Actions mode: show selected app name in the bar
+                // Actions mode: show selected item label in the bar
                 Text {
                     anchors.fill: parent
                     anchors.leftMargin: modeTag.width + 8
-                    visible: appList._mode === "actions" && appList.selectedApp !== null
-                    text: appList.selectedApp ? "Actions \u2014 " + appList.selectedApp.name : ""
+                    visible: modeList._mode === "actions" && modeList.selectedItem !== null
+                    text: modeList.selectedItem ? "Actions \u2014 " + modeList.selectedItem.label : ""
                     color: cfg.color.base04
                     font.family: cfg.fontFamily
                     font.pixelSize: cfg.fontSize
@@ -570,45 +759,91 @@ Item {
             }
         }
 
-        // App list ────────────────────────────────────────────────────────────
+        // Mode bar ─────────────────────────────────────────────────────────────
+        Rectangle {
+            id: modeBar
+            width: parent.width
+            height: 30
+            color: "transparent"
+            visible: modeList.modeNames.length > 0
+
+            Row {
+                anchors.left: parent.left
+                anchors.leftMargin: 4
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 6
+
+                Repeater {
+                    model: modeList.modeNames
+
+                    Rectangle {
+                        required property string modelData
+                        required property int index
+                        width: chipLabel.implicitWidth + 16
+                        height: 22
+                        radius: 6
+                        color: modelData === modeList._activeMode ? cfg.color.base0D + "33" : cfg.color.base02
+
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: functionality.onModeChipClicked(modelData)
+                        }
+
+                        Text {
+                            id: chipLabel
+                            anchors.centerIn: parent
+                            text: modelData
+                            color: modelData === modeList._activeMode ? cfg.color.base0D : cfg.color.base04
+                            font.family: cfg.fontFamily
+                            font.pixelSize: cfg.fontSize - 3
+                            font.bold: modelData === modeList._activeMode
+                        }
+                    }
+                }
+            }
+        }
+
+        // Item list ───────────────────────────────────────────────────────────
         ListView {
             id: list
             width: parent.width
-            height: parent.height - searchBox.height - parent.spacing
+            height: parent.height - searchBox.height - (modeBar.visible ? modeBar.height + parent.spacing : 0) - parent.spacing
             clip: true
             currentIndex: 0
-            model: appList._filteredApps
-            visible: appList._mode !== "actions"
+            model: modeList._filteredItems
+            visible: modeList._mode !== "actions"
             highlightMoveDuration: 0
 
             onCountChanged: functionality.clampListIndex()
 
             Text {
                 anchors.centerIn: parent
-                visible: list.count === 0 && appList._mode !== "actions"
-                text: appList._allApps.length === 0 ? "Loading..." : "No results"
+                visible: list.count === 0 && modeList._mode !== "actions"
+                text: modeList._activeMode === "" ? "No mode active"
+                    : modeList._allItems.length === 0 ? "Loading..." : "No results"
                 color: cfg.color.base03
                 font.family: cfg.fontFamily
                 font.pixelSize: cfg.fontSize
             }
 
             delegate: Item {
-                id: appDelegate
+                id: itemDelegate
                 required property var modelData
                 required property int index
                 width: list.width
-                height: modelData.comment !== "" ? 52 : 40
+                height: modelData.description !== "" ? 52 : 40
 
                 readonly property bool isCurrent: list.currentIndex === index
 
                 Rectangle {
                     anchors.fill: parent
                     anchors.margins: 2
-                    color: appDelegate.isCurrent ? cfg.color.base02 : "transparent"
+                    color: itemDelegate.isCurrent ? cfg.color.base02 : "transparent"
                     radius: 6
 
                     Item {
-                        id: appIcon
+                        id: itemIcon
                         anchors.left: parent.left
                         anchors.leftMargin: 10
                         anchors.verticalCenter: parent.verticalCenter
@@ -616,7 +851,7 @@ Item {
                         height: 32
 
                         Image {
-                            id: appIconImage
+                            id: itemIconImage
                             anchors.fill: parent
                             source: modelData.icon !== "" ? ("file://" + modelData.icon) : ""
                             fillMode: Image.PreserveAspectFit
@@ -627,13 +862,13 @@ Item {
 
                         Rectangle {
                             anchors.fill: parent
-                            visible: appIconImage.status !== Image.Ready
+                            visible: itemIconImage.status !== Image.Ready
                             color: cfg.color.base02
                             radius: 6
 
                             Text {
                                 anchors.centerIn: parent
-                                text: modelData.name.charAt(0).toUpperCase()
+                                text: modelData.label.charAt(0).toUpperCase()
                                 color: cfg.color.base05
                                 font.family: cfg.fontFamily
                                 font.pixelSize: 16
@@ -644,14 +879,14 @@ Item {
 
                     Column {
                         anchors.verticalCenter: parent.verticalCenter
-                        anchors.left: appIcon.right
+                        anchors.left: itemIcon.right
                         anchors.right: parent.right
                         anchors.leftMargin: 8
                         anchors.rightMargin: 12
                         spacing: 1
 
                         Text {
-                            text: modelData.name
+                            text: modelData.label
                             color: cfg.color.base05
                             font.family: cfg.fontFamily
                             font.pixelSize: cfg.fontSize
@@ -660,8 +895,8 @@ Item {
                         }
 
                         Text {
-                            visible: modelData.comment !== ""
-                            text: modelData.comment
+                            visible: modelData.description !== ""
+                            text: modelData.description
                             color: cfg.color.base03
                             font.family: cfg.fontFamily
                             font.pixelSize: cfg.fontSize - 2
@@ -690,17 +925,17 @@ Item {
                     }
 
                     QtObject {
-                        id: appDelegateFunctionality
+                        id: itemDelegateFunctionality
                         // ui only
                         function onFlashRequested(idx: int): void {
-                            if (appList._mode !== "actions" && idx === appDelegate.index)
+                            if (modeList._mode !== "actions" && idx === itemDelegate.index)
                                 blinkAnim.restart()
                         }
                     }
 
                     Connections {
-                        target: appList
-                        function onFlashRequested(idx) { appDelegateFunctionality.onFlashRequested(idx) }
+                        target: modeList
+                        function onFlashRequested(idx) { itemDelegateFunctionality.onFlashRequested(idx) }
                     }
                 }
             }
@@ -710,11 +945,11 @@ Item {
         ListView {
             id: actionList
             width: parent.width
-            height: parent.height - searchBox.height - parent.spacing
+            height: parent.height - searchBox.height - (modeBar.visible ? modeBar.height + parent.spacing : 0) - parent.spacing
             clip: true
             currentIndex: 0
-            model: appList._actions
-            visible: appList._mode === "actions"
+            model: modeList._actions
+            visible: modeList._mode === "actions"
             highlightMoveDuration: 0
 
             onCountChanged: functionality.clampActionIndex()
@@ -745,8 +980,8 @@ Item {
                         Image {
                             id: actionIconImage
                             anchors.fill: parent
-                            source: appList.selectedApp && appList.selectedApp.icon !== ""
-                                    ? ("file://" + appList.selectedApp.icon) : ""
+                            source: modeList.selectedItem && modeList.selectedItem.icon !== ""
+                                    ? ("file://" + modeList.selectedItem.icon) : ""
                             fillMode: Image.PreserveAspectFit
                             sourceSize: Qt.size(28, 28)
                             smooth: true
@@ -761,7 +996,7 @@ Item {
 
                             Text {
                                 anchors.centerIn: parent
-                                text: appList.selectedApp ? appList.selectedApp.name.charAt(0).toUpperCase() : ""
+                                text: modeList.selectedItem ? modeList.selectedItem.label.charAt(0).toUpperCase() : ""
                                 color: cfg.color.base05
                                 font.family: cfg.fontFamily
                                 font.pixelSize: 14
@@ -807,13 +1042,13 @@ Item {
                         id: actionDelegateFunctionality
                         // ui only
                         function onFlashRequested(idx: int): void {
-                            if (appList._mode === "actions" && idx === actionDelegate.index)
+                            if (modeList._mode === "actions" && idx === actionDelegate.index)
                                 actionBlinkAnim.restart()
                         }
                     }
 
                     Connections {
-                        target: appList
+                        target: modeList
                         function onFlashRequested(idx) { actionDelegateFunctionality.onFlashRequested(idx) }
                     }
                 }

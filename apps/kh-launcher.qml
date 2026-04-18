@@ -4,7 +4,7 @@
 // Toggle: quickshell ipc -c kh-launcher call launcher toggle
 //
 // This file owns: window, IPC, global launch dispatch, focus routing, and
-// HelpOverlay. All app list and actions logic lives in AppList.
+// HelpOverlay.  All mode, item, and navigation logic lives in ModeList.
 import QtQuick
 import Quickshell
 import Quickshell.Io
@@ -25,17 +25,15 @@ ShellRoot {
     // ── Launch ────────────────────────────────────────────────────────────────
     QtObject {
         id: impl
-        function launchApp(exec, terminal, workspace): void {
-            let cmd = exec
-            if (terminal) cmd = bin.terminal + " -- bash -c " + JSON.stringify(cmd)
-
+        function launchCallback(callback, workspace): void {
+            if (!callback) return
             if (workspace > 0) {
                 launchProcess.command = [
                     bin.hyprctl, "dispatch", "exec",
-                    "[workspace " + workspace + "] " + cmd
+                    "[workspace " + workspace + "] " + callback
                 ]
             } else {
-                launchProcess.command = [bin.bash, "-c", cmd + " &>/dev/null &"]
+                launchProcess.command = [bin.bash, "-c", callback + " &>/dev/null &"]
             }
             launchProcess.running = true
             closeTimer.restart()
@@ -47,23 +45,23 @@ ShellRoot {
         id: functionality
 
         // ui+ipc
-        function toggle(): void                  { root.showing = !root.showing }
+        function toggle(): void                      { root.showing = !root.showing }
         // ipc only
-        function open(): void                    { root.showing = true }
+        function open(): void                        { root.showing = true }
         // ui+ipc
-        function close(): void                   { root.showing = false }
+        function close(): void                       { root.showing = false }
         // ipc only
-        function launch(): void                  { if (list.selectedApp) impl.launchApp(list.selectedApp.exec, list.selectedApp.terminal, 0) }
+        function launch(): void                      { if (list.selectedItem) impl.launchCallback(list.selectedItem.callback, 0) }
         // ipc only
-        function launchOnWorkspace(n: int): void { if (list.selectedApp) impl.launchApp(list.selectedApp.exec, list.selectedApp.terminal, n) }
+        function launchOnWorkspace(n: int): void     { if (list.selectedItem) impl.launchCallback(list.selectedItem.callback, n) }
         // ipc only
-        function enterActionsMode(): void        { list.enterActionsMode() }
+        function enterActionsMode(): void            { list.enterActionsMode() }
         // ui+ipc (via setMode / handleKeyEvent)
-        function enterInsertMode(): void         { list.enterInsertMode() }
+        function enterInsertMode(): void             { list.enterInsertMode() }
         // ui+ipc (via setMode / handleKeyEvent)
-        function enterNormalMode(): void         { list.enterNormalMode(); normalModeHandler.forceActiveFocus() }
+        function enterNormalMode(): void             { list.enterNormalMode(); normalModeHandler.forceActiveFocus() }
         // ipc only
-        function setMode(m: string): void        { if (m === "insert") enterInsertMode(); else enterNormalMode() }
+        function setMode(m: string): void            { if (m === "insert") enterInsertMode(); else enterNormalMode() }
         // ipc only
         function nav(dir: string): void {
             const d = dir.toLowerCase()
@@ -73,11 +71,11 @@ ShellRoot {
             else if (d === "bottom") list.navBottom()
         }
         // ui+ipc (via key / handleKeyEvent)
-        function openHelp(): void                { helpOverlay.open() }
+        function openHelp(): void                    { helpOverlay.open() }
         // ui+ipc (via key / handleKeyEvent)
-        function closeHelp(): void               { helpOverlay.close() }
+        function closeHelp(): void                   { helpOverlay.close() }
         // ipc only (via key)
-        function toggleHelp(): void              { helpOverlay.showing ? helpOverlay.close() : helpOverlay.open() }
+        function toggleHelp(): void                  { helpOverlay.showing ? helpOverlay.close() : helpOverlay.open() }
         // ipc only
         function type(text: string): void {
             if (helpOverlay.showing) { helpOverlay._filtering = true; helpOverlay._filterText += text }
@@ -91,12 +89,42 @@ ShellRoot {
             else if (lk === "escape" || lk === "esc")  { if (helpOverlay.showing) closeHelp(); else list.handleIpcKey(k) }
             else                                        list.handleIpcKey(k)
         }
+        // ipc only — activate a named mode (registered or ad-hoc); opens the launcher
+        function activateMode(name: string): void {
+            list.activateMode(name)
+            root.showing = true
+            normalModeHandler.forceActiveFocus()
+        }
+        // ipc only — push an item into a named mode's buffer
+        function addItem(mode: string, label: string, description: string, icon: string, callback: string): void {
+            list.addItem(mode, label, description, icon, callback, label)
+        }
+        // ipc only — push an item with an explicit id into a named mode's buffer
+        function addItemWithId(mode: string, label: string, description: string, icon: string, callback: string, id: string): void {
+            list.addItem(mode, label, description, icon, callback, id)
+        }
+        // ipc only — signal all items for the named mode have been pushed
+        function itemsReady(mode: string): void      { list.itemsReady(mode) }
+        // ipc only — return to the default mode
+        function returnToDefault(): void             { list.activateDefaultMode() }
+        // ipc only — register or replace a mode in the runtime registry
+        function registerMode(name: string, script: string, frecency: bool, hasActions: bool, placeholder: string): void {
+            list.registerMode(name, script, frecency, hasActions, placeholder)
+        }
+        // ipc only — remove a mode from the runtime registry
+        function removeMode(name: string): void      { list.removeMode(name) }
+        // ipc only — list registered mode names
+        function listModes(): string                 { return list.listModes() }
+        // ui+ipc — cycle to the next registered mode
+        function nextMode(): void                    { list.nextMode() }
+        // ui+ipc — cycle to the previous registered mode
+        function prevMode(): void                    { list.prevMode() }
         // ui only
-        function onShow(): void           { list.reset(); list.load(); helpOverlay.close(); normalModeHandler.forceActiveFocus() }
+        function onShow(): void                      { list.reset(); list.activateDefaultMode(); helpOverlay.close(); normalModeHandler.forceActiveFocus() }
         // ui only
-        function onVisibleChanged(): void { if (root.showing) onShow() }
+        function onVisibleChanged(): void            { if (root.showing) onShow() }
         // ui only
-        function onLaunchRequested(exec, terminal, workspace): void { impl.launchApp(exec, terminal, workspace) }
+        function onLaunchRequested(callback, workspace): void { impl.launchCallback(callback, workspace) }
         // ui only
         function handleKeyEvent(event): void {
             if (event.key === Qt.Key_Shift || event.key === Qt.Key_Control ||
@@ -111,21 +139,48 @@ ShellRoot {
     // ── IPC ───────────────────────────────────────────────────────────────────
     IpcHandler {
         target: "launcher"
-        readonly property bool   showing:         root.showing
-        readonly property string mode:           list.mode
-        readonly property string selectedAppName: list.selectedApp ? list.selectedApp.name : ""
-        readonly property string selectedAppExec: list.selectedApp ? list.selectedApp.exec : ""
+        // Window state
+        readonly property bool   showing:          root.showing
+        // Input mode
+        readonly property string mode:             list.mode
+        // Active content mode
+        readonly property string activeMode:       list.activeModeName
+        // Selection
+        readonly property string selectedLabel:    list.selectedItem ? list.selectedItem.label : ""
+        readonly property string selectedCallback: list.selectedItem ? list.selectedItem.callback : ""
+        readonly property int    selectedIndex:    list.selectedItem ? list.filteredCount > 0 ? 0 : -1 : -1
+        readonly property int    itemCount:        list.filteredCount
+        // Last launched item label
+        readonly property string lastSelection:    list.lastSelection
 
-        function toggle(): void                  { functionality.toggle() }
-        function open(): void                    { functionality.open() }
-        function close(): void                   { functionality.close() }
-        function launch(): void                  { functionality.launch() }
-        function launchOnWorkspace(n: int): void { functionality.launchOnWorkspace(n) }
-        function enterActionsMode(): void        { functionality.enterActionsMode() }
-        function setMode(m: string): void        { functionality.setMode(m) }
-        function nav(dir: string): void          { functionality.nav(dir) }
-        function key(k: string): void            { functionality.key(k) }
-        function type(text: string): void        { functionality.type(text) }
+        // Window
+        function toggle(): void                       { functionality.toggle() }
+        function open(): void                         { functionality.open() }
+        function close(): void                        { functionality.close() }
+        // Launch
+        function launch(): void                       { functionality.launch() }
+        function launchOnWorkspace(n: int): void      { functionality.launchOnWorkspace(n) }
+        // Input mode
+        function enterActionsMode(): void             { functionality.enterActionsMode() }
+        function setMode(m: string): void             { functionality.setMode(m) }
+        // Navigation
+        function nav(dir: string): void               { functionality.nav(dir) }
+        // Key dispatch
+        function key(k: string): void                 { functionality.key(k) }
+        // Text input
+        function type(text: string): void             { functionality.type(text) }
+        // Mode system
+        function activateMode(name: string): void     { functionality.activateMode(name) }
+        function addItem(mode: string, label: string, description: string, icon: string, callback: string): void { functionality.addItem(mode, label, description, icon, callback) }
+        function addItemWithId(mode: string, label: string, description: string, icon: string, callback: string, id: string): void { functionality.addItemWithId(mode, label, description, icon, callback, id) }
+        function itemsReady(mode: string): void       { functionality.itemsReady(mode) }
+        function returnToDefault(): void              { functionality.returnToDefault() }
+        // Mode registry
+        function registerMode(name: string, script: string, frecency: bool, hasActions: bool, placeholder: string): void { functionality.registerMode(name, script, frecency, hasActions, placeholder) }
+        function removeMode(name: string): void       { functionality.removeMode(name) }
+        function listModes(): string                  { return functionality.listModes() }
+        function nextMode(): void                     { functionality.nextMode() }
+        function prevMode(): void                     { functionality.prevMode() }
     }
 
     // ── Window ────────────────────────────────────────────────────────────────
@@ -192,7 +247,7 @@ ShellRoot {
                     anchors.right: parent.right
                     anchors.rightMargin: 4
                     anchors.verticalCenter: parent.verticalCenter
-                    text: list.filteredCount + " apps"
+                    text: list.filteredCount + " items"
                     color: cfg.color.base03
                     font.family: cfg.fontFamily
                     font.pixelSize: cfg.fontSize - 3
@@ -200,7 +255,7 @@ ShellRoot {
             }
 
             // Content
-            AppList {
+            ModeList {
                 id: list
                 anchors.top: parent.top
                 anchors.left: parent.left
@@ -209,7 +264,7 @@ ShellRoot {
 
                 onSearchEscapePressed: functionality.enterNormalMode()
                 onCloseRequested:      functionality.close()
-                onLaunchRequested:     (exec, terminal, workspace) => functionality.onLaunchRequested(exec, terminal, workspace)
+                onLaunchRequested:     (callback, workspace) => functionality.onLaunchRequested(callback, workspace)
             }
 
             // Help overlay
@@ -228,7 +283,7 @@ ShellRoot {
                         { key: "Ctrl+U",     desc: "half-page up" },
                         { key: "Enter",      desc: "launch action" },
                         { key: "Ctrl+1\u20139", desc: "launch on workspace" },
-                        { key: "h / Esc",    desc: "back to app list" }
+                        { key: "h / Esc",    desc: "back to item list" }
                     ]
                 }] : [{
                     title: "NORMAL MODE",
@@ -239,8 +294,9 @@ ShellRoot {
                         { key: "G",          desc: "jump to bottom" },
                         { key: "Ctrl+D",     desc: "half-page down" },
                         { key: "Ctrl+U",     desc: "half-page up" },
-                        { key: "Enter",      desc: "launch app" },
-                        { key: "l / Tab",    desc: "actions for app" },
+                        { key: "Enter",      desc: "launch" },
+                        { key: "l / Tab",    desc: "actions for item" },
+                        { key: "[ / ]",      desc: "switch mode" },
                         { key: "Ctrl+1\u20139", desc: "launch on workspace" },
                         { key: "/",          desc: "focus search" },
                         { key: "q / Esc",    desc: "close" }
@@ -262,9 +318,9 @@ ShellRoot {
                     title: "SEARCH FILTERS",
                     bindings: [
                         { key: "'foo",  desc: "exact substring match" },
-                        { key: "^foo",  desc: "name prefix match" },
-                        { key: "$foo",  desc: "name suffix match" },
-                        { key: "!foo",  desc: "exclude matching apps" },
+                        { key: "^foo",  desc: "label prefix match" },
+                        { key: "$foo",  desc: "label suffix match" },
+                        { key: "!foo",  desc: "exclude matching items" },
                         { key: "a b",   desc: "AND: must match both tokens" }
                     ]
                 }]
