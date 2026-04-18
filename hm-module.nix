@@ -80,7 +80,7 @@ in
     theme = {
       colors = lib.mkOption {
         type = lib.types.attrsOf lib.types.str;
-        default = import (src + "/themes/default-dark.nix");
+        default = import (src + "/themes/default-light.nix");
         description = ''
           Base16 color palette (hex strings without #). Defaults to a
           neutral dark palette. Theming integrations (e.g. Stylix) can

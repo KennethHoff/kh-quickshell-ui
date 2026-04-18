@@ -10,7 +10,7 @@
       pkgs = nixpkgs.legacyPackages.${system};
       lib = pkgs.lib;
 
-      defaultColors = import ./themes/default-dark.nix;
+      defaultColors = import ./themes/default-light.nix;
 
       # Named QML module directories for qmltestrunner / devShell.
       nixGenDir = pkgs.runCommand "nix-gen-dir" { } ''
