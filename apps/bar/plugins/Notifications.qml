@@ -5,8 +5,6 @@ import Quickshell.Io
 import Quickshell.Services.Notifications
 
 BarPlugin {
-    NixConfig { id: cfg }
-
     NotificationServer {
         id: server
         keepOnReload: true
@@ -46,14 +44,11 @@ BarPlugin {
     }
 
     visible: state.unreadCount > 0
-    implicitWidth: visible ? label.implicitWidth + 24 : 0
+    implicitWidth: visible ? _bell.implicitWidth + 24 : 0
 
-    Text {
-        id: label
+    BarIcon {
+        id: _bell
         anchors.centerIn: parent
-        color: cfg.color.base05
-        font.family:    cfg.fontFamily
-        font.pixelSize: cfg.fontSize - 1
-        text: "\uF0F3"
+        glyph: "\uF0F3"
     }
 }

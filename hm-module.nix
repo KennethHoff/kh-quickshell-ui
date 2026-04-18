@@ -227,8 +227,8 @@ in
 
           Built-in layout / composition types:
           BarRow, BarSpacer, BarPipe, BarGroup, BarDropdown, BarText,
-          ControlTile, TailscalePanel, EthernetPanel, TailscalePeers,
-          DropdownHeader, DropdownDivider, DropdownItem.
+          BarIcon, ControlTile, TailscalePanel, EthernetPanel,
+          TailscalePeers, DropdownHeader, DropdownDivider, DropdownItem.
 
           Example — network + audio grouped behind one button:
           <programlisting>
