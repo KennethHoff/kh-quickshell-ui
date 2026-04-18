@@ -12,6 +12,7 @@ pkgs.writeText "NixBins.qml" ''
     QtObject {
         readonly property string bash:     "${lib.getExe' pkgs.bash "bash"}"
         readonly property string cliphist: "${lib.getExe pkgs.cliphist}"
+        readonly property string curl:     "${lib.getExe pkgs.curl}"
         readonly property string hyprctl:  "${lib.getExe' pkgs.hyprland "hyprctl"}"
         readonly property string jq:       "${lib.getExe pkgs.jq}"
   readonly property string stat:     "${lib.getExe' pkgs.coreutils "stat"}"

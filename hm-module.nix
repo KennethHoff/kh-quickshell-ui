@@ -263,6 +263,24 @@ in
           in the <option>structure</option> string.
         '';
       };
+      environment = lib.mkOption {
+        type = lib.types.attrsOf lib.types.str;
+        default = { };
+        description = ''
+          Environment variables passed to the kh-bar service with direct values.
+          Use for non-secret configuration values. Secret values should be passed
+          via <option>environmentFiles</option> instead.
+        '';
+      };
+      environmentFiles = lib.mkOption {
+        type = lib.types.listOf lib.types.path;
+        default = [ ];
+        description = ''
+          Paths to files containing environment variables to source for the kh-bar service.
+          Use this to pass secret values (e.g., API keys from sops/agenix).
+          Each file should contain VAR=value lines that will be sourced by systemd.
+        '';
+      };
     };
   };
 
@@ -364,7 +382,7 @@ in
       (lib.mkIf config.programs.kh-ui.enable {
         systemd.user.services =
           let
-            mkQsService = configName: {
+            mkQsService = configName: serviceOpts: {
               Unit = {
                 Description = "Quickshell instance: ${configName}";
                 PartOf = [ "graphical-session.target" ];
@@ -377,12 +395,13 @@ in
                 ExecStart = "${lib.getExe pkgs.quickshell} -p ${qsConfigs.${configName}}";
                 Restart = "on-failure";
                 RestartSec = 2;
-              };
+              }
+              // serviceOpts;
               Install.WantedBy = [ "graphical-session.target" ];
             };
           in
           lib.optionalAttrs config.programs.kh-ui.clipboard-history.enable {
-            kh-cliphist = mkQsService "kh-cliphist";
+            kh-cliphist = mkQsService "kh-cliphist" { };
             kh-cliphist-store = {
               Unit = {
                 Description = "Clipboard history store (wl-paste -> cliphist)";
@@ -398,13 +417,16 @@ in
             };
           }
           // lib.optionalAttrs config.programs.kh-ui.launcher.enable {
-            kh-launcher = mkQsService "kh-launcher";
+            kh-launcher = mkQsService "kh-launcher" { };
           }
           // lib.optionalAttrs config.programs.kh-ui.bar.enable {
-            kh-bar = mkQsService "kh-bar";
+            kh-bar = mkQsService "kh-bar" {
+              Environment = lib.mapAttrsToList (k: v: "${k}=${v}") config.programs.kh-ui.bar.environment;
+              EnvironmentFiles = config.programs.kh-ui.bar.environmentFiles;
+            };
           }
           // lib.optionalAttrs config.programs.kh-ui.osd.enable {
-            kh-osd = mkQsService "kh-osd";
+            kh-osd = mkQsService "kh-osd" { };
           };
       })
     ];
