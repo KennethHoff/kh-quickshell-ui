@@ -96,6 +96,29 @@ BarPlugin {
         }
     }
 
+    BarTooltip {
+        active:  root.hasError
+        ipcName: "error"
+        Column {
+            id: _errCol
+            spacing: 6
+            Repeater {
+                model: (_state.configError || _state.error).split("\n").filter(s => s.length > 0)
+                delegate: Column {
+                    id: _errRow
+                    spacing: 6
+                    BarHorizontalDivider {
+                        visible:      index > 0
+                        dividerColor: _cfg.color.base04
+                        width:        _errCol.width * 0.9
+                        x:            (_errRow.width - width) / 2
+                    }
+                    BarText { text: modelData; color: errorColor }
+                }
+            }
+        }
+    }
+
     SequentialAnimation on opacity {
         running: _state.loading
         loops:   Animation.Infinite
@@ -110,22 +133,18 @@ BarPlugin {
 
         function validateConfig(): void {
             const prev = _state.configError
-            let err = ""
-            if (!host) {
-                err = "host is empty"
-            } else if (port < 1 || port > 65535) {
-                err = "port " + port + " out of range (1..65535)"
-            } else if (pollInterval < 5) {
-                err = "pollInterval " + pollInterval + "s below minimum 5s"
-            } else if (!apiKeyEnv) {
-                err = "apiKeyEnv property not set"
-            } else if (!Quickshell.env(apiKeyEnv)) {
-                err = apiKeyEnv + " env var is empty or unset"
-            }
-            _state.configError = err
+            const errs = []
+            if (!host) errs.push("host is empty")
+            if (port < 1 || port > 65535) errs.push("port " + port + " out of range (1..65535)")
+            if (pollInterval < 5) errs.push("pollInterval " + pollInterval + "s below minimum 5s")
+            if (!apiKeyEnv) errs.push("apiKeyEnv property not set")
+            // Only check env var resolution if apiKeyEnv is set — otherwise the
+            // "env var is empty" message is a duplicate of the previous line.
+            else if (!Quickshell.env(apiKeyEnv)) errs.push(apiKeyEnv + " env var is empty or unset")
+            _state.configError = errs.join("\n")
             // Config just became valid — poll immediately instead of waiting
             // out a full pollInterval for the timer's first tick.
-            if (prev !== "" && err === "") poll()
+            if (prev !== "" && _state.configError === "") poll()
         }
 
         function getApiKey(): string {
