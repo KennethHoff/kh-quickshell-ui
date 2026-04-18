@@ -56,10 +56,9 @@
       };
 
       # mkAppConfig builds a kh-{name} app derivation following the static layout:
-      #   apps/kh-{name}.qml        → $out/shell.qml
-      #   apps/{name}/*.qml         → $out/          (if the directory exists)
-      #   apps/{name}/plugins/*.qml → $out/          (if the directory exists)
-      #   lib/*.qml                 → $out/lib/
+      #   apps/kh-{name}.qml     → $out/shell.qml
+      #   apps/{name}/**/*.qml   → $out/   (recursive — any subdir works: primitives/, plugins/, …)
+      #   lib/*.qml              → $out/lib/
       # generatedFiles: { "Dest.qml" = <store-path>; } for eval-time generated files.
       # extraPluginDirs: list of paths whose *.qml files are copied into $out/.
       mkAppConfig =
@@ -71,15 +70,13 @@
         }:
         let
           appDir = "${self}/apps/${name}";
-          pluginsDir = "${self}/apps/${name}/plugins";
           nixBins = import ./ffi.nix { inherit pkgs lib extraBins; };
         in
         pkgs.runCommand "kh-${name}-config" { } ''
           mkdir -p $out/lib
           cp ${self}/lib/*.qml $out/lib/
           cp ${self}/apps/kh-${name}.qml $out/shell.qml
-          ${lib.optionalString (builtins.pathExists appDir) "cp ${appDir}/*.qml $out/"}
-          ${lib.optionalString (builtins.pathExists pluginsDir) "cp ${pluginsDir}/*.qml $out/ 2>/dev/null || true"}
+          ${lib.optionalString (builtins.pathExists appDir) "find ${appDir} -name '*.qml' -exec cp -t $out/ {} +"}
           ${lib.concatStrings (lib.mapAttrsToList (dest: src: "cp ${src} $out/${dest}\n") generatedFiles)}
           ${lib.concatMapStrings (d: "cp ${toString d}/*.qml $out/\n") extraPluginDirs}
           cp ${nixConfigQml} $out/NixConfig.qml
