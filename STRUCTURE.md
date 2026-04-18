@@ -75,7 +75,9 @@ apps/
     TailscalePeers.qml
 
   launcher/
-    AppList.qml
+    ModeList.qml
+    plugins/
+      apps.nix
 
   cliphist/
     ClipDelegate.qml
@@ -137,7 +139,7 @@ git mv lib/TailscalePeers.qml  apps/bar/TailscalePeers.qml
 
 # launcher components
 mkdir -p apps/launcher
-git mv apps/AppList.qml apps/launcher/AppList.qml
+git mv apps/AppList.qml apps/launcher/ModeList.qml
 
 # cliphist components
 mkdir -p apps/cliphist
@@ -164,7 +166,8 @@ cp ${self}/apps/bar/plugins/*.qml $out/
 **`launcherConfig`**:
 ```nix
 # was: cp ${self}/qml/AppList.qml $out/
-cp ${self}/apps/launcher/AppList.qml $out/
+cp ${self}/apps/launcher/ModeList.qml $out/
+cp ${self}/apps/launcher/ModeRegistry.qml $out/  # generated at build time
 ```
 
 **`cliphistConfig`**:
