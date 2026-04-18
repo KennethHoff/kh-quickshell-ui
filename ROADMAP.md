@@ -109,7 +109,7 @@ Searchable application launcher (`quickshell -c kh-launcher`).
 - [12] ✅ `?` toggles a searchable help overlay listing all keybinds; help sections are mode-aware (actions vs. normal/insert)
 - [13] ✅ App icons — display the icon image (not just name) in the list row
 - [14] ✅ App icons in actions mode — show the parent app's icon next to each desktop action entry
-- [15] ⬜ Frequency-weighted results — track launch counts per app in a local counter file; blend match score with usage frequency so frequently-launched apps surface higher; decays over time so stale counts don't dominate
+- [15] ✅ Frequency-weighted results — per-app decayed launch counter persisted at `$XDG_DATA_HOME/kh-launcher/meta/frecency` (via shared `MetaStore`); fuzzy score gets a `3·log2(1+count)` boost so frequently-launched apps surface higher without swamping strong prefix matches; each count decays with a 14-day half-life so stale usage stops dominating; empty query sorts by decayed count then name
 - [16] ⬜ Script mode — any external process can push a list of items (label, description, icon, callback command) into the launcher via IPC and receive the user's selection back; makes the launcher infinitely extensible without baking in every mode; Nix option to register named script modes that appear alongside built-in modes
 
 ### Modes

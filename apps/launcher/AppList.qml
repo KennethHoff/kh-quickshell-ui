@@ -35,6 +35,20 @@ Item {
     NixBins    { id: bin }
     FuzzyScore { id: fuzzy }
 
+    // Frecency store: filePath → "<count>:<lastLaunchEpoch>" — decayed launch
+    // counter blended into search scores (see impl.frecencyBoost / runFilter).
+    MetaStore {
+        id: frecencyStore
+        bash:     bin.bash
+        appName:  "kh-launcher"
+        storeKey: "frecency"
+    }
+
+    // Half-life for decayed launch counts (seconds). After this much time with
+    // no launches, a count halves — so stale apps eventually stop dominating
+    // the ranking even if they were heavily used long ago.
+    readonly property int _frecencyHalfLifeSec: 14 * 86400
+
     // ── Private state ─────────────────────────────────────────────────────────
     property var    _allApps:       []
     property var    _filteredApps:  []
@@ -65,6 +79,10 @@ Item {
     signal closeRequested()
     signal searchEscapePressed()
     signal flashRequested(int idx)
+
+    // Load the persisted frecency counts once at startup; subsequent writes
+    // happen on launch and the in-memory `values` map stays authoritative.
+    Component.onCompleted: frecencyStore.load()
 
     // ── Public API ────────────────────────────────────────────────────────────
     function reset() {
@@ -191,10 +209,47 @@ Item {
     QtObject {
         id: impl
 
+        // Parse a frecency store value "count:lastLaunchEpoch" → { count, last }.
+        // Returns zeros for missing / malformed entries so callers don't branch.
+        function parseFrecency(raw: string): var {
+            if (!raw) return { count: 0, last: 0 }
+            const colon = raw.indexOf(":")
+            if (colon < 0) return { count: 0, last: 0 }
+            const count = parseFloat(raw.substring(0, colon))
+            const last  = parseInt(raw.substring(colon + 1), 10)
+            return { count: isFinite(count) ? count : 0, last: isFinite(last) ? last : 0 }
+        }
+
+        // Effective count at `nowSec`, applying exponential decay since last launch.
+        function effectiveCount(filePath: string, nowSec: int): real {
+            const entry = parseFrecency(frecencyStore.values[filePath] || "")
+            if (entry.count <= 0) return 0
+            const dt = Math.max(0, nowSec - entry.last)
+            return entry.count * Math.exp(-dt * Math.LN2 / appList._frecencyHalfLifeSec)
+        }
+
+        // Log-scaled boost added to raw fuzzy score. Tuned so a frequently-used
+        // app (count ~= 8) adds ~9 points — enough to beat close fuzzy ties but
+        // not to swamp strong prefix matches.
+        function frecencyBoost(filePath: string, nowSec: int): real {
+            const c = effectiveCount(filePath, nowSec)
+            return c > 0 ? 3 * (Math.log(1 + c) / Math.LN2) : 0
+        }
+
+        function recordLaunch(filePath: string): void {
+            if (!filePath) return
+            const now = Math.floor(Date.now() / 1000)
+            const entry = parseFrecency(frecencyStore.values[filePath] || "")
+            const dt = Math.max(0, now - entry.last)
+            const decayed = entry.count * Math.exp(-dt * Math.LN2 / appList._frecencyHalfLifeSec)
+            frecencyStore.set(filePath, (decayed + 1).toFixed(4) + ":" + now)
+        }
+
         function launchApp(workspace): void {
             const app = selectedApp
             if (!app) return
             const terminal = (app.terminal === "true" || app.terminal === "True")
+            recordLaunch(app._filePath)
             flash(list.currentIndex)
             launchRequested(app.exec.trim(), terminal, workspace)
         }
@@ -203,6 +258,8 @@ Item {
             const idx = actionList.currentIndex
             if (idx < 0 || idx >= appList._actions.length) return
             const action = appList._actions[idx]
+            const app = selectedApp
+            if (app) recordLaunch(app._filePath)
             flash(actionList.currentIndex)
             launchRequested(action.exec.trim(), false, workspace)
         }
@@ -286,11 +343,22 @@ Item {
         }
 
         // Supports: fuzzy (default), ' exact, ^ prefix, $ suffix, ! negation.
-        // Space-separated tokens combine with AND.
+        // Space-separated tokens combine with AND. Fuzzy scores get a
+        // frecency boost so frequently-used apps surface higher (and dominate
+        // empty-query ordering).
         function runFilter(): void {
             const q = searchField.text.trim().toLowerCase()
+            const nowSec = Math.floor(Date.now() / 1000)
+
             if (!q) {
-                appList._filteredApps = appList._allApps.slice()
+                const apps = appList._allApps.slice()
+                apps.sort((a, b) => {
+                    const cb = effectiveCount(b._filePath, nowSec)
+                    const ca = effectiveCount(a._filePath, nowSec)
+                    if (cb !== ca) return cb - ca
+                    return a.name.localeCompare(b.name)
+                })
+                appList._filteredApps = apps
                 list.currentIndex = 0
                 return
             }
@@ -331,7 +399,7 @@ Item {
                     }
                 }
 
-                if (matched) scored.push({ app, score: totalScore })
+                if (matched) scored.push({ app, score: totalScore + frecencyBoost(app._filePath, nowSec) })
             }
 
             scored.sort((a, b) => b.score - a.score)
