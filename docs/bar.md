@@ -28,6 +28,7 @@ programs.kh-ui.bar.structure = ''
 | `BarPipe` | Thin vertical separator; place between plugin groups for a visual divide |
 | `BarGroup` | Bar button that opens a popup panel; children are panel content |
 | `BarDropdown` | Generic dropdown primitive; use `BarGroup` for most cases |
+| `BarTooltip` | Hover-activated popup attached to any bar element; surfaces secondary detail (errors, long labels, etc.) |
 
 Use `BarGroup` to group plugins behind a single dropdown button:
 
@@ -98,6 +99,10 @@ PipeWire volume control. Scroll to adjust volume, click to toggle mute. Hidden w
 ### `Tray`
 
 StatusNotifierItem system tray. Left-click activates an item, right-click shows its native context menu. Hidden when no tray items are present.
+
+### `Notifications`
+
+Bell indicator that appears when there are unread notifications. Sourced from the Quickshell `NotificationServer`. Hidden when the count is zero.
 
 ### System-stats data sources
 
@@ -264,7 +269,13 @@ Each instance polls independently and reads from its own environment variable.
 - `newCount: int` — Number of recently grabbed episodes
 - `recentGrabs: array` — Array of recent grab items (`{series, season, episode, title, timestamp}`)
 - `loading: bool` — Whether an API call is in progress
-- `error: string` — Error message if the last poll failed (empty on success)
+- `error: string` — Runtime/API error from the last poll (empty on success)
+- `configError: string` — Newline-separated list of failed config checks (empty when the config is valid); set by `validateConfig()` on `Component.onCompleted` and whenever `host`/`port`/`pollInterval`/`apiKeyEnv` changes. Polling is skipped while non-empty
+- `hasError: bool` — `configError !== "" || error !== ""`; drives the badge colour and the error `BarTooltip` visibility
+
+**Error surface:**
+
+Hovering the badge opens a `BarTooltip` listing every current error (config + runtime), each line separated by a `BarHorizontalDivider`. The tooltip is also IPC-pinnable — `qs ipc call bar.sonarr.error pin` keeps it visible without a mouse hover, useful for scripts or keyboard-first workflows.
 
 ### `TailscalePeers`
 
@@ -284,15 +295,16 @@ Low-level building blocks for custom plugins and panels (no import needed):
 |---|---|
 | `BarText` | Pre-styled `Text` (theme font + default foreground); exposes `normalColor` / `warnColor` / `errorColor` / `mutedColor` for overrides without a separate `NixConfig` reference |
 | `BarIcon` | Pre-styled `Text` bound to the bundled nerd-font via `cfg.iconFontFile`; set `glyph:` to the PUA codepoint; same `normalColor` / `warnColor` / `errorColor` / `mutedColor` overrides as `BarText` |
+| `BarTooltip` | Hover popup attached to any bar element; default content slot accepts any QML children; optional `ipcName` exposes `pin` / `unpin` / `togglePin` / `isPinned` / `isVisible` |
+| `BarHorizontalDivider` | 1 px horizontal rule spanning the parent's width; `dividerColor` and `dividerHeight` override per use |
 | `BarControlTile` | Styled toggle pill for custom panel tiles |
-| `BarDropdownHeader` | Muted section heading |
-| `BarHorizontalDivider` | 1 px horizontal rule |
+| `BarDropdownHeader` | Muted section heading inside a `BarDropdown` panel |
 | `BarDropdownItem` | Row with dot indicator, primary label, secondary label |
 | `NixConfig` | Theme colors (`color.baseXX`), font family and size |
 
 ## Writing a custom plugin
 
-A plugin is a `BarPlugin` subtype. `BarPlugin` handles the sizing boilerplate and provides `ipcPrefix`, `barHeight`, and `barWindow` — you only need to set `implicitWidth`.
+A plugin is a `BarPlugin` subtype. `BarPlugin` handles the sizing boilerplate and provides `ipcPrefix`, `barHeight`, and `barWindow` — you only need to set `implicitWidth`. Set `ipcName: "<segment>"` on the plugin to give it a stable IPC namespace; the plugin's own `IpcHandler` then writes `target: ipcPrefix` and resolves to `<parentPrefix>.<segment>` automatically. Any child that walks the parent chain (another `BarPlugin`, a `BarTooltip`, a `BarDropdown`) nests underneath.
 
 Two singleton helpers are available in every plugin without an import:
 
@@ -308,13 +320,14 @@ import QtQuick
 import Quickshell.Io
 
 BarPlugin {
+    ipcName: "mywidget"
     NixConfig { id: cfg }
     NixBins   { id: bin }  // omit if the plugin doesn't run external processes
 
     implicitWidth: _label.implicitWidth + 16
 
     IpcHandler {
-        target: ipcPrefix + ".mywidget"
+        target: ipcPrefix
         function getValue(): string { return _label.text }
     }
 
@@ -345,7 +358,7 @@ programs.kh-ui.bar = {
 
 ## IPC
 
-Each plugin registers at a suffix derived from its type. The full target path is built from the nesting in your `structure`:
+Each plugin registers at a suffix derived from its `ipcName` property. The full target path is built from the nesting in your `structure` — every `BarPlugin` / `BarGroup` / `BarDropdown` / `BarTooltip` that declares an `ipcName` appends its own segment to the parent's prefix:
 
 ```
 bar                                              (root)
@@ -368,8 +381,11 @@ The root target (`bar`) exposes bar-wide queries:
 | `Volume` | `.volume` | `getVolume()` -> int (0-150), `setVolume(v)`, `adjustVolume(delta)`, `isMuted()` -> bool, `setMuted(muted)`, `toggleMute()` |
 | `MediaPlayer` | `.media` | `isActive()` -> bool, `isPlaying()` -> bool, `getTitle()`, `getArtist()`, `togglePlaying()`, `play()`, `pause()`, `next()`, `prev()` |
 | `Tray` | `.tray` | `list()` -> newline-separated titles, `activate(title)`, `showMenu(title)` |
+| `Notifications` | `.notifications` | `getCount()` -> int, `list()` -> array of `{id, app, summary}`, `clear()` |
 | `TailscalePanel` | `.tailscale` | `isConnected()` -> bool, `getSelfIp()` -> string, `toggle()` |
 | `EthernetPanel` | `.ethernet` | `isConnected()` -> bool, `getIface()` -> string |
+| `SonarrPanel` | `.sonarr` | `getNewCount()` -> int, `getRecentGrabs()` -> array, `getError()` -> string, `getConfigError()` -> string |
+| `SonarrPanel` error tooltip | `.sonarr.error` | `pin()`, `unpin()`, `togglePin()`, `isPinned()` -> bool, `isVisible()` -> bool |
 | `CpuUsage` | `.cpu` | `getUsage()` -> int |
 | `RamUsage` | `.ram` | `getUsedMb()` -> int, `getTotalMb()` -> int, `getPercent()` -> int |
 | `GpuUsage` | `.gpu` | `getBusy()` -> int, `getVramUsedMb()` -> int, `getVramTotalMb()` -> int |
