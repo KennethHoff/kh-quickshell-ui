@@ -9,6 +9,7 @@ import Quickshell.Io
 
 BarPlugin {
     id: root
+    ipcName: "ethernet"
     NixBins   { id: bin }
     NixConfig { id: _cfg }
 
@@ -28,7 +29,7 @@ BarPlugin {
 
     // ── IPC ────────────────────────────────────────────────────────────────
     IpcHandler {
-        target: ipcPrefix + ".ethernet"
+        target: ipcPrefix
         function isConnected(): bool { return _state.connected }
         function getIface(): string  { return _state.iface }
     }

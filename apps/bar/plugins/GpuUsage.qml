@@ -9,6 +9,7 @@ import Quickshell.Io
 
 BarPlugin {
     id: root
+    ipcName: "gpu"
 
     property string cardPath: "/sys/class/drm/card1/device"
     property int    interval: 2000
@@ -46,7 +47,7 @@ BarPlugin {
     }
 
     IpcHandler {
-        target: ipcPrefix + ".gpu"
+        target: ipcPrefix
         function getBusy(): int        { return functionality.getBusy() }
         function getVramUsedMb(): int  { return functionality.getVramUsedMb() }
         function getVramTotalMb(): int { return functionality.getVramTotalMb() }

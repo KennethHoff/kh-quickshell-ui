@@ -5,6 +5,8 @@ import Quickshell.Io
 import Quickshell.Services.Notifications
 
 BarPlugin {
+    ipcName: "notifications"
+
     NotificationServer {
         id: server
         keepOnReload: true
@@ -38,8 +40,7 @@ BarPlugin {
     }
 
     IpcHandler {
-        target: ipcPrefix + ".notifications"
-
+        target: ipcPrefix
         function getCount(): int { return functionality.getCount() }
         function list(): var     { return functionality.list() }
         function clear(): void   { functionality.clear() }

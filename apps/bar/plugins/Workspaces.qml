@@ -9,6 +9,7 @@ import Quickshell.Wayland
 
 BarPlugin {
     id: root
+    ipcName: "workspaces"
     NixConfig { id: cfg }
 
     // Hover-preview state — one shared popup for all workspace buttons.
@@ -61,8 +62,7 @@ BarPlugin {
     }
 
     IpcHandler {
-        target: ipcPrefix + ".workspaces"
-
+        target: ipcPrefix
         function getFocused(): string               { return functionality.getFocused() }
         function list(): string                     { return functionality.list() }
         function switchTo(name: string): void       { functionality.switchTo(name) }

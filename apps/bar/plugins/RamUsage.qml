@@ -6,6 +6,7 @@ import Quickshell.Io
 
 BarPlugin {
     id: root
+    ipcName: "ram"
 
     property int interval: 2000
 
@@ -48,7 +49,7 @@ BarPlugin {
     }
 
     IpcHandler {
-        target: ipcPrefix + ".ram"
+        target: ipcPrefix
         function getUsedMb(): int  { return functionality.getUsedMb() }
         function getTotalMb(): int { return functionality.getTotalMb() }
         function getPercent(): int { return functionality.getPercent() }

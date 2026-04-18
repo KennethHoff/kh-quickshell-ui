@@ -5,6 +5,7 @@ import Quickshell.Io
 import Quickshell.Services.Pipewire
 
 BarPlugin {
+    ipcName: "volume"
     NixConfig { id: cfg }
 
     // Bind the default sink so its audio properties stay live.
@@ -41,8 +42,7 @@ BarPlugin {
     }
 
     IpcHandler {
-        target: ipcPrefix + ".volume"
-
+        target: ipcPrefix
         function getVolume(): real              { return functionality.getVolume() }
         function setVolume(v: int): void        { functionality.setVolume(v) }
         function adjustVolume(delta: int): void { functionality.adjustVolume(delta) }

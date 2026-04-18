@@ -10,6 +10,7 @@ import Quickshell.Io
 
 BarPlugin {
     id: root
+    ipcName: "cpuTemp"
     NixBins { id: bin }
 
     property string sensor:   "zenpower"
@@ -44,7 +45,7 @@ BarPlugin {
     }
 
     IpcHandler {
-        target: ipcPrefix + ".cpuTemp"
+        target: ipcPrefix
         function getTemp(): int { return functionality.getTemp() }
     }
 

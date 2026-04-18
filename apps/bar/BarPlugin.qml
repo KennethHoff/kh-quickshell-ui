@@ -17,17 +17,28 @@ Item {
     property int barHeight: parent?.barHeight ?? 32
     property var barWindow: parent?.barWindow ?? null
 
-    // Walk the parent chain to find the nearest ancestor that exposes ipcPrefix.
+    // The plugin's own IPC segment. When set, the plugin (and every child that
+    // walks the parent chain for ipcPrefix) is addressable as
+    // "<parentPrefix>.<ipcName>" — e.g. ipcName: "sonarr" under the dev-bar
+    // yields "dev-bar.sonarr". Plugins that need IPC should set this and
+    // declare `IpcHandler { target: ipcPrefix; ... }`; children (BarTooltip
+    // with its own ipcName, etc.) automatically nest underneath.
+    property string ipcName: ""
+
+    // Walk the parent chain to find the nearest ancestor that exposes ipcPrefix,
+    // then append this plugin's own ipcName segment (if any) so children see
+    // the plugin-scoped prefix — same pattern as BarDropdown's _contentPrefix.
     // Direct parents may be plain layout items (Row, RowLayout) that don't carry
     // ipcPrefix — the walk skips them and finds the nearest BarPlugin, BarRow, or
     // BarDropdown.col that does. Static tree means non-reactive walk is fine.
     readonly property string ipcPrefix: {
+        var inherited = "bar"
         var p = parent
         while (p) {
-            if (typeof p.ipcPrefix === 'string') return p.ipcPrefix
+            if (typeof p.ipcPrefix === 'string') { inherited = p.ipcPrefix; break }
             p = p.parent
         }
-        return "bar"
+        return ipcName !== "" ? inherited + "." + ipcName : inherited
     }
 
     // Walk the parent chain for the nearest ancestor that exposes contentVisible.

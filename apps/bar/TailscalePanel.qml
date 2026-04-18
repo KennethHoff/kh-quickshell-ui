@@ -16,6 +16,7 @@ import Quickshell.Io
 
 BarPlugin {
     id: root
+    ipcName: "tailscale"
     NixBins { id: bin }
 
     // ── Sizing — use the tile's natural dimensions, not barHeight ──────────
@@ -44,7 +45,7 @@ BarPlugin {
 
     // ── IPC ────────────────────────────────────────────────────────────────
     IpcHandler {
-        target: ipcPrefix + ".tailscale"
+        target: ipcPrefix
         function isConnected(): bool    { return _state.connected }
         function getSelfIp(): string    { return _state.selfIp }
         function getExitNodeIp(): string { return _state.exitNodeIp }

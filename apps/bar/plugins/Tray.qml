@@ -6,11 +6,11 @@ import Quickshell.Io
 import Quickshell.Services.SystemTray
 
 BarPlugin {
+    ipcName: "tray"
     NixConfig { id: cfg }
 
     IpcHandler {
-        target: ipcPrefix + ".tray"
-
+        target: ipcPrefix
         function list(): string {
             const titles = []
             for (let i = 0; i < SystemTray.items.values.length; i++)

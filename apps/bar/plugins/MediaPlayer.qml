@@ -6,6 +6,7 @@ import Quickshell.Io
 import Quickshell.Services.Mpris
 
 BarPlugin {
+    ipcName: "media"
     NixConfig { id: cfg }
 
     // State in a QtObject so its id is globally accessible from nested children.
@@ -37,8 +38,7 @@ BarPlugin {
     }
 
     IpcHandler {
-        target: ipcPrefix + ".media"
-
+        target: ipcPrefix
         function isActive(): bool      { return state.active }
         function isPlaying(): bool     { return functionality.isPlaying() }
         function getTitle(): string    { return functionality.getTitle() }

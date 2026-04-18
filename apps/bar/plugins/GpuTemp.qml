@@ -10,6 +10,7 @@ import Quickshell.Io
 
 BarPlugin {
     id: root
+    ipcName: "gpuTemp"
     NixBins { id: bin }
 
     property string sensor:   "amdgpu"
@@ -44,7 +45,7 @@ BarPlugin {
     }
 
     IpcHandler {
-        target: ipcPrefix + ".gpuTemp"
+        target: ipcPrefix
         function getTemp(): int { return functionality.getTemp() }
     }
 

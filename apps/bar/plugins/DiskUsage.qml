@@ -7,6 +7,7 @@ import Quickshell.Io
 
 BarPlugin {
     id: root
+    ipcName: "disk"
     NixBins { id: bin }
 
     property var mounts:   ["/"]
@@ -53,7 +54,7 @@ BarPlugin {
     }
 
     IpcHandler {
-        target: ipcPrefix + ".disk"
+        target: ipcPrefix
         function list(): string { return functionality.list() }
         function count(): int   { return functionality.count() }
     }

@@ -19,6 +19,7 @@ import Quickshell.Io
 
 BarPlugin {
     id: root
+    ipcName: "sonarr"
     NixBins { id: bin }
 
     // ── Properties ─────────────────────────────────────────────────────────
@@ -54,7 +55,7 @@ BarPlugin {
 
     // ── IPC ────────────────────────────────────────────────────────────────
     IpcHandler {
-        target: ipcPrefix + ".sonarr"
+        target: ipcPrefix
         function getNewCount(): int { return _state.newCount }
         function getRecentGrabs(): var { return _state.recentGrabs }
         function getError(): string { return _state.configError || _state.error }

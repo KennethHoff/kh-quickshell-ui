@@ -6,6 +6,7 @@ import Quickshell.Io
 
 BarPlugin {
     id: root
+    ipcName: "cpu"
 
     property int interval: 2000
 
@@ -42,7 +43,7 @@ BarPlugin {
     }
 
     IpcHandler {
-        target: ipcPrefix + ".cpu"
+        target: ipcPrefix
         function getUsage(): int { return functionality.getUsage() }
     }
 
