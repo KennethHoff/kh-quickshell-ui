@@ -351,32 +351,6 @@ in
           configs = qsConfigs;
         };
 
-        home.packages =
-          lib.optionals config.programs.kh-ui.clipboard-history.enable [
-            (pkgs.writeShellScriptBin "kh-cliphist" ''
-              exec ${lib.getExe pkgs.quickshell} -c kh-cliphist "$@"
-            '')
-          ]
-          ++ lib.optionals config.programs.kh-ui.launcher.enable [
-            (pkgs.writeShellScriptBin "kh-launcher" ''
-              exec ${lib.getExe pkgs.quickshell} -c kh-launcher "$@"
-            '')
-          ]
-          ++ lib.optionals config.programs.kh-ui.bar.enable [
-            (pkgs.writeShellScriptBin "kh-bar" ''
-              exec ${lib.getExe pkgs.quickshell} -c kh-bar "$@"
-            '')
-          ]
-          ++ lib.optionals config.programs.kh-ui.view.enable [
-            (pkgs.writeShellScriptBin "kh-view" ''
-              exec ${lib.getExe pkgs.quickshell} -c kh-view "$@"
-            '')
-          ]
-          ++ lib.optionals config.programs.kh-ui.osd.enable [
-            (pkgs.writeShellScriptBin "kh-osd" ''
-              exec ${lib.getExe pkgs.quickshell} -c kh-osd "$@"
-            '')
-          ];
       })
 
       (lib.mkIf config.programs.kh-ui.enable {
