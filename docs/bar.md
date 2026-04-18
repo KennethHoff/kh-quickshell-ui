@@ -75,6 +75,51 @@ PipeWire volume control. Scroll to adjust volume, click to toggle mute. Hidden w
 
 StatusNotifierItem system tray. Left-click activates an item, right-click shows its native context menu. Hidden when no tray items are present.
 
+### `Cpu`
+
+Aggregate CPU utilisation %. Samples `/proc/stat` on `interval` (default 2 s) and renders a rolling delta. Set `hideBelow` to an int percentage to hide the plugin when idle:
+
+```qml
+Cpu { hideBelow: 5 }   // hidden while usage < 5 %
+```
+
+### `Ram`
+
+RAM usage from `/proc/meminfo` (`MemTotal - MemAvailable`). Default display is absolute (`ram: 4.2G/16G`); set `format: "percent"` for `ram: 27%`.
+
+### `Gpu`
+
+AMD GPU utilisation and VRAM use from `/sys/class/drm/<card>/device/`. Defaults to `card1`; override via `cardPath`:
+
+```qml
+Gpu { cardPath: "/sys/class/drm/card0/device"; hideBelow: 5 }
+```
+
+Nvidia is not yet supported — see the ROADMAP's "System Stats → GPU stats" entry.
+
+### `Disk`
+
+Disk used/total for one or more configured mount points. Shells out to `df -B1` on `interval` (default 60 s):
+
+```qml
+Disk { mounts: ["/", "/home"]; interval: 120000 }
+```
+
+### `Temps`
+
+CPU and GPU temperatures from `/sys/class/hwmon`. Sensors are matched by their `name` file (inspect with `for d in /sys/class/hwmon/hwmon*; do echo "$d $(cat "$d/name")"; done`). Defaults match a Ryzen + AMD GPU system:
+
+```qml
+Temps {
+    cpuSensor: "zenpower"   // e.g. "coretemp" on Intel, "k10temp" on older Ryzen
+    gpuSensor: "amdgpu"
+    warmAt: 60              // base09 colour above this
+    hotAt:  80              // base08 colour above this
+}
+```
+
+Hidden entirely when neither sensor is found.
+
 ### `TailscalePanel`
 
 Tailscale status tile. Shows connection state and the machine's Tailscale IP. Click to toggle `tailscale up` / `tailscale down`. Exposes `connected` (bool), `selfIp` (string), and `peers` (array) for use by `TailscalePeers`.
@@ -183,6 +228,11 @@ For example, a `TailscalePanel` inside `BarGroup { ipcName: "net" }` is reachabl
 | `Tray` | `.tray` | `list()` -> newline-separated titles, `activate(title)`, `showMenu(title)` |
 | `TailscalePanel` | `.tailscale` | `isConnected()` -> bool, `getSelfIp()` -> string, `toggle()` |
 | `EthernetPanel` | `.ethernet` | `isConnected()` -> bool, `getIface()` -> string |
+| `Cpu` | `.cpu` | `getUsage()` -> int |
+| `Ram` | `.ram` | `getUsedMb()` -> int, `getTotalMb()` -> int, `getPercent()` -> int |
+| `Gpu` | `.gpu` | `getBusy()` -> int, `getVramUsedMb()` -> int, `getVramTotalMb()` -> int |
+| `Disk` | `.disk` | `list()` -> `[{ mount, usedB, totalB }]` |
+| `Temps` | `.temps` | `getCpu()` -> int, `getGpu()` -> int |
 | `BarGroup` / `BarDropdown` | `.<ipcName>` | `toggle()`, `open()`, `close()`, `isOpen()` -> bool |
 
 ### Dropdown IPC for custom plugins

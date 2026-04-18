@@ -267,11 +267,11 @@ A full status bar built in Quickshell, replacing Waybar.
 
 ### System Stats
 
-- [1] ⬜ CPU usage — utilisation % across all cores; updates on a short interval; hidden when idle below a threshold
-- [2] ⬜ RAM usage — used/total memory; sourced from `/proc/meminfo`
-- [3] ⬜ GPU stats — utilisation % and VRAM used/total for AMD (`/sys/class/drm`) or Nvidia (`nvml`); hidden when idle below a threshold
-- [4] ⬜ Disk usage — used/total for one or more configured mount points (e.g. `/`, `/home`)
-- [5] ⬜ Temperature — CPU and GPU temps via `/sys/class/hwmon`; colour-coded (cool → warm → hot); shown alongside the corresponding CPU/GPU stat
+- [1] ✅ CPU usage — `Cpu` plugin samples `/proc/stat` every 2 s and renders a rolling (non-idle / total) %; `hideBelow: int` hides the plugin when usage is below the threshold (default 0 = always visible)
+- [2] ✅ RAM usage — `Ram` plugin reads `/proc/meminfo` and renders `MemTotal − MemAvailable`; `format: "absolute" | "percent"` switches between `4.2G/16G` and `27%`
+- [3] ✅ AMD GPU stats — `Gpu` plugin reads `/sys/class/drm/<card>/device/{gpu_busy_percent,mem_info_vram_used,mem_info_vram_total}`; `cardPath` is configurable; `hideBelow` hides when idle. Nvidia support deferred — would need `nvidia-smi` via `extraBins` and no Nvidia hardware is available to test against
+- [4] ✅ Disk usage — `Disk` plugin shells out to `df -B1 <mounts>` every 60 s (`mounts` and `interval` configurable); displays `<mount> <used>/<total>` per mount, comma-joined
+- [5] ✅ Temperature — `Temps` plugin walks `/sys/class/hwmon/hwmon*` (via `bash`) matching `cpuSensor` / `gpuSensor` against each `name` file and reads `temp1_input`; colour-coded via `warmAt` / `hotAt` thresholds (defaults 60 / 80 °C) against `base09` / `base08`
 
 ### Docker
 

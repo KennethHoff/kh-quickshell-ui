@@ -4,7 +4,10 @@
   inputs.nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
 
   outputs =
-    { self, nixpkgs }:
+    {
+      self,
+      nixpkgs,
+    }:
     let
       system = "x86_64-linux";
       pkgs = nixpkgs.legacyPackages.${system};
@@ -98,6 +101,7 @@
             "BarLayout.qml" = import ./bar-config.nix { inherit pkgs structure ipcName; };
           };
           extraBins = {
+            df = lib.getExe' pkgs.coreutils "df";
             nmcli = lib.getExe' pkgs.networkmanager "nmcli";
             tailscale = lib.getExe pkgs.tailscale;
           }
@@ -131,6 +135,16 @@
               Workspaces {}
               MediaPlayer {}
               BarSpacer {}
+              BarGroup {
+                  label: "stats"
+                  ipcName: "stats"
+                  panelWidth: 320
+                  Cpu {}
+                  Ram {}
+                  Gpu {}
+                  Disk {}
+                  Temps {}
+              }
               Tray {}
               Notifications {}
               Clock {}

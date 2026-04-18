@@ -66,6 +66,7 @@ let
         "BarLayout.qml" = import (src + "/bar-config.nix") { inherit pkgs structure ipcName; };
       };
       extraBins = {
+        df = lib.getExe' pkgs.coreutils "df";
         nmcli = lib.getExe' pkgs.networkmanager "nmcli";
         tailscale = lib.getExe pkgs.tailscale;
       }
@@ -290,7 +291,12 @@ in
             };
             userPlugins = lib.mapAttrs (_: cfg: {
               script = toString cfg.script;
-              inherit (cfg) frecency hasActions placeholder label;
+              inherit (cfg)
+                frecency
+                hasActions
+                placeholder
+                label
+                ;
               default = false;
             }) launcherCfg.scriptPlugins;
             allPlugins = appsPlugin.plugins // hyprlandWindowsPlugin.plugins // userPlugins;
