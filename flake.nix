@@ -135,6 +135,8 @@
               Workspaces {}
               MediaPlayer {}
               BarSpacer {}
+              SonarrPanel {}
+              BarPipe {}
               BarGroup {
                   label: "stats"
                   ipcName: "stats"
