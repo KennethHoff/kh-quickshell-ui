@@ -25,6 +25,7 @@ programs.kh-ui.bar.structure = ''
 |---|---|
 | `BarRow` | Full-width `RowLayout` row; children laid out left-to-right |
 | `BarSpacer` | Flexible spacer; expands to fill remaining width |
+| `BarPipe` | Thin vertical separator; place between plugin groups for a visual divide |
 | `BarGroup` | Bar button that opens a popup panel; children are panel content |
 | `BarDropdown` | Generic dropdown primitive; use `BarGroup` for most cases |
 

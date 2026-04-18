@@ -226,8 +226,8 @@ in
           BarText (or any other component) to render their values.
 
           Built-in layout / composition types:
-          BarRow, BarSpacer, BarGroup, BarDropdown, BarText, ControlTile,
-          TailscalePanel, EthernetPanel, TailscalePeers,
+          BarRow, BarSpacer, BarPipe, BarGroup, BarDropdown, BarText,
+          ControlTile, TailscalePanel, EthernetPanel, TailscalePeers,
           DropdownHeader, DropdownDivider, DropdownItem.
 
           Example — network + audio grouped behind one button:

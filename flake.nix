@@ -195,10 +195,13 @@
                       }
                   }
               }
+              BarPipe {}
               Tray {}
               Notifications {}
+              BarPipe {}
               Clock {}
               Volume {}
+              BarPipe {}
               BarGroup {
                   label: "●●●"
                   ipcName: "controlcenter"
