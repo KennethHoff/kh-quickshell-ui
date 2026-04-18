@@ -103,33 +103,3 @@ wayland.windowManager.hyprland.settings.bind = [
   "$mainMod, I,     exec, ${lib.getExe pkgs.quickshell} ipc -c kh-view     call view     toggle"
 ];
 ```
-
----
-
-## Development
-
-Take headless screenshots:
-
-```bash
-# Single shot
-nix run .#screenshot -- kh-bar default
-nix run .#screenshot -- kh-launcher my-shot
-nix run .#screenshot -- kh-cliphist my-shot
-nix run .#screenshot -- kh-osd volume-50 "osd showVolume 50"
-
-# Multiple shots in one run (shared sway instance)
-nix run .#screenshot -- kh-launcher shot-a 'type chrm' -- shot-b "type 'chrm"
-```
-
-Run the QML test suite:
-
-```bash
-nix develop
-qmltestrunner -input tests/
-```
-
-Or just validate that all derivations evaluate:
-
-```bash
-nix flake check
-```
