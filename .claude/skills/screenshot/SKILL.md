@@ -9,13 +9,14 @@ Take screenshots using the headless screenshot app. Output the file paths so the
 ## Step 1 — Capture
 
 ```bash
-nix run .#screenshot -- [--run <dir>] <app> <name> [<ipc-call>...] [-- <name> [<ipc-call>...]]...
+nix run .#screenshot -- [--show] [--run <dir>] <app> <name> [<ipc-call>...] [-- <name> [<ipc-call>...]]...
 ```
 
+- `--show` — after all shots complete, opens the captured PNGs in kh-view on the caller's Wayland session
 - `--run <dir>` — reuse an existing run directory (useful for iterating on the same shot)
 - `<app>` — a package name from `packages.x86_64-linux` in `flake.nix`; check the flake for the current list
 - `<name>` — output filename without extension; saved to `<run-dir>/<name>.png`
-- `<ipc-call>` — function name with optional argument, space-separated in a single string
+- `<ipc-call>` — function name with space-separated arguments in a single quoted string (e.g. `'registerMode system /bin/true false false Search...'`)
 - `--` — separates multiple shots; all shots share one sway instance and one run directory
 
 The window is **opened automatically** (toggle is implicit) for each shot.

@@ -262,7 +262,7 @@
         # Usage: nix run .#screenshot -- [--show] <app> <name> [<ipc-call>...] [-- <name> [<ipc-call>...]]...
         # Multiple shots separated by -- share one sway instance and one output directory
         # (/tmp/qs-screenshots/<timestamp>/).
-        # Each <ipc-call> is a function name with optional arg, e.g. "setView help" or "type Navigate".
+        # Each <ipc-call> is a function name with optional args, space-separated in a single string.
         # The window is opened automatically via toggle before any calls are made.
         # --show opens the captured PNGs in kh-view on the caller's Wayland session after all shots complete.
         screenshot = {
@@ -395,10 +395,10 @@
                                 elif [[ $# -gt 0 ]]; then
                                   # Use the first IPC call as the probe; consume it from "$@".
                                   local probe=$1; shift
-                                  read -ra _parts <<< "$probe"
                                   for i in $(seq 30); do
                                     sleep 0.05
-                                    "$qs" ipc --pid "$current_pid" call "''${_parts[@]}" >/dev/null 2>&1 && break
+                                    eval "set -- $probe"
+                                    "$qs" ipc --pid "$current_pid" call "$@" >/dev/null 2>&1 && break
                                   done
                                 else
                                   # No probe available (e.g. kh-bar has no IPC) — short fallback.
@@ -407,17 +407,12 @@
                               fi
                               for call in "$@"; do
                                 if [[ -z "$target" ]]; then
-                                  # No fixed target — call string is "target function [arg]"
-                                  read -ra _parts <<< "$call"
-                                  "$qs" ipc --pid "$current_pid" call "''${_parts[@]}" >/dev/null 2>&1 || true
+                                  # No fixed target — call string is "target function [args...]"
+                                  eval "set -- $call"
+                                  "$qs" ipc --pid "$current_pid" call "$@" >/dev/null 2>&1 || true
                                 else
-                                  local fn="''${call%% *}"
-                                  if [[ "$fn" == "$call" ]]; then
-                                    "$qs" ipc --pid "$current_pid" call "$target" "$fn" >/dev/null 2>&1 || true
-                                  else
-                                    local arg="''${call#* }"
-                                    "$qs" ipc --pid "$current_pid" call "$target" "$fn" "$arg" >/dev/null 2>&1 || true
-                                  fi
+                                  eval "set -- $call"
+                                  "$qs" ipc --pid "$current_pid" call "$target" "$@" >/dev/null 2>&1 || true
                                 fi
                               done
                               sleep 0.25
