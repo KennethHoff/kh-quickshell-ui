@@ -168,37 +168,29 @@ A full status bar built in Quickshell, replacing Waybar.
 ### Core
 
 - [1] ✅ Plugin authoring system — plugins are `.qml` files wired in via Nix (`structure`/`extraPluginDirs`); built at eval time so no runtime module import is needed
-- [2] ✅ `BarRow` and `BarSpacer` layout types — `BarRow` is a full-width row; `BarSpacer` fills remaining space (CSS space-between equivalent)
-- [3] ✅ Per-plugin IPC targets — each plugin exposes its own named target (e.g. `bar.volume`, `bar.workspaces`)
-- [4] ✅ Dropdown IPC — dropdowns with `ipcName` set expose `bar.<name>` with `toggle`/`open`/`close`/`isOpen`
-- [5] ✅ `BarGroup` plugin — a container plugin that groups any number of child plugins behind a single dropdown button; children are declared inline in `structure` exactly like top-level plugins; any plugin (Volume, Workspaces, custom) can appear inside a group or directly in the bar — placement is independent of plugin type; the button shows a configurable label or icon; implement before hierarchical IPC
-  ```qml
-  // Network + audio behind one button
-  BarGroup {
-      label: "●●●"
-      EthernetPanel {}
-      TailscalePanel { id: ts }
-      TailscalePeers { source: ts }
-      Volume {}
-  }
+- [2] ✅ Per-plugin IPC targets — each plugin exposes its own named target (e.g. `bar.volume`, `bar.workspaces`)
+- [3] ✅ Dropdown IPC — dropdowns with `ipcName` set expose `bar.<name>` with `toggle`/`open`/`close`/`isOpen`
+- [4] ✅ `BarGroup` plugin — a container plugin that groups any number of child plugins behind a single dropdown button; children are declared inline in `structure` exactly like top-level plugins; any plugin (Volume, Workspaces, custom) can appear inside a group or directly in the bar — placement is independent of plugin type; the button shows a configurable label or icon; implement before hierarchical IPC
+- [5] ✅ Hierarchical IPC prefix — `ipcPrefix` propagates through `BarPlugin` → `BarRow` → `BarDropdown.col` via parent chain walk; each `BarGroup`/`BarDropdown` appends its `ipcName` segment so plugins get targets like `bar.controlcenter.tailscale` automatically; root prefix is `ipcName` from `mkBarConfig` (default `"bar"`), exposed as `programs.kh-ui.bar.ipcName` in the hm-module; `EthernetPanel` and `TailscalePanel` converted from `ControlTile` to `BarPlugin` base so they join the prefix chain regardless of popup nesting depth
+- [6] ⬜ Plugin error surface — a standard mechanism for plugins to report failures to the user; currently any subprocess that exits non-zero is silently ignored and the plugin stays in its last known state; needs a shared primitive (e.g. a visual error state on `ControlTile`, a toast, or a bar-level error badge) so plugins like `TailscalePanel` can surface "toggle failed" instead of doing nothing
+- [7] ⬜ Multi-bar support — allow N bars at arbitrary screen edges (top, bottom, left, right); `mkBarConfig` accepts a list of `{ edge, structure }` entries; each bar gets its own `PanelWindow` and generated `BarLayout`; `BarDropdown` opens its popup toward the screen interior so it works on any edge; currently kh-bar uses a single `PanelWindow` with no screen binding (multi-screen removed pending this entry)
+- [8] ✅ Root bar IPC — `ipcPrefix` itself (e.g. `bar`, `dev-bar`) exposes `getHeight()`/`getWidth()` returning the visible footprint in pixels, with `getHeight()` summing the bar's own height and the tallest currently-open dropdown popup so callers can size overlays or screenshot crops without hardcoded values; implemented inside the generated `BarLayout.qml` by walking children for visible popups
+- [9] ✅ Service environment injection — `programs.kh-ui.bar.environment` (plaintext attrset) and `programs.kh-ui.bar.environmentFiles` (list of paths, typically sops/agenix) pass env vars to the `kh-bar` systemd service; plugins read via `StandardPaths.getenv()`; follows the nixpkgs convention used by nginx/gitea/servarr so new plugins needing secrets require no special Nix scaffolding
 
-  // Wrap any existing plugin — no changes to the plugin itself
-  BarGroup {
-      label: "media"
-      MediaPlayer {}
-  }
+### Building Blocks
 
-  // Mix grouped and ungrouped freely in the same bar
-  BarRow {
-      Workspaces {}
-      BarSpacer {}
-      BarGroup { label: "●●●"; EthernetPanel {}; TailscalePanel {} }
-      Clock {}
-  }
-  ```
-- [6] ✅ Hierarchical IPC prefix — `ipcPrefix` propagates through `BarPlugin` → `BarRow` → `BarDropdown.col` via parent chain walk; each `BarGroup`/`BarDropdown` appends its `ipcName` segment so plugins get targets like `bar.controlcenter.tailscale` automatically; root prefix is `ipcName` from `mkBarConfig` (default `"bar"`), exposed as `programs.kh-ui.bar.ipcName` in the hm-module; `EthernetPanel` and `TailscalePanel` converted from `ControlTile` to `BarPlugin` base so they join the prefix chain regardless of popup nesting depth
-- [7] ⬜ Plugin error surface — a standard mechanism for plugins to report failures to the user; currently any subprocess that exits non-zero is silently ignored and the plugin stays in its last known state; needs a shared primitive (e.g. a visual error state on `ControlTile`, a toast, or a bar-level error badge) so plugins like `TailscalePanel` can surface "toggle failed" instead of doing nothing
-- [8] ⬜ Multi-bar support — allow N bars at arbitrary screen edges (top, bottom, left, right); `mkBarConfig` accepts a list of `{ edge, structure }` entries; each bar gets its own `PanelWindow` and generated `BarLayout`; `BarDropdown` opens its popup toward the screen interior so it works on any edge; currently kh-bar uses a single `PanelWindow` with no screen binding (multi-screen removed pending this entry)
+Authoring primitives that make up a bar structure. Plugins compose these
+rather than raw QtQuick types so layout, IPC prefix propagation, and theme
+access stay consistent.
+
+- [1] ✅ `BarPlugin` base type — every plugin extends it; `implicitWidth` sizes the plugin, `implicitHeight` tracks `barHeight`, `barWindow` is inherited from the parent chain, and `ipcPrefix` walks the parent chain skipping plain `Row`/`RowLayout` so nesting in any container still produces the right IPC target
+- [2] ✅ `BarRow` — full-width `RowLayout` row; carries `ipcPrefix` so children resolve IPC targets correctly
+- [3] ✅ `BarSpacer` — flexible spacer filling remaining width; place between plugin clusters to push them apart (CSS space-between equivalent)
+- [4] ✅ `BarPipe` — thin vertical separator; defaults to `base03`, 18 px tall, 6 px side margins; `pipeColor` / `pipeHeight` / margin props override per use
+- [5] ✅ `BarGroup` — dropdown button wrapping arbitrary children as panel content; any plugin (Volume, Workspaces, custom) can live inside a group or at the top level with no plugin-side changes; see **Core [4]** for composition semantics and hierarchical IPC behaviour
+- [6] ✅ `BarDropdown` — generic dropdown primitive used under the hood by `BarGroup`; exposes `toggle`/`open`/`close`/`isOpen` via IPC when `ipcName` is set (see **Core [3]**)
+- [7] ✅ `BarText` — theme-styled text primitive exposing `normalColor` / `warnColor` / `errorColor` / `mutedColor` so threshold colouring doesn't need a `NixConfig { id: cfg }` at every call site
+- [8] ✅ `BarIcon` — same contract as `BarText` but loads the bundled nerd-font via `FontLoader` so PUA codepoints (bell, tv, etc.) render deterministically regardless of the user's system fontconfig
 
 ### Workspaces
 
@@ -259,7 +251,20 @@ A full status bar built in Quickshell, replacing Waybar.
 
 ### Sonarr
 
-- [1] ⬜ Sonarr — badge when new episodes are downloaded; click to open a panel showing recently grabbed episodes and upcoming releases (polls Sonarr API)
+Polls the Sonarr API and surfaces recently grabbed episodes in the bar.
+Configured inline on `SonarrPanel` (host/port/pollInterval/apiKeyEnv/maxHistoryItems); API keys come from the systemd service `environment`/`environmentFiles` and are read via `StandardPaths.getenv(apiKeyEnv)`. Multiple instances (e.g. separate TV + 4K servers) are supported by declaring multiple `SonarrPanel {}` children in the bar structure.
+
+- [1] ✅ Queue badge — `SonarrPanel` polls `/api/v3/queue` at `pollInterval` (default 120 s) while visible; shows a TV glyph (`BarIcon`, mdi-television) plus the queue count; colour shifts to `base0B` when count > 0, `base08` on error, muted `base03` otherwise; pulses opacity while a request is in flight
+- [2] ✅ Multi-instance support — declare multiple `SonarrPanel {}` in the bar structure with distinct `host`/`port`/`apiKeyEnv`; each instance has its own state, timer, Process, and IPC endpoint (via `ipcPrefix` chain); no registration or naming scheme in Nix
+- [3] ✅ Secret via env var — `apiKeyEnv` property names the environment variable to read; the user wires it through `programs.kh-ui.bar.environment` (plaintext) or `environmentFiles` (sops/agenix); no plugin-specific Nix options
+- [4] ✅ IPC — plugin exposes `<ipcPrefix>.sonarr` with `getNewCount()`, `getRecentGrabs()`, `getError()`
+- [5] ⬜ Click-to-open panel — currently badge-only; wrap the badge in a `BarDropdown`/`BarGroup` (or add a click area) that opens a panel listing the recent grabs already held in `_state.recentGrabs` (series title, S/E, timestamp)
+- [6] ⬜ Upcoming releases — poll `/api/v3/calendar` in addition to `/queue`; render upcoming episodes in the panel alongside recent grabs
+- [7] ⬜ Configuration validation — catch misconfiguration at `Component.onCompleted` before the first poll rather than letting it show up as a cryptic runtime failure. Required: `apiKeyEnv` is set, names an env var that actually resolves to a non-empty string, `host` is non-empty, `port` is in `1..65535`, `pollInterval` ≥ some sane minimum (e.g. 5 s). Today a bare `SonarrPanel {}` with nothing configured silently polls `http://localhost:8989` with an unset env var and only produces the generic `"API key not set"` message; the fix is one validation pass that sets a specific `_state.error` per failed check (e.g. `"SONARR_TV env var is empty"`, `"port 70000 out of range"`) and skips polling until the config changes
+- [8] ⬜ Transport error detection — current error handling only catches parse failures and API error objects; curl failures (connection refused, DNS, timeout, TLS) silently set `_state.loading = false` in `onExited` without setting `_state.error`, so the badge keeps showing stale data. Switch to `curl -f` (fail on HTTP ≥ 400), check `exitCode` in `onExited`, and surface distinct messages for *network unreachable*, *401 unauthorised* (bad API key), *404* (wrong host/port), and *5xx* (Sonarr down)
+- [9] ⬜ Per-instance error context — with multiple `SonarrPanel {}` instances, `_state.error` strings like `"Parse error"` or `"Empty response"` don't identify which server failed; prefix errors with the host or a user-provided `label` property so the tooltip/panel shows *which* instance is broken
+- [10] ⬜ Retry with backoff — after a transport error, the plugin keeps polling at the full `pollInterval`, delaying recovery when the server comes back but also hammering it during outages; use exponential backoff (e.g. 10 s → 60 s → 300 s cap) while `_state.error` is set, reset on the first success
+- [11] ⬜ Surface errors via Core [6] — once the bar's shared plugin error surface exists (Core [6]), wire `SonarrPanel` through it so errors become a visible tooltip / toast / badge in a consistent way across plugins instead of the current "!" glyph + `base08` colour, which doesn't reveal the error message without calling `getError()` over IPC
 
 ### Network
 
