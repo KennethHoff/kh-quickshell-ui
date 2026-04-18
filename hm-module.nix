@@ -159,6 +159,18 @@ in
                 default = "Search...";
                 description = "Placeholder text shown in the search field when this plugin is active.";
               };
+              label = lib.mkOption {
+                type = lib.types.str;
+                default = "";
+                description = ''
+                  Display name shown on the plugin chip in the launcher.
+                  Defaults to the plugin key (the attribute name under
+                  <option>scriptPlugins</option>) when empty, so e.g. a plugin
+                  keyed <literal>hyprland-windows</literal> can present itself
+                  as <literal>Windows</literal> without changing its stable
+                  IPC identifier.
+                '';
+              };
             };
           }
         );
@@ -275,7 +287,7 @@ in
             };
             userPlugins = lib.mapAttrs (_: cfg: {
               script = toString cfg.script;
-              inherit (cfg) frecency hasActions placeholder;
+              inherit (cfg) frecency hasActions placeholder label;
               default = false;
             }) launcherCfg.scriptPlugins;
             allPlugins = appsPlugin.plugins // userPlugins;

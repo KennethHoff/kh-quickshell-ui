@@ -16,6 +16,8 @@ A **plugin** is a named item source. Each plugin has:
 
 | Field | Type | Description |
 |---|---|---|
+| *key* | string | The attribute name / IPC identifier — stable, machine-facing (e.g. `hyprland-windows`). Used by `activatePlugin`, `removePlugin`, `registerPlugin`, and the plugin's entry in `listPlugins` output |
+| `label` | string | Human-facing display name shown on the plugin chip in the launcher. Defaults to the key when empty, so a key like `hyprland-windows` can present itself as `Windows` without changing its IPC identity |
 | `script` | path (string) | Executable that outputs items as TSV to stdout |
 | `frecency` | bool | Track launch frequency and boost frequently-used items |
 | `hasActions` | bool | Enable desktop-action sub-mode (parses `[Desktop Action]` sections from `.desktop` files) |
@@ -53,6 +55,7 @@ programs.kh-ui.launcher.scriptPlugins.emoji = {
     #   printf '%s %s\t\t\techo %s | wl-copy\n' "$emoji" "$name" "$emoji"
     # done < /path/to/emoji.tsv
   '';
+  label = "Emoji";
   placeholder = "Search emoji...";
 };
 ```
@@ -67,9 +70,13 @@ programs.kh-ui.launcher.scriptPlugins.system = {
     echo -e "Reboot\tRestart the machine\t\tsystemctl reboot"
     echo -e "Shutdown\tPower off\t\tsystemctl poweroff"
   '';
+  label = "System";
   placeholder = "System command...";
 };
 ```
+
+The attribute name (`emoji`, `system`) is the stable IPC identifier; `label`
+is purely cosmetic. If `label` is omitted, the chip shows the attribute name.
 
 ### Example: window switcher (Hyprland)
 
@@ -80,6 +87,7 @@ programs.kh-ui.launcher.scriptPlugins.windows = {
       .[] | "\(.title)\t\(.class)\t\thyprctl dispatch focuswindow address:\(.address)"
     ' <<< "$(hyprctl clients -j)"
   '';
+  label = "Windows";
   placeholder = "Switch window...";
 };
 ```
@@ -110,15 +118,16 @@ its TSV output, just like Nix-configured plugins:
 
 ```bash
 qs ipc -c kh-launcher call launcher registerPlugin \
-  "bookmarks" "/path/to/bookmarks-script.sh" false false "Search bookmarks..."
+  "bookmarks" "/path/to/bookmarks-script.sh" false false "Search bookmarks..." "Bookmarks"
 ```
 
 Arguments to `registerPlugin`:
-1. `name` (string) — plugin name
+1. `name` (string) — plugin key / IPC identifier
 2. `script` (string) — path to executable (empty string for push-based plugins)
 3. `frecency` (bool) — enable frecency tracking
 4. `hasActions` (bool) — enable desktop-action sub-mode
 5. `placeholder` (string) — search field placeholder
+6. `label` (string) — display name on the chip; pass `""` to fall back to the key
 
 Then activate it:
 
@@ -135,7 +144,7 @@ finder, a daemon that streams results, or a test harness:
 ```bash
 # Register an empty plugin
 qs ipc -c kh-launcher call launcher registerPlugin \
-  "picker" "" false false "Pick an item..."
+  "picker" "" false false "Pick an item..." "Picker"
 
 # Push items (each call adds one item to the buffer)
 qs ipc -c kh-launcher call launcher addItem \
@@ -218,9 +227,9 @@ qs ipc -c kh-launcher prop get launcher lastSelection
 | `returnToDefault` | — | Switch to the default plugin |
 | `nextPlugin` | — | Cycle to the next registered plugin |
 | `prevPlugin` | — | Cycle to the previous registered plugin |
-| `registerPlugin` | `name, script, frecency, hasActions, placeholder` | Register or replace a runtime plugin |
+| `registerPlugin` | `name, script, frecency, hasActions, placeholder, label` | Register or replace a runtime plugin (`label` empty → chip shows `name`) |
 | `removePlugin` | `name` | Remove a plugin (returns to default if active) |
-| `listPlugins` | — | Returns space-separated list of plugin names |
+| `listPlugins` | — | Returns space-separated list of plugin keys |
 | `addItem` | `plugin, label, description, icon, callback` | Push an item into a plugin's buffer |
 | `addItemWithId` | `plugin, label, description, icon, callback, id` | Push an item with explicit id |
 | `itemsReady` | `plugin` | Flush the buffer and display items |

@@ -55,7 +55,9 @@ Item {
     // ── Runtime plugin registry ───────────────────────────────────────────────
     // Seeded from PluginRegistry (Nix) at startup.  Mutable at runtime via
     // registerPlugin / removePlugin.  Each entry:
-    //   { script, frecency, hasActions, placeholder, default }
+    //   { script, frecency, hasActions, placeholder, label, default }
+    // The key is the stable identifier used by IPC; `label` is what the chip
+    // in the plugin bar displays (falls back to the key when empty).
     property var _plugins: ({})
 
     // Seed the runtime registry from Nix-generated PluginRegistry on startup.
@@ -207,7 +209,9 @@ Item {
     }
 
     // Register (or replace) a plugin in the runtime registry.
-    function registerPlugin(name, script, frecency, hasActions, placeholder) {
+    // `label` is the display name shown on the plugin chip; empty falls back
+    // to the plugin key.
+    function registerPlugin(name, script, frecency, hasActions, placeholder, label) {
         const p = {}
         for (const k in _plugins) p[k] = _plugins[k]
         p[name] = {
@@ -215,9 +219,16 @@ Item {
             frecency:    !!frecency,
             hasActions:  !!hasActions,
             placeholder: placeholder || "Search...",
+            label:       label       || name,
             "default":   false
         }
         _plugins = p
+    }
+
+    // Return the display label for a plugin key, falling back to the key.
+    function pluginLabel(name) {
+        const p = _plugins[name]
+        return (p && p.label) ? p.label : name
     }
 
     // Remove a plugin from the runtime registry.  If the removed plugin is
@@ -793,7 +804,7 @@ Item {
                         Text {
                             id: chipLabel
                             anchors.centerIn: parent
-                            text: modelData
+                            text: pluginList.pluginLabel(modelData)
                             color: modelData === pluginList._activePlugin ? cfg.color.base0D : cfg.color.base04
                             font.family: cfg.fontFamily
                             font.pixelSize: cfg.fontSize - 3

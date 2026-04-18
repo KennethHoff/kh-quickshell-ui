@@ -119,6 +119,7 @@ in
       frecency = true;
       hasActions = true;
       placeholder = "Search applications...";
+      label = "Apps";
       default = true;
     };
   };

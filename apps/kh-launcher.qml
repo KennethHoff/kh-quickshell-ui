@@ -107,9 +107,11 @@ ShellRoot {
         function itemsReady(plugin: string): void    { list.itemsReady(plugin) }
         // ipc only — return to the default plugin
         function returnToDefault(): void             { list.activateDefaultPlugin() }
-        // ipc only — register or replace a plugin in the runtime registry
-        function registerPlugin(name: string, script: string, frecency: bool, hasActions: bool, placeholder: string): void {
-            list.registerPlugin(name, script, frecency, hasActions, placeholder)
+        // ipc only — register or replace a plugin in the runtime registry.
+        // `label` is the display name shown on the plugin chip; empty falls
+        // back to `name` (the stable identifier used by IPC).
+        function registerPlugin(name: string, script: string, frecency: bool, hasActions: bool, placeholder: string, label: string): void {
+            list.registerPlugin(name, script, frecency, hasActions, placeholder, label)
         }
         // ipc only — remove a plugin from the runtime registry
         function removePlugin(name: string): void      { list.removePlugin(name) }
@@ -176,7 +178,7 @@ ShellRoot {
         function itemsReady(plugin: string): void     { functionality.itemsReady(plugin) }
         function returnToDefault(): void              { functionality.returnToDefault() }
         // Plugin registry
-        function registerPlugin(name: string, script: string, frecency: bool, hasActions: bool, placeholder: string): void { functionality.registerPlugin(name, script, frecency, hasActions, placeholder) }
+        function registerPlugin(name: string, script: string, frecency: bool, hasActions: bool, placeholder: string, label: string): void { functionality.registerPlugin(name, script, frecency, hasActions, placeholder, label) }
         function removePlugin(name: string): void       { functionality.removePlugin(name) }
         function listPlugins(): string                  { return functionality.listPlugins() }
         function nextPlugin(): void                     { functionality.nextPlugin() }
