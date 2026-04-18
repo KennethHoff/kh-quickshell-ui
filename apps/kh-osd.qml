@@ -19,6 +19,14 @@ ShellRoot {
 
     NixConfig { id: cfg }
 
+    // Load the icon font directly from the nix-store path baked into NixConfig.
+    // Avoids relying on the user's system fonts — Stylix sans-serif lacks the
+    // Material Design PUA glyphs and Qt does not auto-fall-back to them.
+    FontLoader {
+        id: iconFont
+        source: "file://" + cfg.iconFontFile
+    }
+
     // ── PipeWire ──────────────────────────────────────────────────────────────
     PwObjectTracker { objects: [Pipewire.defaultAudioSink] }
 
@@ -48,9 +56,20 @@ ShellRoot {
     QtObject {
         id: functionality
 
+        // Icon tiers split the configured max into thirds: low / medium / high.
+        // Scales with volumeMax so the glyph tracks the bar's visual fill.
+        readonly property real lowMax: cfg.volumeMax / 3
+        readonly property real medMax: cfg.volumeMax * 2 / 3
+
+        function iconForVol(vol: real): string {
+            if (vol < lowMax) return "volume-low"
+            if (vol < medMax) return "volume-medium"
+            return "volume-high"
+        }
+
         // ui only
         function onVolumeChanged(vol: real): void {
-            trigger(Math.round(vol * 100), vol < 0.15 ? "volume-low" : "volume")
+            trigger(Math.round(vol * 100), iconForVol(vol))
         }
         // ui only
         function onMutedChanged(muted: bool): void {
@@ -58,7 +77,7 @@ ShellRoot {
             else       onVolumeChanged(audio.vol)
         }
         // ipc only
-        function showVolume(value: int): void { trigger(value, value < 15 ? "volume-low" : "volume") }
+        function showVolume(value: int): void { trigger(value, iconForVol(value / 100)) }
         // ipc only
         function showMuted(): void            { trigger(0, "volume-mute") }
 
@@ -130,17 +149,20 @@ ShellRoot {
                     anchors.centerIn: parent
                     spacing: 14
 
-                    // Icon
+                    // Icon — font.family comes from the FontLoader above so the glyph
+                    // renders from the bundled nix-store font regardless of the user's
+                    // system-wide font setup.
                     Text {
                         anchors.verticalCenter: parent.verticalCenter
                         color: state.icon === "volume-mute" ? cfg.color.base03 : cfg.color.base05
-                        font.family: cfg.fontFamily
+                        font.family: iconFont.name
                         font.pixelSize: cfg.fontSize + 6
                         text: {
                             switch (state.icon) {
-                                case "volume-mute": return "\uF026"  // fa-volume-off
-                                case "volume-low":  return "\uF027"  // fa-volume-down
-                                default:            return "\uF028"  // fa-volume-up
+                                case "volume-mute":   return "\u{F075F}"  // mdi-volume-off
+                                case "volume-low":    return "\u{F057F}"  // mdi-volume-low (one wave)
+                                case "volume-medium": return "\u{F0580}"  // mdi-volume-medium (two waves)
+                                default:              return "\u{F057E}"  // mdi-volume-high (three waves)
                             }
                         }
                     }
