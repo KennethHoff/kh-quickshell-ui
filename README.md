@@ -16,14 +16,14 @@ Everything controllable via keyboard is also controllable via [Quickshell IPC](h
 
 ## Quick start
 
-Run a component directly without installing:
+Try out a component directly:
 
 ```bash
-nix run .#kh-bar
-nix run .#kh-launcher
-nix run .#kh-cliphist
-nix run .#kh-view
-nix run .#kh-osd
+nix run github:KennethHoff/kh-quickshell-ui#kh-bar
+nix run github:KennethHoff/kh-quickshell-ui#kh-launcher
+nix run github:KennethHoff/kh-quickshell-ui#kh-cliphist
+nix run github:KennethHoff/kh-quickshell-ui#kh-view
+nix run github:KennethHoff/kh-quickshell-ui#kh-osd
 ```
 
 ## Flake integration
