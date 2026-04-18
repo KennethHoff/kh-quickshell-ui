@@ -144,8 +144,8 @@ Item {
     }
 
     // ── Metadata stores ───────────────────────────────────────────────────────
-    MetaStore { id: pinStore;  bash: bin.bash; storeKey: "pins" }
-    MetaStore { id: tsStore;   bash: bin.bash; storeKey: "timestamps" }
+    MetaStore { id: pinStore;  bash: bin.bash; appName: "kh-cliphist"; storeKey: "pins" }
+    MetaStore { id: tsStore;   bash: bin.bash; appName: "kh-cliphist"; storeKey: "timestamps" }
 
     // Append `text` to the search field (IPC use only — not for key events).
     function typeText(text) {

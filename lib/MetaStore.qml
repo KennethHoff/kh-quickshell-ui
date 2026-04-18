@@ -1,12 +1,13 @@
-// Generic id→value metadata store for kh-cliphist.
+// Generic id→value metadata store.
 //
-// Manages one file under $XDG_DATA_HOME/kh-cliphist/meta/<storeKey>.
+// Manages one file under $XDG_DATA_HOME/<appName>/meta/<storeKey>.
 // File format: id<TAB>value<LF> per line.
 //
 // Usage:
 //   MetaStore {
 //       id:       myStore
 //       bash:     bin.bash
+//       appName:  "kh-cliphist"
 //       storeKey: "attribution"
 //       onLoaded: doSomethingWithMyStore.values
 //   }
@@ -26,6 +27,7 @@ Item {
     id: store
 
     property string bash:     ""   // path to bash binary; set before calling load()
+    property string appName:  ""   // subdir under $XDG_DATA_HOME; set before calling load()
     property string storeKey: ""   // filename under meta/; set before calling load()
     property var    values:   ({}) // live id → value map (reassign to notify bindings)
 
@@ -33,7 +35,7 @@ Item {
 
     // ── Public API ─────────────────────────────────────────────────────────────
     function load() {
-        if (!bash || !storeKey) return
+        if (!bash || !appName || !storeKey) return
         pathProcess.running = true
     }
 
@@ -126,7 +128,7 @@ Item {
     Process {
         id: pathProcess
         command: [store.bash, "-c",
-            'f="${XDG_DATA_HOME:-$HOME/.local/share}/kh-cliphist/meta/' + store.storeKey + '"' +
+            'f="${XDG_DATA_HOME:-$HOME/.local/share}/' + store.appName + '/meta/' + store.storeKey + '"' +
             '; mkdir -p "$(dirname "$f")"' +
             '; printf "%s\\n" "$f"']
         stdout: SplitParser {

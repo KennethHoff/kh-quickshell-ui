@@ -82,13 +82,13 @@ apps/
     CliphistEntry.qml     # ← move from lib/
     ClipList.qml
     ClipPreview.qml
-    MetaStore.qml
 
 lib/                      # cross-app reusables only
   FormatBytes.qml         # utility; used by multiple apps
   FuzzyScore.qml          # used by launcher + cliphist
   HelpFilter.qml          # used by HelpOverlay (shared)
   HelpOverlay.qml         # used by launcher + cliphist
+  MetaStore.qml           # used by launcher (frecency) + cliphist (pins, timestamps)
   Overlay.qml             # used by HelpOverlay + cliphist
   SearchParser.qml        # used by launcher + cliphist
   TextStats.qml           # utility
