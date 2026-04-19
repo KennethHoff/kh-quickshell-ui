@@ -425,6 +425,7 @@ or stdin; shows all files side-by-side with Tab to cycle focus between panes.
 - [5] ✅ IPC — `target: "view"`; `next()`/`prev()`/`seek(n)`/`quit()`/`setFullscreen(bool)`/`key(k)`; readable props `currentIndex`, `count`, `fullscreen`, `hasPrev`, `hasNext`
 - [6] ⬜ Optional pane labels — each pane optionally shows a header bar with a short name and description; `kh-view` accepts label metadata alongside each file via a sidecar format or extended list protocol *(implement together with Dev Tooling → screenshot skill labels)*
 - [7] ⬜ Monitor selection — `--monitor <name|index>` flag; defaults to the monitor containing the active window
+- [8] ⬜ Gallery history — persist recent sessions (file list + labels) to `$XDG_DATA_HOME/kh-view/history.jsonl`; recall a prior gallery via `--recall [N]` or IPC so a closed window can be reopened. Motivating case: "Show me the previous gallery please, I accidentally closed it"
 
 ### Navigation
 
