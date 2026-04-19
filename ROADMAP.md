@@ -506,7 +506,7 @@ via keybind or IPC.
 
 Improvements to the Claude skills and agentic development workflow.
 
-- [1] ⬜ `screenshot` skill passes labels to `kh-view` — once kh-view supports optional pane labels, update the skill to supply a name and short description for each shot (what app/state it shows, what to look for); makes review sessions self-documenting without manual annotation *(implement together with File Viewer → optional pane labels)*
+- [1] ✅ `screenshot` skill passes labels to `kh-view` — once kh-view supports optional pane labels, update the skill to supply a name and short description for each shot (what app/state it shows, what to look for); makes review sessions self-documenting without manual annotation *(implement together with File Viewer → optional pane labels)*
 - [2] ⬜ Headless Hyprland for workspace preview screenshots — `kh-bar`'s Workspaces plugin uses
   `Quickshell.Hyprland` types and `ScreencopyView`, which require a live Hyprland session;
   Sway headless can't drive them.

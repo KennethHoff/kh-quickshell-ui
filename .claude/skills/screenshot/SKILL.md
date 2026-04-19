@@ -25,7 +25,19 @@ screenshots".
 | kh-cliphist | `.#kh-cliphist` | `cliphist` (`toggle`) | full screen | |
 | kh-launcher | `.#kh-launcher` | `launcher` (`toggle`) | full screen | |
 | kh-osd | `.#kh-osd` | `osd` (`showVolume N`, `showMuted`) | `1720,2000 400x100` | OSD fades; screenshot before it disappears. |
-| kh-view | `.#kh-view` | — | full screen | Accepts file **or directory** paths (dirs expand to image files). Or set `KH_VIEW_LIST=<file>` — newline-separated paths. |
+| kh-view | `.#kh-view` | — | full screen | Accepts file **or directory** paths (dirs expand to image files). Use `--label <file> <label> <desc>` to label panes. |
+
+## kh-view: Labelled view
+
+When you want to label each pane in kh-view (e.g., screenshots with names and descriptions), pass each file with `--label`:
+
+```bash
+nix run .#kh-view -- \
+  --label /path/to/file1 "Label 1" "Description 1" \
+  --label /path/to/file2 "Label 2" "Description 2" &
+```
+
+Each `--label` consumes three arguments: `<file>`, `<label>`, `<description>`. Bare paths (no `--label`) show no header. Directories passed with `--label` apply the same label/description to every image file found.
 
 ## Pipeline (single shot)
 
@@ -126,11 +138,15 @@ needs hermetic fonts (e.g. comparing against reference pixels), set
 
 When — and only when — the user explicitly asks to view the screenshots
 (e.g. "show me", "open it", "view the results"), open them in `kh-view`
-using the pinned known-good commit. Pass all paths as arguments — they
-open side-by-side.
+using the pinned known-good commit with the `--label` wrapper flag.
+**Always label screenshots** — the label and description should describe
+what each shot shows, not just the app name.
 
 ```bash
-nix run "git+file://$PWD?rev=0d90a3bdc2de0046587e9bb2197a414989e16bab#kh-view" -- <path1> [<path2> ...]
+nix run "git+file://$PWD?rev=239edbdd4c661f572aee55d8a3bad4f87d264b04#kh-view" -- \
+  --label "$path1" "Closed state"   "Bar with no popups open"  \
+  --label "$path2" "Dropdown open"  "Volume plugin expanded"   \
+  --label "$path3" "Search results" "Launcher with query typed" &
 ```
 
 Update the pinned commit when kh-view reaches a new stable state.
