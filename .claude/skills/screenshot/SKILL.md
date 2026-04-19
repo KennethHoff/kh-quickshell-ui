@@ -1,6 +1,6 @@
 ---
 name: screenshot
-description: Take headless screenshots of a quickshell app by running the sway + quickshell + grim pipeline directly.
+description: Capture headless screenshots of a quickshell app (kh-bar, kh-launcher, kh-cliphist, kh-osd, kh-view) via a sway + quickshell + grim pipeline. Use when the user asks for a screenshot / "show me" / "take a shot", for visual verification after .qml or theme changes, to debug UI regressions, or to compare revisions side-by-side ("it worked earlier" / "why does this look different").
 allowed-tools: Bash, Read
 ---
 
