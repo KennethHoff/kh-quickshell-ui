@@ -13,7 +13,7 @@
 //   yankTextRequested(string text)  — emit when the user yanks in visual mode
 //
 // Example:
-//   TextViewer {
+//   ContentViewer {
 //       id: viewer
 //       text: someText
 //       focused: detailFocused
@@ -63,7 +63,7 @@ Item {
         return ""
     }
 
-    // Hint covering only what TextViewer itself handles; parent adds surrounding
+    // Hint covering only what ContentViewer itself handles; parent adds surrounding
     // context (Esc back, Tab, Enter fullscreen, y in normal mode, etc.)
     readonly property string hintText: {
         if (_visualMode === "char")

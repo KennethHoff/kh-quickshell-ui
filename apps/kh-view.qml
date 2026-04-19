@@ -278,7 +278,7 @@ ShellRoot {
                         }
                     }
 
-                    TextViewer {
+                    ContentViewer {
                         id: paneViewer
                         anchors {
                             top: parent.top

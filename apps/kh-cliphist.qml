@@ -5,7 +5,7 @@
 //
 // This file owns: window, IPC, global paste/yank, focus routing, fullscreen
 // overlay, and HelpOverlay. All list and preview logic lives in ClipList and
-// ClipPreview respectively. TextViewer and HelpOverlay are reusable lib components.
+// ClipPreview respectively. ContentViewer and HelpOverlay are reusable lib components.
 import QtQuick
 import Quickshell
 import Quickshell.Io
@@ -292,7 +292,7 @@ ShellRoot {
                     color: cfg.color.base00
                     z: 5
 
-                    TextViewer {
+                    ContentViewer {
                         id: fsViewer
                         anchors.fill: parent
 

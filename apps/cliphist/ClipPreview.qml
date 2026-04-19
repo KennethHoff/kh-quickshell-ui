@@ -1,7 +1,7 @@
 // Clipboard history detail panel.
 //
-// A thin shell around TextViewer. Owns the decode processes, refresh debounce,
-// and stats bar. Delegates all text navigation and visual selection to TextViewer.
+// A thin shell around ContentViewer. Owns the decode processes, refresh debounce,
+// and stats bar. Delegates all text navigation and visual selection to ContentViewer.
 //
 // The orchestrator sets `entry` whenever the list selection changes.
 // ClipPreview debounces the decode and manages its own loading state.
@@ -14,14 +14,14 @@
 //   text          — decoded text content (empty while loading or image)
 //   isImage       — true while showing an image entry
 //   imageSource   — "file://..." for images; empty otherwise
-//   hintText      — forwarded from TextViewer (changes by visual mode)
-//   modeText      — forwarded from TextViewer ("CHR"/"LIN"/"BLK"/"")
+//   hintText      — forwarded from ContentViewer (changes by visual mode)
+//   modeText      — forwarded from ContentViewer ("CHR"/"LIN"/"BLK"/"")
 //
 // Signals:
 //   exitFocus()                   — Tab or Esc in normal mode → orchestrator unfocuses
 //   fullscreenRequested()         — Enter in normal mode
 //   yankEntryRequested(rawLine)   — y in normal mode → orchestrator runs yank
-//   yankTextRequested(text)       — y in visual mode (forwarded from TextViewer)
+//   yankTextRequested(text)       — y in visual mode (forwarded from ContentViewer)
 import QtQuick
 import Quickshell.Io
 import "./lib"
@@ -63,7 +63,7 @@ Item {
 
         if (viewer.handleKey(event)) return true
 
-        // These are returned false by TextViewer in normal mode
+        // These are returned false by ContentViewer in normal mode
         if (event.key === Qt.Key_Escape || event.key === Qt.Key_Tab || event.text === "q") {
             exitFocus(); return true
         }
@@ -281,8 +281,8 @@ Item {
         }
     }
 
-    // Main content via TextViewer
-    TextViewer {
+    // Main content via ContentViewer
+    ContentViewer {
         id: viewer
         anchors.top: previewHeader.bottom
         anchors.bottom: statsBar.top
