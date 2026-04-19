@@ -6,11 +6,6 @@
 # the callback stays stable regardless of how many sessions have landed
 # since the launcher scanned.
 #
-# After kh-view exits, the callback re-opens the launcher with the
-# Galleries plugin active so Esc in the viewer feels like "back to the
-# gallery" rather than "close everything".  On a fresh install with no
-# launcher daemon running the IPC call is a silent no-op.
-#
 # History persistence lives in the kh-view wrapper — the plugin only
 # reads.  If the file is missing (fresh install) the script exits cleanly
 # and the plugin stays registered but empty.
@@ -31,7 +26,7 @@ let
     # - label:       "YYYY-MM-DD HH:MM"  ("  ·  <first label>" appended when present)
     # - description: "<N> item(s)"       (+ first path when no label exists)
     # - icon:        first item's path when it is an image, else empty (→ letter tile)
-    # - callback:    kh-view --recall-ts <ts>; launcher activatePlugin
+    # - callback:    kh-view --recall-ts <ts>
     # - id:          <ts>  (stable; MetaStore key for this entry)
 
     set -eu
@@ -40,13 +35,6 @@ let
     _date=${lib.getExe' pkgs.coreutils "date"}
     _sort=${lib.getExe' pkgs.coreutils "sort"}
     _kh_view=${khViewWrapper}
-    _qs=${lib.getExe pkgs.quickshell}
-
-    # When kh-view exits, re-open the launcher on the Galleries plugin so
-    # Esc in the viewer returns to the gallery list (rather than closing
-    # everything).  `|| true` keeps the pipeline resilient if no launcher
-    # daemon is listening.
-    _reopen="$_qs ipc call launcher activatePlugin kh-view-history || true"
 
     history="''${XDG_DATA_HOME:-$HOME/.local/share}/kh-view/meta/history"
     [ -f "$history" ] || exit 0
@@ -100,7 +88,7 @@ let
         icon="$first_path"
       fi
 
-      callback="$_kh_view --recall-ts $ts; $_reopen"
+      callback="$_kh_view --recall-ts $ts"
 
       printf '%s\t%s\t%s\t%s\t%s\n' \
         "$label" "$desc" "$icon" "$callback" "$ts"
