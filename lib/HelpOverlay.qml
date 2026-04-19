@@ -32,7 +32,7 @@ Overlay {
     property var sections: []   // [{title: string, bindings: [{key, desc}]}]
 
     // ── Wire footer to filter state ───────────────────────────────────────────
-    footerText:      _filtering ? (_filterText || "") : "/  filter  \u00b7  ?  close"
+    footerText:      _filtering ? (_filterText || "") : "/ filter  \u00b7  ? close"
     footerTextColor: (_filtering && _filterText) ? textColor : dimColor
 
     // ── Public API ─────────────────────────────────────────────────────────────

@@ -20,7 +20,6 @@
 // Signals:
 //   exitFocus()                   — Tab or Esc in normal mode → orchestrator unfocuses
 //   fullscreenRequested()         — Enter in normal mode
-//   yankEntryRequested(rawLine)   — y in normal mode → orchestrator runs yank
 //   yankTextRequested(text)       — y in visual mode (forwarded from ContentViewer)
 import QtQuick
 import Quickshell.Io
@@ -50,7 +49,6 @@ Item {
     // ── Signals ───────────────────────────────────────────────────────────────
     signal exitFocus()
     signal fullscreenRequested()
-    signal yankEntryRequested(string rawLine)
     signal yankTextRequested(string text)
 
     // ── Public API ─────────────────────────────────────────────────────────────
@@ -70,9 +68,6 @@ Item {
         if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
             fullscreenRequested(); return true
         }
-        if (event.text === "y") {
-            yankEntryRequested(entry); return true
-        }
         return false
     }
 
@@ -83,9 +78,6 @@ Item {
         }
         if (lk === "enter" || lk === "return") {
             fullscreenRequested(); return true
-        }
-        if (lk === "y") {
-            yankEntryRequested(entry); return true
         }
         if (lk === "v") {
             // Synthesise a "v" key event to toggle char visual mode

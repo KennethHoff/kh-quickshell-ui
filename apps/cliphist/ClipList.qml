@@ -18,7 +18,7 @@
 // Signals:
 //   openDetail()                    — Tab in normal mode
 //   closeRequested()                — Esc in normal mode
-//   yankEntryRequested(rawLine)     — y key (flash is triggered internally)
+//   yankEntryRequested(rawLine)     — Enter (flash is triggered internally)
 //   searchEscapePressed()           — Esc in insert mode; orchestrator reclaims focus
 //
 // handleKey(event) → bool
@@ -76,10 +76,10 @@ Item {
                    "  \u00b7  y confirm  \u00b7  Esc cancel"
         }
         if (_mode === "visual")
-            return "j/k  select  \u00b7  d delete  \u00b7  v / Esc  normal mode"
+            return "j/k select  \u00b7  d delete  \u00b7  q / v / Esc normal mode  \u00b7  ? help"
         if (_mode === "normal")
-            return "j/k navigate  \u00b7  v visual  \u00b7  y copy  \u00b7  d delete  \u00b7  p pin  \u00b7  Tab detail  \u00b7  / search  \u00b7  ? help  \u00b7  Esc close"
-        return "Esc  normal mode  \u00b7  ?  help"
+            return "j/k navigate  \u00b7  Enter copy  \u00b7  v visual  \u00b7  d delete  \u00b7  p pin  \u00b7  Tab detail  \u00b7  / search  \u00b7  ? help  \u00b7  Esc close"
+        return "Esc / Enter normal mode  \u00b7  ? help"
     }
 
     // ── Signals ───────────────────────────────────────────────────────────────
@@ -199,7 +199,7 @@ Item {
             if (_mode === "normal") { enterVisualMode(); return true }
             return false
         }
-        if (lk === "y") {
+        if (lk === "enter" || lk === "return") {
             if (selectedEntry !== "") { flash(selectedIndex); yankEntryRequested(selectedEntry) }
             return true
         }
@@ -371,7 +371,7 @@ Item {
             if (event.key === Qt.Key_U && (event.modifiers & Qt.ControlModifier)) {
                 navHalfUp(); return true
             }
-            if (event.text === "y") {
+            if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
                 if (clipList.selectedEntry !== "") { flash(clipList.selectedIndex); yankEntryRequested(clipList.selectedEntry) }
                 return true
             }
@@ -608,13 +608,13 @@ Item {
                 width: modeLabel.implicitWidth + 12
                 height: 22
                 radius: 4
-                color: cfg.color.base02
+                color: clipList._mode === "visual" ? "#33" + cfg.color.base0D.slice(1) : cfg.color.base02
 
                 Text {
                     id: modeLabel
                     anchors.centerIn: parent
                     text: clipList.modeText
-                    color: clipList._mode === "visual" ? cfg.color.base0E : cfg.color.base0D
+                    color: cfg.color.base0D
                     font.family: cfg.fontFamily
                     font.pixelSize: cfg.fontSize - 3
                     font.bold: true
@@ -645,6 +645,7 @@ Item {
 
                 onTextChanged:        functionality.onSearchTextChanged()
                 Keys.onEscapePressed: functionality.searchEscape()
+                Keys.onReturnPressed: functionality.searchEscape()
                 Keys.onPressed: (event) => functionality.handleSearchCtrlKey(event)
             }
         }

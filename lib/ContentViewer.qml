@@ -72,7 +72,7 @@ Item {
             return "V/Esc exit  \u00b7  j/k extend  \u00b7  o swap  \u00b7  v char  \u00b7  Ctrl+V block  \u00b7  y copy"
         if (_visualMode === "block")
             return "Ctrl+V/Esc exit  \u00b7  j/k/h/l move  \u00b7  o diag  \u00b7  O col  \u00b7  v char  \u00b7  y copy"
-        return "hjkl cursor  \u00b7  w/b/e word  \u00b7  0/$  line  \u00b7  v/V/Ctrl+V visual"
+        return "hjkl cursor  \u00b7  w/b/e word  \u00b7  0/$ line  \u00b7  v/V/Ctrl+V visual"
     }
 
     // ── Signals ──────────────────────────────────────────────────────────────

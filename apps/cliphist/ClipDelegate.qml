@@ -139,7 +139,7 @@ Item {
             id: flashOverlay
             anchors.fill: parent
             radius: 6
-            color: cfg.color.base0D
+            color: cfg.color.base0B
             opacity: 0
             SequentialAnimation {
                 id: blinkAnim

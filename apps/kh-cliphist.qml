@@ -105,15 +105,12 @@ ShellRoot {
                 else                                 list.handleIpcKey(k)
             }
             else if (lk === "enter" || lk === "return") {
-                if (root.detailFocused && !root.fullscreenShowing) enterFullscreen()
+                if      (root.detailFocused && !root.fullscreenShowing) enterFullscreen()
+                else if (!root.fullscreenShowing)                       pasteSelected()
             }
             else if (lk === "tab") {
                 if      (!root.detailFocused && !root.fullscreenShowing) focusDetail()
                 else if (root.detailFocused)                              unfocusDetail()
-            }
-            else if (lk === "y") {
-                if (list._confirmingDelete) list.handleIpcKey(k)
-                else                        pasteSelected()
             }
             else if (lk === "v") {
                 if (root.fullscreenShowing || root.detailFocused) preview.handleIpcKey(k)
@@ -136,7 +133,9 @@ ShellRoot {
             if (helpOverlay.showing) { event.accepted = helpOverlay.handleKey(event); return }
             if (root.fullscreenShowing) {
                 if (fsViewer.handleKey(event))                             { event.accepted = true; return }
-                if (event.text === "y")                                    { pasteSelected(); event.accepted = true; return }
+                if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                    pasteSelected(); event.accepted = true; return
+                }
                 if (event.key === Qt.Key_Escape || event.text === "q")     { exitFullscreen(); event.accepted = true; return }
                 return
             }
@@ -220,11 +219,11 @@ ShellRoot {
                         if (root.fullscreenShowing)
                             return preview.modeText !== ""
                                 ? preview.hintText
-                                : "Esc back  \u00b7  hjkl/w/b/e cursor  \u00b7  0/$  line  \u00b7  v/V/Ctrl+V visual  \u00b7  y copy"
+                                : "Esc back  \u00b7  hjkl/w/b/e cursor  \u00b7  0/$ line  \u00b7  v/V/Ctrl+V visual  \u00b7  Enter copy"
                         if (root.detailFocused)
                             return preview.modeText !== ""
                                 ? preview.hintText
-                                : "Tab/Esc list  \u00b7  hjkl/w/b/e cursor  \u00b7  0/$  line  \u00b7  v/V/Ctrl+V visual  \u00b7  Enter fullscreen  \u00b7  y copy"
+                                : "Tab / Esc list  \u00b7  hjkl/w/b/e cursor  \u00b7  0/$ line  \u00b7  v/V/Ctrl+V visual  \u00b7  Enter fullscreen"
                         return list.hintText
                     }
                     color: cfg.color.base03
@@ -281,7 +280,6 @@ ShellRoot {
 
                     onExitFocus:           functionality.unfocusDetail()
                     onFullscreenRequested: functionality.enterFullscreen()
-                    onYankEntryRequested:  (rawLine) => functionality.onYankEntryRequested(rawLine)
                     onYankTextRequested:   (text)    => functionality.onYankTextRequested(text)
                 }
 
@@ -321,7 +319,7 @@ ShellRoot {
                 showing:    list._confirmingDelete
                 title:      "CONFIRM DELETE"
                 titleColor: cfg.color.base08
-                footerText: "y  confirm  \u00b7  Esc  cancel"
+                footerText: "y confirm  \u00b7  Esc cancel"
                 maxWidth:   320
                 bgColor:    cfg.color.base01
                 headerBg:   cfg.color.base02
@@ -353,46 +351,54 @@ ShellRoot {
                 sections: [{
                     title: "NORMAL MODE",
                     bindings: [
-                        { key: "j / \u2193", desc: "down" },
-                        { key: "k / \u2191", desc: "up" },
-                        { key: "gg",         desc: "jump to top" },
-                        { key: "G",          desc: "jump to bottom" },
-                        { key: "Ctrl+D",     desc: "half-page down" },
-                        { key: "Ctrl+U",     desc: "half-page up" },
-                        { key: "y",          desc: "copy to clipboard" },
-                        { key: "d",          desc: "delete entry" },
-                        { key: "v",          desc: "visual select mode" },
-                        { key: "p",          desc: "pin / unpin entry" },
-                        { key: "Tab",        desc: "focus detail pane" },
-                        { key: "Enter",      desc: "fullscreen detail" },
-                        { key: "Tab / Esc",  desc: "focus list (from detail)" },
-                        { key: "/",          desc: "focus search" },
-                        { key: "q / Esc",    desc: "close" }
+                        { key: "j / \u2193",   desc: "down" },
+                        { key: "k / \u2191",   desc: "up" },
+                        { key: "gg",           desc: "jump to top" },
+                        { key: "G",            desc: "jump to bottom" },
+                        { key: "Ctrl+D",       desc: "half-page down" },
+                        { key: "Ctrl+U",       desc: "half-page up" },
+                        { key: "Enter",        desc: "copy entry" },
+                        { key: "v",            desc: "visual select mode" },
+                        { key: "d",            desc: "delete entry" },
+                        { key: "p",            desc: "pin / unpin entry" },
+                        { key: "Tab",          desc: "focus detail pane" },
+                        { key: "/",            desc: "focus search" },
+                        { key: "q / Esc",      desc: "close" }
                     ]
                 }, {
                     title: "VISUAL MODE",
                     bindings: [
-                        { key: "j / \u2193", desc: "down" },
-                        { key: "k / \u2191", desc: "up" },
-                        { key: "gg",         desc: "jump to top" },
-                        { key: "G",          desc: "jump to bottom" },
-                        { key: "Ctrl+D",     desc: "half-page down" },
-                        { key: "Ctrl+U",     desc: "half-page up" },
-                        { key: "d",          desc: "delete selected entries" },
-                        { key: "q / v / Esc", desc: "normal mode" }
+                        { key: "j / \u2193",   desc: "down" },
+                        { key: "k / \u2191",   desc: "up" },
+                        { key: "gg",           desc: "jump to top" },
+                        { key: "G",            desc: "jump to bottom" },
+                        { key: "Ctrl+D",       desc: "half-page down" },
+                        { key: "Ctrl+U",       desc: "half-page up" },
+                        { key: "d",            desc: "delete selected entries" },
+                        { key: "q / v / Esc",  desc: "normal mode" }
+                    ]
+                }, {
+                    title: "DETAIL MODE",
+                    bindings: [
+                        { key: "hjkl",         desc: "cursor" },
+                        { key: "w / b / e",    desc: "word motion" },
+                        { key: "0 / $",        desc: "line start / end" },
+                        { key: "v / V / Ctrl+V", desc: "visual select" },
+                        { key: "Enter",        desc: "fullscreen" },
+                        { key: "Tab / Esc",    desc: "focus list" }
                     ]
                 }, {
                     title: "INSERT MODE",
                     bindings: [
-                        { key: "Esc",    desc: "normal mode" },
-                        { key: "Ctrl+A", desc: "cursor to start" },
-                        { key: "Ctrl+E", desc: "cursor to end" },
-                        { key: "Ctrl+F", desc: "cursor forward" },
-                        { key: "Ctrl+B", desc: "cursor back" },
-                        { key: "Ctrl+D", desc: "delete char forward" },
-                        { key: "Ctrl+K", desc: "delete to end of line" },
-                        { key: "Ctrl+W", desc: "delete word back" },
-                        { key: "Ctrl+U", desc: "delete to line start" }
+                        { key: "Esc / Enter",  desc: "normal mode" },
+                        { key: "Ctrl+A",       desc: "cursor to start" },
+                        { key: "Ctrl+E",       desc: "cursor to end" },
+                        { key: "Ctrl+F",       desc: "cursor forward" },
+                        { key: "Ctrl+B",       desc: "cursor back" },
+                        { key: "Ctrl+D",       desc: "delete char forward" },
+                        { key: "Ctrl+K",       desc: "delete to end of line" },
+                        { key: "Ctrl+W",       desc: "delete word back" },
+                        { key: "Ctrl+U",       desc: "delete to line start" }
                     ]
                 }]
 

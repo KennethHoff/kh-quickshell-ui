@@ -104,7 +104,7 @@ Item {
             const multi = Object.keys(_plugins).length > 1 ? dot + "[ / ] switch plugin" : ""
             return "j/k navigate" + (plug ? dot + plug : "") + multi + dot + "/ search" + dot + "? help" + dot + "Esc close"
         }
-        return "Esc  normal mode  \u00b7  ? help"
+        return "Esc / Enter normal mode  \u00b7  ? help"
     }
     readonly property int filteredCount: _filteredItems.length
     readonly property string lastSelection: _lastSelection
