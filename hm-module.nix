@@ -48,7 +48,9 @@ let
       ${lib.optionalString (builtins.pathExists appDir) "find ${appDir} -name '*.qml' -exec cp -t $out/ {} +"}
       ${lib.optionalString (builtins.pathExists pluginsDir) "find ${pluginsDir} -name '*.qml' -exec cp -t $out/ {} + 2>/dev/null || true"}
       ${lib.concatStrings (lib.mapAttrsToList (dest: path: "cp ${path} $out/${dest}\n") generatedFiles)}
-      ${lib.concatMapStrings (d: "find ${toString d} -name '*.qml' -exec cp -t $out/ {} + 2>/dev/null || true\n") extraPluginDirs}
+      ${lib.concatMapStrings (
+        d: "find ${toString d} -name '*.qml' -exec cp -t $out/ {} + 2>/dev/null || true\n"
+      ) extraPluginDirs}
       cp ${nixConfig} $out/NixConfig.qml
       cp ${nixBins}   $out/NixBins.qml
     '';

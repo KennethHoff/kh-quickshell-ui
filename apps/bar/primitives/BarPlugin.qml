@@ -19,8 +19,8 @@ Item {
 
     // The plugin's own IPC segment. When set, the plugin (and every child that
     // walks the parent chain for ipcPrefix) is addressable as
-    // "<parentPrefix>.<ipcName>" — e.g. ipcName: "sonarr" under the dev-bar
-    // yields "dev-bar.sonarr". Plugins that need IPC should set this and
+    // "<parentPrefix>.<ipcName>" — e.g. ipcName: "tailscale" under the dev-bar
+    // yields "dev-bar.tailscale". Plugins that need IPC should set this and
     // declare `IpcHandler { target: ipcPrefix; ... }`; children (BarTooltip
     // with its own ipcName, etc.) automatically nest underneath.
     property string ipcName: ""

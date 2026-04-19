@@ -46,7 +46,7 @@ Item {
     // Scoped IPC prefix — walks the parent chain for the nearest ancestor's
     // ipcPrefix and appends this tooltip's own ipcName segment, mirroring
     // BarPlugin's pattern so nested tooltips and plugins produce consistent
-    // dotted targets (e.g. "dev-bar.sonarr.error"). Empty string means the
+    // dotted targets (e.g. "dev-bar.workspaces.ws1"). Empty string means the
     // walk failed — IpcHandler below refuses to enable so we never register
     // under a fabricated namespace.
     readonly property string ipcPrefix: {

@@ -65,13 +65,12 @@ programs.kh-ui.bar = {
   
   environment = {
     // Direct environment variables (plaintext values)
-    SONARR_TV = "your-api-key";
     EXAMPLE_VAR = "value";
   };
   
   environmentFiles = [
     // Secret files (typically from sops/agenix)
-    config.sops.secrets."sonarr/4k-key".path
+    config.sops.secrets."some/api-key".path
   ];
 };
 ```
@@ -196,86 +195,6 @@ Tailscale status tile. Shows connection state and the machine's Tailscale IP. Cl
 
 Ethernet status tile. Shows the active interface name and link state. Exposes `connected` (bool) and `iface` (string).
 
-### `SonarrPanel`
-
-Sonarr integration tile. Displays the count of recently grabbed episodes from a Sonarr media server. Click to poll the API manually.
-
-Configuration:
-
-```qml
-SonarrPanel {
-    baseUrl: "http://sonarr"         // Required: protocol://host[:port] (port defaults to 80 for http, 443 for https)
-    apiKeyEnv: "SONARR_API_KEY"      // Environment variable name for API key (required)
-    pollInterval: 120                // Poll interval in seconds (optional, default: 120)
-    maxHistoryItems: 20              // Max items to display (optional, default: 20)
-}
-```
-
-**API Key Setup:**
-
-The API key must be passed via an environment variable. Set it in your home-manager config using the standard `environment` + `environmentFiles` pattern:
-
-```nix
-programs.kh-ui.bar = {
-  structure = ''
-    BarRow {
-      Workspaces {}
-      BarSpacer {}
-      SonarrPanel {
-        baseUrl: "http://192.168.1.100:8989"
-        apiKeyEnv: "SONARR_TV"
-      }
-      Clock {}
-      Volume {}
-    }
-  '';
-  
-  environment = {
-    SONARR_TV = "your-api-key";  // Plaintext (not recommended for secrets)
-  };
-};
-```
-
-For secrets, use `sops` or `agenix`:
-
-```nix
-programs.kh-ui.bar.environmentFiles = [
-  config.sops.secrets."sonarr/api-key".path
-];
-```
-
-**Multiple Instances:**
-
-To monitor multiple Sonarr servers, declare multiple `SonarrPanel` instances with different `host` and `apiKeyEnv` values:
-
-```qml
-BarRow {
-  SonarrPanel {
-    baseUrl: "http://sonarr:8989"
-    apiKeyEnv: "SONARR_TV"
-  }
-  SonarrPanel {
-    baseUrl: "https://sonarr.100.x.x.x"
-    apiKeyEnv: "SONARR_4K"
-  }
-}
-```
-
-Each instance polls independently and reads from its own environment variable.
-
-**Exposes:**
-
-- `newCount: int` — Number of recently grabbed episodes
-- `recentGrabs: array` — Array of recent grab items (`{series, season, episode, title, timestamp}`)
-- `loading: bool` — Whether an API call is in progress
-- `error: string` — Runtime/API error from the last poll (empty on success)
-- `configError: string` — Newline-separated list of failed config checks (empty when the config is valid); set by `validateConfig()` on `Component.onCompleted` and whenever `baseUrl`/`pollInterval`/`apiKeyEnv` changes. Polling is skipped while non-empty
-- `hasError: bool` — `configError !== "" || error !== ""`; drives the badge colour and the error `BarTooltip` visibility
-
-**Error surface:**
-
-Hovering the badge opens a `BarTooltip` listing every current error (config + runtime), each line separated by a `BarHorizontalDivider`. The tooltip is also IPC-pinnable — `qs ipc call bar.sonarr.error pin` keeps it visible without a mouse hover, useful for scripts or keyboard-first workflows.
-
 ### `TailscalePeers`
 
 Peer list panel section. Displays the self IP header and all peers with online/offline indicators. Bind it to a `TailscalePanel` via the `source` property — it hides itself when disconnected:
@@ -384,8 +303,6 @@ The root target (`bar`) exposes bar-wide queries:
 | `Notifications` | `.notifications` | `getCount()` -> int, `list()` -> array of `{id, app, summary}`, `clear()` |
 | `TailscalePanel` | `.tailscale` | `isConnected()` -> bool, `getSelfIp()` -> string, `toggle()` |
 | `EthernetPanel` | `.ethernet` | `isConnected()` -> bool, `getIface()` -> string |
-| `SonarrPanel` | `.sonarr` | `getNewCount()` -> int, `getRecentGrabs()` -> array, `getError()` -> string, `getConfigError()` -> string |
-| `SonarrPanel` error tooltip | `.sonarr.error` | `pin()`, `unpin()`, `togglePin()`, `isPinned()` -> bool, `isVisible()` -> bool |
 | `CpuUsage` | `.cpu` | `getUsage()` -> int |
 | `RamUsage` | `.ram` | `getUsedMb()` -> int, `getTotalMb()` -> int, `getPercent()` -> int |
 | `GpuUsage` | `.gpu` | `getBusy()` -> int, `getVramUsedMb()` -> int, `getVramTotalMb()` -> int |
