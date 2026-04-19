@@ -110,9 +110,20 @@
         };
 
       viewConfig = mkAppConfig { name = "view"; };
+      khViewWrapper = import ./scripts/kh-view-wrapper.nix {
+        inherit pkgs lib;
+        viewConfigPath = viewConfig;
+      };
+      khViewHistoryPlugin = import ./apps/launcher/plugins/kh-view-history.nix {
+        inherit pkgs lib khViewWrapper;
+      };
       launcherPluginRegistry =
         let
-          allPlugins = appsPlugin.plugins // hyprlandWindowsPlugin.plugins // emojiPlugin.plugins;
+          allPlugins =
+            appsPlugin.plugins
+            // hyprlandWindowsPlugin.plugins
+            // emojiPlugin.plugins
+            // khViewHistoryPlugin.plugins;
         in
         pkgs.writeText "PluginRegistry.qml" ''
           import QtQuick
@@ -128,7 +139,8 @@
         }
         // (appsPlugin.generatedFiles or { })
         // (hyprlandWindowsPlugin.generatedFiles or { })
-        // (emojiPlugin.generatedFiles or { });
+        // (emojiPlugin.generatedFiles or { })
+        // (khViewHistoryPlugin.generatedFiles or { });
       };
 
       barConfig = mkBarConfig {
@@ -363,12 +375,7 @@
         };
         kh-view = {
           type = "app";
-          program = toString (
-            import ./scripts/kh-view-wrapper.nix {
-              inherit pkgs lib;
-              viewConfigPath = viewConfig;
-            }
-          );
+          program = toString khViewWrapper;
         };
       };
     };
