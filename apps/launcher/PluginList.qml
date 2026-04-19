@@ -122,6 +122,14 @@ Item {
     // Otherwise creates an empty ad-hoc plugin (caller pushes items via
     // addItem + itemsReady).
     function activatePlugin(name) {
+        // Clear the ListView model *before* changing _pluginConfig so the
+        // existing delegates are destroyed first. Otherwise each delegate's
+        // Binding fires `modelData.icon` (still the old plugin's payload)
+        // into iconLoader.item right after it retargets to the new plugin's
+        // iconDelegate — e.g. leaking emoji glyphs into LauncherIconFile's
+        // Image source during an emoji→apps switch.
+        _filteredItems = []
+
         _activePlugin    = name
         _pluginConfig    = _plugins[name] || {}
         _actions       = []
@@ -137,13 +145,11 @@ Item {
         const existing = _pluginItems[name]
         if (existing && existing.length > 0) {
             _allItems      = existing
-            _filteredItems = []
             impl.runFilter()
             return
         }
 
         _allItems      = []
-        _filteredItems = []
 
         if (_pluginConfig.script) {
             pluginProcess.command = [_pluginConfig.script]
