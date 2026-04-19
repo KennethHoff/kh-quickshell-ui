@@ -2,8 +2,9 @@
 # Usage:
 #   kh-view <file-or-dir> [<file-or-dir2> ...]                  # View files without labels
 #   kh-view --label <file> <label> <desc> [--label <file> ...]  # View files with labels
-#   kh-view --recall [N]                                         # Recall Nth-from-newest session (default 1)
-#   kh-view --list-history                                       # Print recent sessions
+#   kh-view --browse-history                                    # Open the history picker
+#   kh-view --recall [N]                                        # Alias: open picker, auto-select Nth-from-newest
+#   kh-view --list-history                                      # Print recent sessions
 #
 # Directory args are expanded to their image files (png/jpg/jpeg/gif/
 # webp/bmp/svg, non-recursive) sorted by filename.
@@ -11,16 +12,16 @@
 # Normal invocations append a session entry to the MetaStore-format file
 #   $XDG_DATA_HOME/kh-view/meta/history (one line per session:
 #   <epoch><TAB><compact JSON items array>).  MetaStore in QML reads the
-#   same file; --recall reads without appending so recalls don't rewrite
-#   history.
+#   same file; --browse-history / --recall do not append so recalls stay
+#   idempotent.
 #
 # Examples:
 #   nix run .#kh-view -- image1.png image2.png
 #   nix run .#kh-view -- --label image1.png "Before" "Initial" --label image2.png "After" "Final"
 #   nix run .#kh-view -- --label ./screenshots/ "All" "Screenshot batch"
-#   nix run .#kh-view -- --recall          # Reopen the most recent gallery
-#   nix run .#kh-view -- --recall 3        # Reopen the third-most-recent gallery
-#   nix run .#kh-view -- --list-history    # Print recent sessions
+#   nix run .#kh-view -- --browse-history          # Pick a prior gallery from a list
+#   nix run .#kh-view -- --recall 3                # Jump straight into the third-most-recent gallery
+#   nix run .#kh-view -- --list-history            # Print recent sessions
 {
   pkgs,
   lib,
@@ -38,6 +39,7 @@ pkgs.writeShellScript "kh-view-wrapper" ''
   history="$data_dir/history"
   mkdir -p "$data_dir"
 
+  browse_history=false
   recall_n=""
   list_history=false
   list=$(mktemp)
@@ -47,6 +49,9 @@ pkgs.writeShellScript "kh-view-wrapper" ''
     if [[ "$1" == "--list-history" ]]; then
       list_history=true
       shift
+    elif [[ "$1" == "--browse-history" ]]; then
+      browse_history=true
+      shift
     elif [[ "$1" == "--recall" ]]; then
       shift
       if [[ $# -gt 0 && "$1" =~ ^[0-9]+$ ]]; then
@@ -55,6 +60,7 @@ pkgs.writeShellScript "kh-view-wrapper" ''
       else
         recall_n=1
       fi
+      browse_history=true
     elif [[ "$1" == "--label" ]]; then
       shift
       if [[ $# -lt 3 ]]; then
@@ -115,42 +121,33 @@ pkgs.writeShellScript "kh-view-wrapper" ''
     exit 0
   fi
 
-  if [[ -n "$recall_n" ]]; then
-    if [[ ! -s "$history" ]]; then
-      echo "Error: no history to recall" >&2
-      exit 1
-    fi
-    total=$(wc -l < "$history")
-    if [[ $recall_n -lt 1 || $recall_n -gt $total ]]; then
-      echo "Error: no session at position $recall_n (history has $total entr$( [[ "$total" == "1" ]] && echo y || echo ies ))" >&2
-      exit 1
-    fi
-    # History rows are unordered w.r.t. time; sort newest-first, then pick Nth.
-    sort -t$'\t' -k1,1nr -- "$history" \
-      | sed -n "''${recall_n}p" \
-      | cut -f2- \
-      | "$jq" -r '.[] | "\(.path)\t\(.label)\t\(.desc)"' > "$list"
-    if [[ ! -s "$list" ]]; then
-      echo "Error: recalled session has no items" >&2
-      exit 1
-    fi
-  else
-    if [[ ! -s "$list" ]]; then
-      echo "Usage: kh-view <file-or-dir> [...]  |  --label <file> <label> <desc> ..." >&2
-      echo "       kh-view --recall [N]  |  --list-history" >&2
-      exit 1
-    fi
-    ts=$("$date" +%s)
-    items_json=$("$jq" -c -R -s '
-      split("\n")
-      | map(select(length > 0))
-      | map(split("\t"))
-      | map({ path: .[0], label: (.[1] // ""), desc: (.[2] // "") })
-    ' < "$list")
-    printf '%s\t%s\n' "$ts" "$items_json" >> "$history"
+  if [[ "$browse_history" == true ]]; then
+    # --browse-history / --recall hand off to the QML picker.  QML reads
+    # KH_VIEW_MODE=browse and (optionally) KH_VIEW_RECALL_INDEX to auto-select
+    # the Nth-from-newest entry on launch.  No history write happens here.
+    export KH_VIEW_MODE=browse
+    [[ -n "$recall_n" ]] && export KH_VIEW_RECALL_INDEX="$recall_n"
+    ${
+      if viewConfigPath != null then "exec \"$qs\" -p ${viewConfigPath}" else "exec \"$qs\" -c kh-view"
+    }
   fi
 
+  if [[ ! -s "$list" ]]; then
+    echo "Usage: kh-view <file-or-dir> [...]  |  --label <file> <label> <desc> ..." >&2
+    echo "       kh-view --browse-history  |  --recall [N]  |  --list-history" >&2
+    exit 1
+  fi
+
+  ts=$("$date" +%s)
+  items_json=$("$jq" -c -R -s '
+    split("\n")
+    | map(select(length > 0))
+    | map(split("\t"))
+    | map({ path: .[0], label: (.[1] // ""), desc: (.[2] // "") })
+  ' < "$list")
+  printf '%s\t%s\n' "$ts" "$items_json" >> "$history"
+
   export KH_VIEW_LIST="$list"
-  export KH_VIEW_HISTORY="$history"
+  export KH_VIEW_MODE=session
   ${if viewConfigPath != null then "exec \"$qs\" -p ${viewConfigPath}" else "exec \"$qs\" -c kh-view"}
 ''

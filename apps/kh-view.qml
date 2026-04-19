@@ -1,6 +1,7 @@
 // Standalone fullscreen text / image viewer — supports N files side-by-side.
 //
 // Usage (via wrapper): nix run .#kh-view -- <file-or-dir> [<file-or-dir2> ...]
+//                      nix run .#kh-view -- --browse-history
 //                      nix run .#kh-view -- --recall [N]
 //                      nix run .#kh-view -- --list-history
 //
@@ -8,12 +9,19 @@
 //
 // Direct (Quickshell): KH_VIEW_LIST=/path/to/list quickshell -p <config-dir>
 //   where the list file contains one TSV line per pane (path\tlabel\tdesc).
+//   Set KH_VIEW_MODE=browse to open the history picker instead of loading
+//   a list; combine with KH_VIEW_RECALL_INDEX=<N> to auto-select the
+//   Nth-from-newest entry at launch (the wrapper's --recall does this).
 //   Gallery history is read via MetaStore from
 //   $XDG_DATA_HOME/kh-view/meta/history (see `listHistory` / `recall` IPC).
 //
 // Split mode (default): Tab cycles focus between panes.
 // Fullscreen mode (f):  h/l steps through files one at a time.
 // Both modes:           hjkl/Ctrl+D/U scroll; v/V/Ctrl+V visual; y yank; q/Esc quit.
+// History browser:      j/k navigate, / focus search, Enter opens, Esc quits.
+//                       Selecting an entry enters session view with a
+//                       "Back to History" pill top-left; Esc returns to
+//                       the browser instead of quitting.
 import QtQuick
 import Quickshell
 import Quickshell.Io
@@ -26,12 +34,41 @@ ShellRoot {
     NixConfig { id: cfg }
     NixBins   { id: bin }
 
+    // ── Mode state ────────────────────────────────────────────────────────────
+    // _mode toggles the top-level view between the session panes and the
+    // history picker.  _cameFromBrowser records whether the current session
+    // view was entered via the browser (so Esc returns there).
+    property string _mode:              Quickshell.env("KH_VIEW_MODE") === "browse" ? "browser" : "session"
+    property bool   _cameFromBrowser:   false
+    readonly property int _autoRecallIdx: {
+        const v = parseInt(Quickshell.env("KH_VIEW_RECALL_INDEX") || "0", 10)
+        return isFinite(v) ? v : 0
+    }
+
+    // ── Session state ─────────────────────────────────────────────────────────
     property var  _panes:       []
     property var  _listItems:   []
     property bool _ready:       false
     property int  _focusedPane: 0
     property bool _fullscreen:  false
     property bool _wrap:        true
+
+    // ── Picker state ──────────────────────────────────────────────────────────
+    property string _pickerSearch: ""
+    property string _pickerMode:   "insert"   // "insert" | "normal"
+
+    // Filtered history rows, newest first. Each row: { ts, items }.
+    readonly property var _pickerFiltered: {
+        const q = _pickerSearch.trim().toLowerCase()
+        const rows = functionality._sortedHistory().slice().reverse()  // newest first
+        if (!q) return rows
+        return rows.filter(r => {
+            const first = r.items[0] || {}
+            const hay = ((first.label || "") + " " + (first.path || "")).toLowerCase()
+            return hay.includes(q)
+        })
+    }
+    readonly property int _pickerCount: _pickerFiltered.length
 
     Component.onCompleted: functionality.init()
 
@@ -54,6 +91,7 @@ ShellRoot {
         bash:     bin.bash
         appName:  "kh-view"
         storeKey: "history"
+        onLoaded: functionality.onHistoryLoaded()
     }
 
     // ── Functionality ─────────────────────────────────────────────────────────
@@ -80,7 +118,7 @@ ShellRoot {
         function key(k: string): void {
             const lk = k.toLowerCase()
             if      (lk === "f")                    toggleFullscreen()
-            else if (lk === "q" || lk === "escape") quit()
+            else if (lk === "q" || lk === "escape") escapeOrQuit()
             else if (lk === "tab" && !root._fullscreen) cyclePanes()
             else if (root._fullscreen && (lk === "h" || lk === "left"))  prev()
             else if (root._fullscreen && (lk === "l" || lk === "right")) next()
@@ -91,8 +129,8 @@ ShellRoot {
         }
         // ui only
         function init(): void {
-            listProcess.running = true
             historyStore.load()
+            if (root._mode === "session") listProcess.running = true
         }
         // ui only
         function onListRead(line: string): void {
@@ -106,6 +144,20 @@ ShellRoot {
             root._panes     = root._listItems.slice()
             root._listItems = []
             root._ready     = true
+        }
+        // ui only — history has finished loading; handle auto-recall and focus
+        function onHistoryLoaded(): void {
+            if (root._mode !== "browser") return
+            // --recall <N> ships us here with _autoRecallIdx set; commit that
+            // entry straight away so the user lands in the session view.
+            if (root._autoRecallIdx > 0) {
+                const rows = _sortedHistory().slice().reverse()
+                if (root._autoRecallIdx >= 1 && root._autoRecallIdx <= rows.length) {
+                    openSessionFromPicker(rows[root._autoRecallIdx - 1])
+                    return
+                }
+            }
+            pickerSearch.forceActiveFocus()
         }
         // ui only — history entries sorted oldest→newest by epoch key
         function _sortedHistory(): var {
@@ -124,9 +176,7 @@ ShellRoot {
             if (n < 1 || n > rows.length) return
             const entry = rows[rows.length - n]
             if (!entry.items || entry.items.length === 0) return
-            root._panes       = entry.items.slice()
-            root._focusedPane = 0
-            root._fullscreen  = false
+            openSessionFromPicker(entry)
         }
         // ipc only — newest first, 1-indexed; one TSV line per entry
         function listHistory(): string {
@@ -142,15 +192,43 @@ ShellRoot {
             }
             return lines.join("\n")
         }
+        // ui only — transition from browser mode into a session view
+        function openSessionFromPicker(entry): void {
+            if (!entry || !entry.items || entry.items.length === 0) return
+            root._panes           = entry.items.slice()
+            root._listItems       = []
+            root._focusedPane     = 0
+            root._fullscreen      = false
+            root._ready           = true
+            root._cameFromBrowser = true
+            root._mode            = "session"
+            keyHandler.forceActiveFocus()
+        }
+        // ui only — session Esc: back to browser if we came from there, else quit
+        function escapeOrQuit(): void {
+            if (root._cameFromBrowser) {
+                root._panes       = []
+                root._ready       = false
+                root._fullscreen  = false
+                root._focusedPane = 0
+                root._mode        = "browser"
+                pickerSearch.text = ""
+                root._pickerSearch = ""
+                root._pickerMode  = "insert"
+                pickerSearch.forceActiveFocus()
+                return
+            }
+            quit()
+        }
         // ui only
-        function onShow(): void { keyHandler.forceActiveFocus() }
+        function onShow(): void { if (root._mode === "session") keyHandler.forceActiveFocus() }
         // ui only
         function onYankTextRequested(t: string): void { impl.yank(t) }
         // ui only
         function handleKeyEvent(event): void {
             if (event.key === Qt.Key_Shift   || event.key === Qt.Key_Control ||
                 event.key === Qt.Key_Alt     || event.key === Qt.Key_Meta) return
-            if (event.text === "q" || event.key === Qt.Key_Escape)            { quit();             event.accepted = true; return }
+            if (event.text === "q" || event.key === Qt.Key_Escape)            { escapeOrQuit();     event.accepted = true; return }
             if (event.text === "f" && root._panes.length > 1)                 { toggleFullscreen(); event.accepted = true; return }
             if (root._fullscreen && (event.key === Qt.Key_H || event.key === Qt.Key_Left))  { prev(); event.accepted = true; return }
             if (root._fullscreen && (event.key === Qt.Key_L || event.key === Qt.Key_Right)) { next(); event.accepted = true; return }
@@ -158,18 +236,61 @@ ShellRoot {
             const pane = paneRepeater.itemAt(root._focusedPane)
             if (pane) event.accepted = pane.handleViewerKey(event)
         }
+
+        // ── Picker ───────────────────────────────────────────────────────────
+        // ui only
+        function pickerCommit(): void {
+            const entry = root._pickerFiltered[pickerList.currentIndex]
+            if (entry) openSessionFromPicker(entry)
+        }
+        // ui only — search field text change: refilter + reset cursor
+        function pickerSearchChanged(): void {
+            root._pickerSearch = pickerSearch.text
+            pickerList.currentIndex = 0
+        }
+        // ui only — insert → normal mode
+        function pickerSearchEscape(): void {
+            root._pickerMode = "normal"
+            pickerKeyHandler.forceActiveFocus()
+        }
+        // ui only — `/` from normal → insert mode
+        function pickerEnterInsert(): void {
+            root._pickerMode = "insert"
+            pickerSearch.forceActiveFocus()
+        }
+        // ui only — navigation in normal mode
+        function pickerNav(delta: int): void {
+            if (root._pickerCount === 0) return
+            pickerList.currentIndex = Math.max(
+                0, Math.min(root._pickerCount - 1, pickerList.currentIndex + delta))
+        }
+        // ui only — key dispatch in picker normal mode
+        function pickerNormalKey(event): void {
+            if (event.key === Qt.Key_Shift   || event.key === Qt.Key_Control ||
+                event.key === Qt.Key_Alt     || event.key === Qt.Key_Meta) return
+            if (event.key === Qt.Key_Escape || event.text === "q") { quit(); event.accepted = true; return }
+            if (event.text === "/")                                { pickerEnterInsert(); event.accepted = true; return }
+            if (event.key === Qt.Key_J || event.key === Qt.Key_Down)     { pickerNav(1);  event.accepted = true; return }
+            if (event.key === Qt.Key_K || event.key === Qt.Key_Up)       { pickerNav(-1); event.accepted = true; return }
+            if (event.key === Qt.Key_G && (event.modifiers & Qt.ShiftModifier)) { pickerList.currentIndex = Math.max(0, root._pickerCount - 1); event.accepted = true; return }
+            if (event.key === Qt.Key_G)                                   { pickerList.currentIndex = 0; event.accepted = true; return }
+            if (event.key === Qt.Key_D && (event.modifiers & Qt.ControlModifier)) { pickerNav( 5); event.accepted = true; return }
+            if (event.key === Qt.Key_U && (event.modifiers & Qt.ControlModifier)) { pickerNav(-5); event.accepted = true; return }
+            if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) { pickerCommit(); event.accepted = true; return }
+        }
     }
 
     IpcHandler {
         target: "view"
 
-        readonly property int  currentIndex: root._focusedPane
-        readonly property int  count:        root._panes.length
-        readonly property bool fullscreen:   root._fullscreen
-        readonly property bool wrap:         root._wrap
-        readonly property bool hasPrev:      root._wrap || root._focusedPane > 0
-        readonly property bool hasNext:      root._wrap || root._focusedPane < root._panes.length - 1
-        readonly property int  historyCount: Object.keys(historyStore.values).length
+        readonly property int    currentIndex: root._focusedPane
+        readonly property int    count:        root._panes.length
+        readonly property bool   fullscreen:   root._fullscreen
+        readonly property bool   wrap:         root._wrap
+        readonly property bool   hasPrev:      root._wrap || root._focusedPane > 0
+        readonly property bool   hasNext:      root._wrap || root._focusedPane < root._panes.length - 1
+        readonly property int    historyCount: Object.keys(historyStore.values).length
+        readonly property string mode:         root._mode
 
         function quit()                  { functionality.quit() }
         function next()                  { functionality.next() }
@@ -193,6 +314,14 @@ ShellRoot {
         }
     }
 
+    // ── Helpers ───────────────────────────────────────────────────────────────
+    function _formatTs(ts: int): string {
+        const d = new Date(ts * 1000)
+        const pad = (n) => n < 10 ? "0" + n : "" + n
+        return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate())
+             + " " + pad(d.getHours()) + ":" + pad(d.getMinutes())
+    }
+
     // ── Window ────────────────────────────────────────────────────────────────
     WlrLayershell {
         id: win
@@ -204,10 +333,12 @@ ShellRoot {
         namespace: "kh-view"
         anchors { top: true; bottom: true; left: true; right: true }
 
+        // ── Session view ──────────────────────────────────────────────────────
         Item {
             id: keyHandler
             anchors.fill: parent
-            focus: true
+            focus: root._mode === "session"
+            visible: root._mode === "session"
             Component.onCompleted: functionality.onShow()
 
             readonly property int _paneWidth: root._panes.length > 0
@@ -426,6 +557,196 @@ ShellRoot {
                         required property int index
                         width: 8; height: 8; radius: 4
                         color: index === root._focusedPane ? cfg.color.base05 : cfg.color.base03
+                    }
+                }
+            }
+
+            // "Back to History" pill — only visible when we reached this session
+            // via the browser, so Esc takes us back instead of quitting.
+            Rectangle {
+                visible: root._cameFromBrowser
+                anchors.left: parent.left
+                anchors.top: parent.top
+                anchors.leftMargin: 20
+                anchors.topMargin: 20
+                height: 30
+                width: pillRow.width + 20
+                radius: 15
+                color: cfg.color.base01
+                border.width: 1
+                border.color: cfg.color.base02
+
+                Row {
+                    id: pillRow
+                    anchors.centerIn: parent
+                    spacing: 6
+
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: "Esc"
+                        color: cfg.color.base0D
+                        font.family: cfg.fontFamily
+                        font.pixelSize: cfg.fontSize - 2
+                        font.bold: true
+                    }
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: "Back to History"
+                        color: cfg.color.base05
+                        font.family: cfg.fontFamily
+                        font.pixelSize: cfg.fontSize - 2
+                    }
+                }
+            }
+        }
+
+        // ── History browser ───────────────────────────────────────────────────
+        Item {
+            id: pickerKeyHandler
+            anchors.fill: parent
+            focus: root._mode === "browser" && root._pickerMode === "normal"
+            visible: root._mode === "browser"
+
+            Keys.onPressed: (event) => functionality.pickerNormalKey(event)
+
+            // Panel chrome
+            Rectangle {
+                id: pickerPanel
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.top: parent.top
+                anchors.topMargin: Math.round(parent.height * 0.08)
+                width:  Math.round(parent.width * 0.5)
+                height: Math.round(parent.height * 0.7)
+                color: cfg.color.base01
+                radius: 12
+
+                Column {
+                    anchors.fill: parent
+                    anchors.margins: 12
+                    spacing: 10
+
+                    // Search bar
+                    Rectangle {
+                        id: pickerSearchBox
+                        width: parent.width
+                        height: 40
+                        color: cfg.color.base02
+                        radius: 6
+
+                        TextInput {
+                            id: pickerSearch
+                            anchors.fill: parent
+                            anchors.leftMargin: 14
+                            anchors.rightMargin: 14
+                            color: cfg.color.base05
+                            font.family: cfg.fontFamily
+                            font.pixelSize: cfg.fontSize
+                            verticalAlignment: TextInput.AlignVCenter
+                            clip: true
+                            readOnly: root._pickerMode !== "insert"
+                            focus: root._mode === "browser" && root._pickerMode === "insert"
+
+                            onTextChanged:        functionality.pickerSearchChanged()
+                            Keys.onEscapePressed: functionality.pickerSearchEscape()
+                            Keys.onReturnPressed: functionality.pickerCommit()
+
+                            Text {
+                                anchors.fill: parent
+                                visible: !pickerSearch.text
+                                text: "Search history..."
+                                color: cfg.color.base03
+                                font.family: cfg.fontFamily
+                                font.pixelSize: cfg.fontSize
+                                verticalAlignment: Text.AlignVCenter
+                            }
+                        }
+                    }
+
+                    // Entry list (or empty-state)
+                    ListView {
+                        id: pickerList
+                        width: parent.width
+                        height: parent.height - pickerSearchBox.height - pickerFooter.height - parent.spacing * 2
+                        clip: true
+                        currentIndex: 0
+                        highlightMoveDuration: 0
+                        model: root._pickerFiltered
+
+                        Text {
+                            anchors.centerIn: parent
+                            visible: root._pickerCount === 0
+                            text: root._pickerSearch ? "No matches" : "(no history)"
+                            color: cfg.color.base03
+                            font.family: cfg.fontFamily
+                            font.pixelSize: cfg.fontSize
+                        }
+
+                        delegate: Item {
+                            required property var modelData     // { ts, items }
+                            required property int index
+                            width: pickerList.width
+                            height: 36
+
+                            Rectangle {
+                                anchors.fill: parent
+                                anchors.margins: 2
+                                radius: 4
+                                color: pickerList.currentIndex === parent.index ? cfg.color.base02 : "transparent"
+                            }
+
+                            Row {
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                anchors.verticalCenter: parent.verticalCenter
+                                anchors.leftMargin: 12
+                                anchors.rightMargin: 12
+                                spacing: 14
+
+                                Text {
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: root._formatTs(parent.parent.modelData.ts || 0)
+                                    color: cfg.color.base04
+                                    font.family: cfg.fontFamily
+                                    font.pixelSize: cfg.fontSize
+                                }
+                                Text {
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: {
+                                        const n = (parent.parent.modelData.items || []).length
+                                        return n + (n === 1 ? " item" : " items")
+                                    }
+                                    color: cfg.color.base05
+                                    font.family: cfg.fontFamily
+                                    font.pixelSize: cfg.fontSize
+                                }
+                            }
+                        }
+                    }
+
+                    // Footer hint
+                    Item {
+                        id: pickerFooter
+                        width: parent.width
+                        height: 20
+
+                        Text {
+                            anchors.left: parent.left
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: root._pickerMode === "insert"
+                                ? "Esc normal mode  \u00b7  Enter open"
+                                : "j/k navigate  \u00b7  Enter open  \u00b7  / search  \u00b7  Esc quit"
+                            color: cfg.color.base03
+                            font.family: cfg.fontFamily
+                            font.pixelSize: cfg.fontSize - 3
+                        }
+                        Text {
+                            anchors.right: parent.right
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: root._pickerCount + " / " + Object.keys(historyStore.values).length
+                            color: cfg.color.base03
+                            font.family: cfg.fontFamily
+                            font.pixelSize: cfg.fontSize - 3
+                        }
                     }
                 }
             }
