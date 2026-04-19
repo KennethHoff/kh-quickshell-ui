@@ -174,6 +174,122 @@ in
                   IPC identifier.
                 '';
               };
+              keybindings = lib.mkOption {
+                type = lib.types.listOf (
+                  lib.types.submodule {
+                    options = {
+                      key = lib.mkOption {
+                        type = lib.types.str;
+                        description = ''
+                          Key name — either a single lowercase letter/digit
+                          (<literal>a</literal>, <literal>1</literal>) or one of
+                          the named specials: <literal>Return</literal>,
+                          <literal>Tab</literal>, <literal>Escape</literal>,
+                          <literal>Space</literal>, <literal>Backspace</literal>.
+                        '';
+                      };
+                      mods = lib.mkOption {
+                        type = lib.types.listOf (
+                          lib.types.enum [
+                            "Ctrl"
+                            "Shift"
+                            "Alt"
+                          ]
+                        );
+                        default = [ ];
+                        description = "Required modifier keys.  Empty list means no modifiers.";
+                      };
+                      mode = lib.mkOption {
+                        type = lib.types.enum [
+                          "normal"
+                          "actions"
+                        ];
+                        default = "normal";
+                        description = "Launcher input mode in which this binding applies.";
+                      };
+                      run = lib.mkOption {
+                        type = lib.types.str;
+                        default = "";
+                        description = ''
+                          Shell template executed when this combo fires.
+                          <literal>{callback}</literal> is substituted with the
+                          selected item's callback (or the selected action's exec,
+                          in actions mode) and the result piped through bash.
+                          Example: <literal>"hyprctl dispatch exec [workspace 1] {callback}"</literal>.
+                          Set this for item-launching bindings; leave empty for
+                          mode-transition bindings that use <option>action</option>.
+                        '';
+                      };
+                      action = lib.mkOption {
+                        type = lib.types.enum [
+                          ""
+                          "enterActionsMode"
+                          "enterNormalMode"
+                          "close"
+                        ];
+                        default = "";
+                        description = ''
+                          Mode/lifecycle transition fired when the combo is pressed:
+                          <itemizedlist>
+                            <listitem><para><literal>enterActionsMode</literal> — switch to the desktop-actions sub-mode (no-op unless <option>hasActions</option> is true).</para></listitem>
+                            <listitem><para><literal>enterNormalMode</literal> — return from actions mode to the main item list.</para></listitem>
+                            <listitem><para><literal>close</literal> — close the launcher window.</para></listitem>
+                          </itemizedlist>
+                          Mutually exclusive with <option>run</option>.
+                        '';
+                      };
+                      helpKey = lib.mkOption {
+                        type = lib.types.str;
+                        default = "";
+                        description = ''
+                          Display string for this binding in the <literal>?</literal>
+                          help overlay (e.g. <literal>"Enter"</literal>,
+                          <literal>"Ctrl+1–9"</literal>).  Defaults to the raw
+                          <option>key</option> when <option>helpDesc</option> is
+                          set but this field is empty.
+                        '';
+                      };
+                      helpDesc = lib.mkOption {
+                        type = lib.types.str;
+                        default = "";
+                        description = ''
+                          Description shown beside <option>helpKey</option> in the
+                          <literal>?</literal> overlay.  Leave empty to hide this
+                          binding from help (use for aliases like <literal>l</literal>
+                          when another binding already covers the row).
+                        '';
+                      };
+                    };
+                  }
+                );
+                default = [
+                  {
+                    key = "Return";
+                    run = "{callback}";
+                    helpKey = "Enter";
+                    helpDesc = "run";
+                  }
+                ];
+                description = ''
+                  Keybindings this plugin owns.  Core handles only navigation
+                  (j/k, gg, G, Ctrl+D/U, [, ], /, ?, Esc, q); every action
+                  key (Enter, Tab, Ctrl+1–9, …) must be declared here.
+                  Help for each binding is inline via <option>helpKey</option> /
+                  <option>helpDesc</option>.
+                  Default is a single <literal>Return → {callback}</literal>
+                  binding so Enter runs the selected item's callback verbatim.
+                '';
+              };
+              hintText = lib.mkOption {
+                type = lib.types.str;
+                default = "Enter run";
+                description = "Plugin-specific footer hint shown in normal mode alongside core navigation hints.";
+              };
+              hintTextActions = lib.mkOption {
+                type = lib.types.str;
+                default = "";
+                description = "Plugin-specific footer hint shown in actions mode.  Empty to omit.";
+              };
             };
           }
         );
@@ -323,10 +439,14 @@ in
                 hasActions
                 placeholder
                 label
+                keybindings
+                hintText
+                hintTextActions
                 ;
               default = false;
             }) launcherCfg.scriptPlugins;
-            allPlugins = appsPlugin.plugins // hyprlandWindowsPlugin.plugins // emojiPlugin.plugins // userPlugins;
+            allPlugins =
+              appsPlugin.plugins // hyprlandWindowsPlugin.plugins // emojiPlugin.plugins // userPlugins;
             pluginRegistryQml = pkgs.writeText "PluginRegistry.qml" ''
               import QtQuick
               QtObject {

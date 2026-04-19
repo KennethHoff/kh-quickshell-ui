@@ -18,7 +18,7 @@
 //   placeholder       — search field placeholder for the active plugin
 //
 // Signals:
-//   launchRequested(string callback, int workspace)
+//   pluginActionRequested(var kb)   — keybinding matched; orchestrator decides
 //   closeRequested()
 //   searchEscapePressed()   — Esc in insert mode; orchestrator reclaims focus
 //
@@ -73,7 +73,7 @@ Item {
 
     // ── Private state ─────────────────────────────────────────────────────────
     property string _activePlugin:     ""       // current plugin name
-    property var    _pluginConfig:     ({})     // config object from registry (or {})
+    readonly property var _pluginConfig: _plugins[_activePlugin] || ({})
     property var    _allItems:       []       // [{ label, description, icon, callback, id }]
     property var    _filteredItems:  []
     property string _mode:           "normal" // "insert" | "normal" | "actions"
@@ -94,22 +94,38 @@ Item {
     readonly property string mode: _mode
     readonly property string modeText: _mode === "normal" ? "NOR" : _mode === "actions" ? "ACT" : ""
     readonly property string hintText: {
-        if (_mode === "actions")
-            return "j/k navigate  \u00b7  Enter launch action  \u00b7  h / Esc back  \u00b7  ? help"
-        if (_mode === "normal")
-            return "j/k navigate  \u00b7  Enter launch  \u00b7  " +
-                   (_pluginConfig.hasActions ? "l / Tab actions  \u00b7  " : "") +
-                   (Object.keys(_plugins).length > 1 ? "[ / ] switch plugin  \u00b7  " : "") +
-                   "Ctrl+1\u20139 workspace  \u00b7  / search  \u00b7  ? help  \u00b7  Esc close"
+        const dot = "  \u00b7  "
+        if (_mode === "actions") {
+            const plug = _pluginConfig.hintTextActions || ""
+            return "j/k navigate" + (plug ? dot + plug : "") + dot + "? help"
+        }
+        if (_mode === "normal") {
+            const plug = _pluginConfig.hintText || ""
+            const multi = Object.keys(_plugins).length > 1 ? dot + "[ / ] switch plugin" : ""
+            return "j/k navigate" + (plug ? dot + plug : "") + multi + dot + "/ search" + dot + "? help" + dot + "Esc close"
+        }
         return "Esc  normal mode  \u00b7  ? help"
     }
     readonly property int filteredCount: _filteredItems.length
     readonly property string lastSelection: _lastSelection
     readonly property string placeholder: _pluginConfig.placeholder || "Search..."
     readonly property var pluginNames: Object.keys(_plugins)
+    readonly property var pluginHelpNormal:  _helpFor("normal")
+    readonly property var pluginHelpActions: _helpFor("actions")
+
+    function _helpFor(mode) {
+        const kbs = _pluginConfig.keybindings || []
+        const rows = []
+        for (const kb of kbs) {
+            if ((kb.mode || "normal") !== mode) continue
+            if (!kb.helpDesc) continue
+            rows.push({ key: kb.helpKey || kb.key, desc: kb.helpDesc })
+        }
+        return rows
+    }
 
     // ── Signals ───────────────────────────────────────────────────────────────
-    signal launchRequested(string callback, int workspace)
+    signal pluginActionRequested(var kb)
     signal closeRequested()
     signal searchEscapePressed()
     signal flashRequested(int idx)
@@ -131,7 +147,6 @@ Item {
         _filteredItems = []
 
         _activePlugin    = name
-        _pluginConfig    = _plugins[name] || {}
         _actions       = []
         _mode          = "normal"
         _pendingG      = false
@@ -168,7 +183,6 @@ Item {
         for (const name in plugins) { activatePlugin(name); return }
         // No plugins at all — clear the UI
         _activePlugin    = ""
-        _pluginConfig    = {}
         _allItems      = []
         _filteredItems = []
         _actions       = []
@@ -213,21 +227,76 @@ Item {
         }
     }
 
-    // Register (or replace) a plugin in the runtime registry.
-    // `label` is the display name shown on the plugin chip; empty falls back
-    // to the plugin key.
-    function registerPlugin(name, script, frecency, hasActions, placeholder, label) {
+    // Apply `mutator` to a shallow-cloned _plugins map and write it back.
+    // All registry mutations flow through this so the assignment trigger
+    // (`_plugins = …`) fires exactly once per change.
+    function _mutatePlugins(mutator) {
         const p = {}
         for (const k in _plugins) p[k] = _plugins[k]
-        p[name] = {
-            script:      script      || "",
-            frecency:    !!frecency,
-            hasActions:  !!hasActions,
-            placeholder: placeholder || "Search...",
-            label:       label       || name,
-            "default":   false
-        }
+        mutator(p)
         _plugins = p
+    }
+
+    // Register (or replace) a plugin in the runtime registry.
+    // Seeds a `Return → {callback}` default so Enter works out of the box.
+    function registerPlugin(name, script, frecency, hasActions, placeholder, label) {
+        _mutatePlugins((p) => {
+            p[name] = {
+                script:      script      || "",
+                frecency:    !!frecency,
+                hasActions:  !!hasActions,
+                placeholder: placeholder || "Search...",
+                label:       label       || name,
+                "default":   false,
+                keybindings: [
+                    { key: "Return", mods: [], mode: "normal", run: "{callback}",
+                      helpKey: "Enter", helpDesc: "run" }
+                ],
+                hintText: "Enter run",
+                hintTextActions: ""
+            }
+        })
+    }
+
+    // Apply `mutator` to a shallow-cloned copy of the named plugin's config
+    // and reinsert. Returns true when the plugin exists, false otherwise.
+    function _updatePlugin(name, mutator) {
+        if (!(name in _plugins)) return false
+        _mutatePlugins((p) => {
+            const cfg = {}
+            for (const k in p[name]) cfg[k] = p[name][k]
+            mutator(cfg)
+            p[name] = cfg
+        })
+        return true
+    }
+
+    // `mods` is a comma-separated string — Quickshell IPC can't pass string
+    // lists, so callers split at the wire.
+    function addKeybinding(plugin, key, mods, mode, action, run, helpKey, helpDesc) {
+        _updatePlugin(plugin, (cfg) => {
+            const modList = mods ? mods.split(",").map(s => s.trim()).filter(s => s) : []
+            const kbs = (cfg.keybindings || []).slice()
+            kbs.push({
+                key:      key,
+                mods:     modList,
+                mode:     mode     || "normal",
+                action:   action   || "",
+                run:      run      || "",
+                helpKey:  helpKey  || "",
+                helpDesc: helpDesc || ""
+            })
+            cfg.keybindings = kbs
+        })
+    }
+
+    function clearKeybindings(plugin) {
+        _updatePlugin(plugin, (cfg) => { cfg.keybindings = [] })
+    }
+
+    function setPluginHintText(plugin, mode, hintText) {
+        const field = (mode === "actions") ? "hintTextActions" : "hintText"
+        _updatePlugin(plugin, (cfg) => { cfg[field] = hintText || "" })
     }
 
     // Return the display label for a plugin key, falling back to the key.
@@ -240,9 +309,7 @@ Item {
     // currently active, returns to the default plugin.
     function removePlugin(name) {
         if (!(name in _plugins)) return
-        const p = {}
-        for (const k in _plugins) { if (k !== name) p[k] = _plugins[k] }
-        _plugins = p
+        _mutatePlugins((p) => { delete p[name] })
         if (_activePlugin === name) activateDefaultPlugin()
     }
 
@@ -269,7 +336,6 @@ Item {
 
     function reset() {
         _activePlugin    = ""
-        _pluginConfig    = {}
         _allItems      = []
         _filteredItems = []
         _pluginItems     = {}
@@ -337,6 +403,29 @@ Item {
 
     function flash(idx) { flashRequested(idx) }
 
+    // Record user confirmation of the currently highlighted row (frecency,
+    // flash, lastSelection) and return its shell callback — the action's
+    // exec line in actions mode, the item's callback in normal mode.
+    // Returns "" when nothing is selected.
+    function confirmSelection(): string {
+        if (_mode === "actions") {
+            const idx = actionList.currentIndex
+            if (idx < 0 || idx >= _actions.length) return ""
+            const action = _actions[idx]
+            const item = selectedItem
+            if (item && _pluginConfig.frecency) impl.recordLaunch(item.id)
+            _lastSelection = action.name
+            flash(idx)
+            return action.exec.trim()
+        }
+        const item = selectedItem
+        if (!item) return ""
+        if (_pluginConfig.frecency) impl.recordLaunch(item.id)
+        _lastSelection = item.label
+        flash(list.currentIndex)
+        return item.callback.trim()
+    }
+
     // ── Navigation ────────────────────────────────────────────────────────────
     function navUp() {
         if (_mode === "actions") { if (actionList.currentIndex > 0) actionList.currentIndex-- }
@@ -381,10 +470,6 @@ Item {
             if (_mode !== "normal")  { enterNormalMode(); return true }
             closeRequested(); return true
         }
-        if (lk === "enter" || lk === "return") {
-            if (_mode === "actions") { impl.launchAction(0); return true }
-            impl.launchItem(0); return true
-        }
         return false
     }
 
@@ -423,35 +508,44 @@ Item {
             frecencyStore.set(id, (decayed + 1).toFixed(4) + ":" + now)
         }
 
-        // ── Launch ───────────────────────────────────────────────────────────
-        function launchItem(workspace): void {
-            const item = pluginList.selectedItem
-            if (!item) return
-            if (pluginList._pluginConfig.frecency) recordLaunch(item.id)
-            pluginList._lastSelection = item.label
-            flash(list.currentIndex)
-            launchRequested(item.callback.trim(), workspace)
-        }
-
-        function launchAction(workspace): void {
-            const idx = actionList.currentIndex
-            if (idx < 0 || idx >= pluginList._actions.length) return
-            const action = pluginList._actions[idx]
-            const item = pluginList.selectedItem
-            if (item && pluginList._pluginConfig.frecency) recordLaunch(item.id)
-            pluginList._lastSelection = action.name
-            flash(actionList.currentIndex)
-            launchRequested(action.exec.trim(), workspace)
-        }
-
         // ── Key dispatch ─────────────────────────────────────────────────────
+        function eventKeyToString(event): string {
+            if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) return "Return"
+            if (event.key === Qt.Key_Tab)       return "Tab"
+            if (event.key === Qt.Key_Backspace) return "Backspace"
+            if (event.key === Qt.Key_Space)     return "Space"
+            if (event.key === Qt.Key_Escape)    return "Escape"
+            if (event.key >= Qt.Key_0 && event.key <= Qt.Key_9)
+                return String.fromCharCode(0x30 + (event.key - Qt.Key_0))
+            if (event.key >= Qt.Key_A && event.key <= Qt.Key_Z)
+                return String.fromCharCode(0x61 + (event.key - Qt.Key_A))
+            return ""
+        }
+
+        function matchPluginKeybinding(event, mode): var {
+            const kbs = pluginList._pluginConfig.keybindings || []
+            if (kbs.length === 0) return null
+            const keyStr = impl.eventKeyToString(event)
+            if (!keyStr) return null
+            const hasCtrl  = !!(event.modifiers & Qt.ControlModifier)
+            const hasShift = !!(event.modifiers & Qt.ShiftModifier)
+            const hasAlt   = !!(event.modifiers & Qt.AltModifier)
+            for (const kb of kbs) {
+                if ((kb.mode || "normal") !== mode) continue
+                if (kb.key !== keyStr) continue
+                const mods = kb.mods || []
+                if ((mods.indexOf("Ctrl")  >= 0) !== hasCtrl)  continue
+                if ((mods.indexOf("Shift") >= 0) !== hasShift) continue
+                if ((mods.indexOf("Alt")   >= 0) !== hasAlt)   continue
+                return kb
+            }
+            return null
+        }
+
         function handleNormalKey(event): bool {
             if (event.text === "?") return false   // propagate → orchestrator opens help
             if (event.key === Qt.Key_Escape || event.text === "q") {
                 closeRequested(); return true
-            }
-            if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                launchItem(0); return true
             }
             if (event.key === Qt.Key_J || event.key === Qt.Key_Down) {
                 navDown(); return true
@@ -472,9 +566,6 @@ Item {
             }
             if (event.key === Qt.Key_U && (event.modifiers & Qt.ControlModifier)) {
                 navHalfUp(); return true
-            }
-            if ((event.key === Qt.Key_Tab || event.text === "l") && pluginList._pluginConfig.hasActions) {
-                enterActionsMode(); return true
             }
             if (event.key === Qt.Key_Slash) {
                 enterInsertMode(); return true
@@ -485,21 +576,15 @@ Item {
             if (event.key === Qt.Key_BracketLeft) {
                 pluginList.prevPlugin(); return true
             }
-            // Ctrl+1–9: launch on workspace N
-            if (event.modifiers & Qt.ControlModifier) {
-                const n = event.key - Qt.Key_1 + 1
-                if (n >= 1 && n <= 9) { launchItem(n); return true }
-            }
+            const kb = impl.matchPluginKeybinding(event, "normal")
+            if (kb) { pluginList.pluginActionRequested(kb); return true }
             return false
         }
 
         function handleActionsKey(event): bool {
             if (event.text === "?") return false
-            if (event.key === Qt.Key_Escape || event.text === "h" || event.text === "q") {
+            if (event.key === Qt.Key_Escape) {
                 enterNormalMode(); return true
-            }
-            if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                launchAction(0); return true
             }
             if (event.key === Qt.Key_J || event.key === Qt.Key_Down) {
                 navDown(); return true
@@ -521,11 +606,8 @@ Item {
             if (event.key === Qt.Key_U && (event.modifiers & Qt.ControlModifier)) {
                 navHalfUp(); return true
             }
-            // Ctrl+1–9: launch action on workspace N
-            if (event.modifiers & Qt.ControlModifier) {
-                const n = event.key - Qt.Key_1 + 1
-                if (n >= 1 && n <= 9) { launchAction(n); return true }
-            }
+            const kb = impl.matchPluginKeybinding(event, "actions")
+            if (kb) { pluginList.pluginActionRequested(kb); return true }
             return false
         }
 

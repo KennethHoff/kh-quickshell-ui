@@ -113,6 +113,23 @@ let
   pluginScript = pkgs.writeShellScript "kh-scan-apps-plugin" ''
     exec ${scanScript} ${lib.getExe terminal}
   '';
+
+  # The first entry carries the "Ctrl+1–9" help row; the rest are silent siblings.
+  workspaceBindings =
+    { mode, helpDesc }:
+    lib.imap0 (
+      i: n:
+      {
+        key = toString n;
+        mods = [ "Ctrl" ];
+        inherit mode;
+        run = "hyprctl dispatch exec [workspace ${toString n}] {callback}";
+      }
+      // lib.optionalAttrs (i == 0) {
+        helpKey = "Ctrl+1–9";
+        inherit helpDesc;
+      }
+    ) (lib.range 1 9);
 in
 {
   plugins = {
@@ -126,6 +143,57 @@ in
       # Icon column carries an absolute path; the shared file-image primitive
       # renders it with a letter-tile fallback when the path doesn't resolve.
       iconDelegate = "LauncherIconFile.qml";
+      hintText = "Enter launch · l/Tab actions · Ctrl+1–9 workspace";
+      hintTextActions = "Enter launch action · Ctrl+1–9 workspace · h / Esc back";
+      keybindings = [
+        {
+          key = "Return";
+          mode = "normal";
+          run = "{callback}";
+          helpKey = "Enter";
+          helpDesc = "launch";
+        }
+        {
+          key = "Return";
+          mode = "actions";
+          run = "{callback}";
+          helpKey = "Enter";
+          helpDesc = "launch action";
+        }
+        {
+          key = "Tab";
+          mode = "normal";
+          action = "enterActionsMode";
+          helpKey = "l / Tab";
+          helpDesc = "actions for item";
+        }
+        # `l` is an alias for Tab — silent (no help row of its own).
+        {
+          key = "l";
+          mode = "normal";
+          action = "enterActionsMode";
+        }
+        {
+          key = "h";
+          mode = "actions";
+          action = "enterNormalMode";
+          helpKey = "h / Esc";
+          helpDesc = "back to item list";
+        }
+        {
+          key = "q";
+          mode = "actions";
+          action = "enterNormalMode";
+        }
+      ]
+      ++ (workspaceBindings {
+        mode = "normal";
+        helpDesc = "launch on workspace";
+      })
+      ++ (workspaceBindings {
+        mode = "actions";
+        helpDesc = "launch action on workspace";
+      });
     };
   };
 }

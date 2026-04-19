@@ -88,6 +88,16 @@ in
       # Icon column carries the emoji glyph directly; the shared glyph
       # primitive renders it as centred text.
       iconDelegate = "LauncherIconGlyph.qml";
+      hintText = "Enter copy";
+      keybindings = [
+        {
+          key = "Return";
+          mode = "normal";
+          run = "{callback}";
+          helpKey = "Enter";
+          helpDesc = "copy emoji to clipboard";
+        }
+      ];
     };
   };
 }

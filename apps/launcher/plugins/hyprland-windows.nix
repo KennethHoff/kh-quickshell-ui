@@ -145,6 +145,16 @@ in
       # Icon column carries an absolute path; shared image primitive with a
       # letter-tile fallback covers the shape cleanly.
       iconDelegate = "LauncherIconFile.qml";
+      hintText = "Enter focus window";
+      keybindings = [
+        {
+          key = "Return";
+          mode = "normal";
+          run = "{callback}";
+          helpKey = "Enter";
+          helpDesc = "focus window";
+        }
+      ];
     };
   };
 }

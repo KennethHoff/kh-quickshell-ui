@@ -25,18 +25,15 @@ ShellRoot {
     // ── Launch ────────────────────────────────────────────────────────────────
     QtObject {
         id: impl
-        function launchCallback(callback, workspace): void {
-            if (!callback) return
-            if (workspace > 0) {
-                launchProcess.command = [
-                    bin.hyprctl, "dispatch", "exec",
-                    "[workspace " + workspace + "] " + callback
-                ]
-            } else {
-                launchProcess.command = [bin.bash, "-c", callback + " &>/dev/null &"]
-            }
+        function runCommand(command): void {
+            if (!command) return
+            launchProcess.command = [bin.bash, "-c", command + " &>/dev/null &"]
             launchProcess.running = true
             closeTimer.restart()
+        }
+        function runTemplate(template, callback): void {
+            if (!callback) return
+            runCommand((template || "{callback}").replace(/\{callback\}/g, callback))
         }
     }
 
@@ -51,9 +48,21 @@ ShellRoot {
         // ui+ipc
         function close(): void                       { root.showing = false }
         // ipc only
-        function launch(): void                      { if (list.selectedItem) impl.launchCallback(list.selectedItem.callback, 0) }
-        // ipc only
-        function launchOnWorkspace(n: int): void     { if (list.selectedItem) impl.launchCallback(list.selectedItem.callback, n) }
+        function launch(): void {
+            if (list.selectedItem) impl.runCommand(list.selectedItem.callback)
+        }
+        // ui only
+        function onPluginActionRequested(kb): void {
+            if (kb.run) { impl.runTemplate(kb.run, list.confirmSelection()); return }
+            switch (kb.action) {
+                case "enterActionsMode": enterActionsMode(); break
+                case "enterNormalMode":  enterNormalMode();  break
+                case "close":            close();            break
+                default:
+                    console.warn("kh-launcher: keybinding for",
+                                 kb.key, "has neither run nor action — ignoring")
+            }
+        }
         // ipc only
         function enterActionsMode(): void            { list.enterActionsMode() }
         // ui+ipc (via setMode / handleKeyEvent)
@@ -115,6 +124,16 @@ ShellRoot {
         }
         // ipc only — remove a plugin from the runtime registry
         function removePlugin(name: string): void      { list.removePlugin(name) }
+        // ipc only
+        function addKeybinding(plugin: string, key: string, mods: string, mode: string, action: string, run: string, helpKey: string, helpDesc: string): void {
+            list.addKeybinding(plugin, key, mods, mode, action, run, helpKey, helpDesc)
+        }
+        // ipc only
+        function clearKeybindings(plugin: string): void { list.clearKeybindings(plugin) }
+        // ipc only
+        function setPluginHintText(plugin: string, mode: string, hintText: string): void {
+            list.setPluginHintText(plugin, mode, hintText)
+        }
         // ipc only — list registered plugin names
         function listPlugins(): string                 { return list.listPlugins() }
         // ui+ipc — cycle to the next registered plugin
@@ -125,8 +144,6 @@ ShellRoot {
         function onShow(): void                      { list.reset(); list.activateDefaultPlugin(); helpOverlay.close(); normalModeHandler.forceActiveFocus() }
         // ui only
         function onVisibleChanged(): void            { if (root.showing) onShow() }
-        // ui only
-        function onLaunchRequested(callback, workspace): void { impl.launchCallback(callback, workspace) }
         // ui only
         function handleKeyEvent(event): void {
             if (event.key === Qt.Key_Shift || event.key === Qt.Key_Control ||
@@ -161,7 +178,6 @@ ShellRoot {
         function close(): void                        { functionality.close() }
         // Launch
         function launch(): void                       { functionality.launch() }
-        function launchOnWorkspace(n: int): void      { functionality.launchOnWorkspace(n) }
         // Input mode
         function enterActionsMode(): void             { functionality.enterActionsMode() }
         function setMode(m: string): void             { functionality.setMode(m) }
@@ -183,6 +199,11 @@ ShellRoot {
         function listPlugins(): string                  { return functionality.listPlugins() }
         function nextPlugin(): void                     { functionality.nextPlugin() }
         function prevPlugin(): void                     { functionality.prevPlugin() }
+        function addKeybinding(plugin: string, key: string, mods: string, mode: string, action: string, run: string, helpKey: string, helpDesc: string): void {
+            functionality.addKeybinding(plugin, key, mods, mode, action, run, helpKey, helpDesc)
+        }
+        function clearKeybindings(plugin: string): void  { functionality.clearKeybindings(plugin) }
+        function setPluginHintText(plugin: string, mode: string, hintText: string): void { functionality.setPluginHintText(plugin, mode, hintText) }
     }
 
     // ── Window ────────────────────────────────────────────────────────────────
@@ -264,9 +285,9 @@ ShellRoot {
                 anchors.right: parent.right
                 anchors.bottom: footer.top
 
-                onSearchEscapePressed: functionality.enterNormalMode()
-                onCloseRequested:      functionality.close()
-                onLaunchRequested:     (callback, workspace) => functionality.onLaunchRequested(callback, workspace)
+                onSearchEscapePressed:    functionality.enterNormalMode()
+                onCloseRequested:         functionality.close()
+                onPluginActionRequested:  (kb) => functionality.onPluginActionRequested(kb)
             }
 
             // Help overlay
@@ -274,35 +295,29 @@ ShellRoot {
                 id: helpOverlay
                 anchors.fill: parent
 
+                readonly property var _navCommon: [
+                    { key: "j / \u2193", desc: "down" },
+                    { key: "k / \u2191", desc: "up" },
+                    { key: "gg",         desc: "jump to top" },
+                    { key: "G",          desc: "jump to bottom" },
+                    { key: "Ctrl+D",     desc: "half-page down" },
+                    { key: "Ctrl+U",     desc: "half-page up" }
+                ]
+                readonly property var _navNormal: _navCommon.concat([
+                    { key: "[ / ]",      desc: "switch plugin" },
+                    { key: "/",          desc: "focus search" },
+                    { key: "q / Esc",    desc: "close" }
+                ])
+                readonly property var _navActions: _navCommon.concat([
+                    { key: "Esc",        desc: "back to item list" }
+                ])
+
                 sections: list.mode === "actions" ? [{
                     title: "ACTIONS MODE",
-                    bindings: [
-                        { key: "j / \u2193", desc: "down" },
-                        { key: "k / \u2191", desc: "up" },
-                        { key: "gg",         desc: "jump to top" },
-                        { key: "G",          desc: "jump to bottom" },
-                        { key: "Ctrl+D",     desc: "half-page down" },
-                        { key: "Ctrl+U",     desc: "half-page up" },
-                        { key: "Enter",      desc: "launch action" },
-                        { key: "Ctrl+1\u20139", desc: "launch on workspace" },
-                        { key: "h / Esc",    desc: "back to item list" }
-                    ]
+                    bindings: _navActions.concat(list.pluginHelpActions)
                 }] : [{
                     title: "NORMAL MODE",
-                    bindings: [
-                        { key: "j / \u2193", desc: "down" },
-                        { key: "k / \u2191", desc: "up" },
-                        { key: "gg",         desc: "jump to top" },
-                        { key: "G",          desc: "jump to bottom" },
-                        { key: "Ctrl+D",     desc: "half-page down" },
-                        { key: "Ctrl+U",     desc: "half-page up" },
-                        { key: "Enter",      desc: "launch" },
-                        { key: "l / Tab",    desc: "actions for item" },
-                        { key: "[ / ]",      desc: "switch plugin" },
-                        { key: "Ctrl+1\u20139", desc: "launch on workspace" },
-                        { key: "/",          desc: "focus search" },
-                        { key: "q / Esc",    desc: "close" }
-                    ]
+                    bindings: _navNormal.concat(list.pluginHelpNormal)
                 }, {
                     title: "INSERT MODE",
                     bindings: [

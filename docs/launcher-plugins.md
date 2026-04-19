@@ -24,6 +24,9 @@ A **plugin** is a named item source. Each plugin has:
 | `placeholder` | string | Search field placeholder text |
 | `default` | bool | Activate this plugin on startup (first match wins) |
 | `iconDelegate` | string | Filename of the QML component that renders the icon slot (e.g. `"LauncherIconFile.qml"`). The launcher instantiates it via `Loader` and binds `iconData` (from the item's icon column) and `labelText` (from the item's label) onto it. Omit for a letter-tile fallback |
+| `keybindings` | list | Plugin-owned keybindings (see [Plugin keybindings](#plugin-keybindings)). Each entry also declares its own `?`-overlay help row inline via `helpKey` / `helpDesc` |
+| `hintText` | string | Footer hint appended to core nav hints in normal mode (e.g. `"Enter launch · Ctrl+1–9 workspace"`) |
+| `hintTextActions` | string | Footer hint in actions mode. Empty to omit |
 
 Items are 4- or 5-field tab-separated lines:
 
@@ -41,6 +44,71 @@ label\tdescription\ticon\tcallback[\tid]
 - **callback** — shell command executed on launch
 - **id** — optional; defaults to label. Used for frecency tracking and
   desktop-action parsing (must be a `.desktop` file path for `hasActions`)
+
+## Plugin keybindings
+
+Core only handles navigation (`j`/`k`, `gg`, `G`, `Ctrl+D`/`U`, `[`/`]`, `/`,
+`?`, `Esc`/`q`). Every other key — Enter, Tab, `Ctrl+1–9`, plugin-specific
+shortcuts — is declared by the active plugin as a list of `keybindings` entries.
+
+Each entry has:
+
+| Field | Description |
+|---|---|
+| `key` | Either a single lowercase letter/digit (`"a"`, `"1"`) or one of: `"Return"`, `"Tab"`, `"Escape"`, `"Space"`, `"Backspace"` |
+| `mods` | List of `"Ctrl"` / `"Shift"` / `"Alt"`; empty for bare keys |
+| `mode` | `"normal"` or `"actions"` — which input mode the binding applies in |
+| `run` | Shell template executed on confirm. `{callback}` is substituted with the selected item's callback (or the selected desktop action's exec when `mode = "actions"`). The substituted command is piped through bash |
+| `action` | Mode/lifecycle transition — one of `"enterActionsMode"`, `"enterNormalMode"`, `"close"`. Mutually exclusive with `run` |
+| `helpKey` | Optional display string for the `?` overlay row (e.g. `"Enter"`, `"Ctrl+1–9"`). Defaults to the raw `key` when `helpDesc` is set |
+| `helpDesc` | Optional description for the `?` overlay. Leave empty to hide this binding from help (useful for aliases — e.g. `l` as a silent alias for `Tab`) |
+
+A binding either runs a shell template (set `run`) or fires a mode
+transition (set `action`). Core knows nothing about what shell commands
+do — Hyprland, wl-copy, xdg-open, wtype, and anything else live in the
+plugin's `run` strings. Help lives inline on each binding, so there's one
+source of truth per plugin.
+
+### Example: apps plugin declares `Ctrl+1..9` for workspace launch
+
+```nix
+keybindings = [
+  { key = "Return"; mode = "normal"; run = "{callback}";
+    helpKey = "Enter"; helpDesc = "launch"; }
+  { key = "Return"; mode = "actions"; run = "{callback}";
+    helpKey = "Enter"; helpDesc = "launch action"; }
+  { key = "Tab"; mode = "normal"; action = "enterActionsMode";
+    helpKey = "l / Tab"; helpDesc = "actions for item"; }
+  { key = "l"; mode = "normal"; action = "enterActionsMode"; }  # silent alias
+  { key = "h"; mode = "actions"; action = "enterNormalMode";
+    helpKey = "h / Esc"; helpDesc = "back to item list"; }
+] ++ lib.imap0 (i: n: {
+  key = toString n;
+  mods = [ "Ctrl" ];
+  mode = "normal";
+  run = "hyprctl dispatch exec [workspace ${toString n}] {callback}";
+} // lib.optionalAttrs (i == 0) {
+  helpKey = "Ctrl+1–9";
+  helpDesc = "launch on workspace";
+}) (lib.range 1 9);
+```
+
+Ctrl+1 owns the `Ctrl+1–9` help row; Ctrl+2..9 are silent siblings so the
+`?` overlay stays compact.
+
+### Example: a bookmarks plugin with `Ctrl+b` for private browsing
+
+```nix
+keybindings = [
+  { key = "Return"; mode = "normal"; run = "xdg-open {callback}";
+    helpKey = "Enter"; helpDesc = "open in default browser"; }
+  { key = "b"; mods = [ "Ctrl" ]; mode = "normal";
+    run = "firefox --private-window {callback}";
+    helpKey = "Ctrl+b"; helpDesc = "open in private window"; }
+];
+```
+
+No patch to core or orchestrator required — just declarative Nix.
 
 ## Adding plugins via Nix
 
@@ -141,6 +209,26 @@ Arguments to `registerPlugin`:
 5. `placeholder` (string) — search field placeholder
 6. `label` (string) — display name on the chip; pass `""` to fall back to the key
 
+IPC-registered plugins get a default keybinding of `Return → {callback}`
+so Enter runs the selected item's callback verbatim. For richer bindings,
+call [`addKeybinding`](#keybindings) (optionally preceded by `clearKeybindings`
+to drop the default). `addKeybinding` takes an `action` argument (mode
+transition, empty for run-bindings), a `run` argument (shell template,
+empty for transition-bindings), and `helpKey` / `helpDesc` for the
+inline `?`-overlay row:
+
+```bash
+qs ipc -c kh-launcher call launcher clearKeybindings bookmarks
+qs ipc -c kh-launcher call launcher addKeybinding \
+  "bookmarks" "Return" "" "normal" "" "{callback}" "Enter" "open"
+qs ipc -c kh-launcher call launcher addKeybinding \
+  "bookmarks" "1" "Ctrl" "normal" "" \
+  "hyprctl dispatch exec [workspace 1] {callback}" \
+  "Ctrl+1–9" "open on workspace"
+qs ipc -c kh-launcher call launcher setPluginHintText \
+  "bookmarks" "normal" "Enter open · Ctrl+1–9 workspace"
+```
+
 Then activate it:
 
 ```bash
@@ -193,12 +281,25 @@ qs ipc -c kh-launcher call launcher listPlugins
 
 ## Plugin navigation
 
-### Keyboard (when launcher is open)
+Navigation keys are handled by core and are the same regardless of which
+plugin is active. Everything else (Enter, Tab, Ctrl+1–9, …) is declared
+per-plugin — see [Plugin keybindings](#plugin-keybindings).
+
+### Core navigation (when launcher is open)
 
 | Key | Input mode | Action |
 |---|---|---|
+| `j` / `↓` | normal, actions | Down |
+| `k` / `↑` | normal, actions | Up |
+| `gg` | normal, actions | Jump to top |
+| `G` | normal, actions | Jump to bottom |
+| `Ctrl+D` / `Ctrl+U` | normal, actions | Half-page down / up |
 | `]` | normal | Next plugin |
 | `[` | normal | Previous plugin |
+| `/` | normal | Focus search (enter insert mode) |
+| `?` | normal, actions | Toggle help overlay |
+| `Esc` / `q` | normal | Close launcher |
+| `Esc` | actions | Back to item list |
 | Click plugin chip | any | Activate that plugin |
 
 ### IPC
@@ -245,6 +346,9 @@ qs ipc -c kh-launcher prop get launcher lastSelection
 | `addItem` | `plugin, label, description, icon, callback` | Push an item into a plugin's buffer |
 | `addItemWithId` | `plugin, label, description, icon, callback, id` | Push an item with explicit id |
 | `itemsReady` | `plugin` | Flush the buffer and display items |
+| `addKeybinding` | `plugin, key, mods, mode, action, run, helpKey, helpDesc` | Append a keybinding. `mods` is a comma-separated string (`""`, `"Ctrl"`, `"Ctrl,Shift"`). Set `action` for mode transitions or `run` for shell templates (leave the other empty). `helpKey` / `helpDesc` declare the row in the `?` overlay — leave both empty to hide the binding from help |
+| `clearKeybindings` | `plugin` | Empty a plugin's keybindings (drops the seeded `Return → {callback}` default) |
+| `setPluginHintText` | `plugin, mode, hintText` | Set the footer hint for the given mode (`normal` / `actions`) |
 
 ### Properties (read-only)
 
