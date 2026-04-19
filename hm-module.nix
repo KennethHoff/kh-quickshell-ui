@@ -313,6 +313,9 @@ in
             hyprlandWindowsPlugin = import (src + "/apps/launcher/plugins/hyprland-windows.nix") {
               inherit pkgs lib;
             };
+            emojiPlugin = import (src + "/apps/launcher/plugins/emoji.nix") {
+              inherit pkgs lib;
+            };
             userPlugins = lib.mapAttrs (_: cfg: {
               script = toString cfg.script;
               inherit (cfg)
@@ -323,7 +326,7 @@ in
                 ;
               default = false;
             }) launcherCfg.scriptPlugins;
-            allPlugins = appsPlugin.plugins // hyprlandWindowsPlugin.plugins // userPlugins;
+            allPlugins = appsPlugin.plugins // hyprlandWindowsPlugin.plugins // emojiPlugin.plugins // userPlugins;
             pluginRegistryQml = pkgs.writeText "PluginRegistry.qml" ''
               import QtQuick
               QtObject {
@@ -338,7 +341,8 @@ in
                 "PluginRegistry.qml" = pluginRegistryQml;
               }
               // (appsPlugin.generatedFiles or { })
-              // (hyprlandWindowsPlugin.generatedFiles or { });
+              // (hyprlandWindowsPlugin.generatedFiles or { })
+              // (emojiPlugin.generatedFiles or { });
             };
           }
         )

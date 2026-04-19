@@ -141,7 +141,7 @@ one abstracted "window switcher".
 
 #### Emoji picker
 
-- [1] ⬜ Fuzzy search emoji by name; Enter copies to clipboard
+- [1] ✅ Fuzzy search emoji by name; Enter copies to clipboard — built-in plugin keyed `emoji`, chip label `Emoji`. Glyph list sourced from `pkgs.unicode-emoji` (`emoji-test.txt`, v17.0, `fully-qualified` status only) joined with `pkgs.cldr-annotations` (`en.xml`, v48.2) for authoritative multilingual keywords; same data source GNOME/GTK pickers use. The join happens once at Nix eval time into a TSV so the plugin scan script is a trivial `cat`. The emoji glyph renders in the 32 px icon slot via a new plugin-owned `iconDelegate` mechanism: each plugin names a QML component (here `LauncherIconGlyph.qml`, shared alongside `LauncherIconFile.qml` for file-path plugins), and `PluginList.qml` instantiates it through a `Loader` with `iconData` / `labelText` bound from the item. Label holds just the canonical name; keywords flow through the description field. Callback copies to the Wayland clipboard via `printf '%s' '<emoji>' | wl-copy` (no trailing newline). Frecency enabled so frequently-copied emoji surface first. ~3944 items under Unicode 17.0
 
 #### Snippets
 

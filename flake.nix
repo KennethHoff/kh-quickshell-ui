@@ -47,6 +47,9 @@
       hyprlandWindowsPlugin = import ./apps/launcher/plugins/hyprland-windows.nix {
         inherit pkgs lib;
       };
+      emojiPlugin = import ./apps/launcher/plugins/emoji.nix {
+        inherit pkgs lib;
+      };
 
       nixConfigQml = import ./config.nix {
         inherit pkgs;
@@ -109,7 +112,7 @@
       viewConfig = mkAppConfig { name = "view"; };
       launcherPluginRegistry =
         let
-          allPlugins = appsPlugin.plugins // hyprlandWindowsPlugin.plugins;
+          allPlugins = appsPlugin.plugins // hyprlandWindowsPlugin.plugins // emojiPlugin.plugins;
         in
         pkgs.writeText "PluginRegistry.qml" ''
           import QtQuick
@@ -124,7 +127,8 @@
           "PluginRegistry.qml" = launcherPluginRegistry;
         }
         // (appsPlugin.generatedFiles or { })
-        // (hyprlandWindowsPlugin.generatedFiles or { });
+        // (hyprlandWindowsPlugin.generatedFiles or { })
+        // (emojiPlugin.generatedFiles or { });
       };
 
       barConfig = mkBarConfig {

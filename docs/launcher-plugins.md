@@ -34,9 +34,10 @@ label\tdescription\ticon\tcallback[\tid]
 - **label** — display name
 - **description** — secondary text (may be empty)
 - **icon** — plugin-defined string passed as `iconData` to the plugin's
-  `iconDelegate` component. Shape depends on the chosen delegate —
-  `LauncherIconFile.qml` expects an absolute file path. Empty falls back to
-  a letter-tile built from the label.
+  `iconDelegate` component. Shape depends on the chosen delegate — e.g.
+  `LauncherIconFile.qml` expects an absolute file path; `LauncherIconGlyph.qml`
+  expects a glyph (emoji or single character). Empty falls back to a
+  letter-tile built from the label.
 - **callback** — shell command executed on launch
 - **id** — optional; defaults to label. Used for frecency tracking and
   desktop-action parsing (must be a `.desktop` file path for `hasActions`)
@@ -45,24 +46,6 @@ label\tdescription\ticon\tcallback[\tid]
 
 Use `programs.kh-ui.launcher.scriptPlugins` in your home-manager config. Each
 entry becomes a plugin alongside the built-in apps plugin.
-
-### Example: emoji picker
-
-```nix
-programs.kh-ui.launcher.scriptPlugins.emoji = {
-  script = pkgs.writeShellScript "emoji-plugin" ''
-    # Output: label (emoji + name), description, icon (empty), callback
-    echo -e "😀 Grinning Face\t\t\techo 😀 | wl-copy"
-    echo -e "🎉 Party Popper\t\t\techo 🎉 | wl-copy"
-    # In practice, read from a data file:
-    # while IFS=$'\t' read -r emoji name; do
-    #   printf '%s %s\t\t\techo %s | wl-copy\n' "$emoji" "$name" "$emoji"
-    # done < /path/to/emoji.tsv
-  '';
-  label = "Emoji";
-  placeholder = "Search emoji...";
-};
-```
 
 ### Example: system commands
 
@@ -79,18 +62,29 @@ programs.kh-ui.launcher.scriptPlugins.system = {
 };
 ```
 
-The attribute name (`emoji`, `system`) is the stable IPC identifier; `label`
-is purely cosmetic. If `label` is omitted, the chip shows the attribute name.
+The attribute name (`system`) is the stable IPC identifier; `label` is purely
+cosmetic. If `label` is omitted, the chip shows the attribute name.
 
-> A **Hyprland-only** window switcher plugin is built in. Its IPC key is
-> `hyprland-windows` (what you pass to `activatePlugin` etc.), and it shows
-> up on the chip as **Windows**. It lists every open Hyprland window sorted
-> by most-recently-focused, with icons resolved from each window's WM class,
-> and Enter runs `hyprctl dispatch focuswindow` (Hyprland switches to the
-> window's workspace automatically). Under any other compositor the plugin
-> stays registered but lists nothing, since it depends on
-> `hyprctl clients -j`. Activate via
-> `qs ipc -c kh-launcher call launcher activatePlugin hyprland-windows`.
+### Built-in plugins
+
+**`apps`** (default, Apps) — fuzzy searches installed `.desktop` applications,
+Enter launches. Frecency-ranked; supports desktop actions (`l` / Tab cycles
+into them).
+
+**`emoji`** (Emoji) — fuzzy searches Unicode emoji; Enter copies the glyph
+to the Wayland clipboard via `wl-copy` (no trailing newline). Glyph list is
+sourced from `pkgs.unicode-emoji` (`fully-qualified` status entries only),
+joined with `pkgs.cldr-annotations` (`en.xml`) for authoritative keyword
+annotations — same data GNOME/GTK pickers use. Keywords flow through the
+description field so `love` finds ❤️, `lol` finds 🤣, etc. The emoji glyph
+renders directly in the icon slot.
+
+**`hyprland-windows`** (Windows) — Hyprland-only. Lists every open window
+sorted most-recently-focused first, with icons resolved from each window's WM
+class; Enter runs `hyprctl dispatch focuswindow` (Hyprland switches to the
+window's workspace automatically). Under any other compositor the plugin
+stays registered but lists nothing. Activate via
+`qs ipc -c kh-launcher call launcher activatePlugin hyprland-windows`.
 
 ### Icon primitives
 
@@ -101,6 +95,7 @@ launcher binds those from the item's icon and label columns.
 | Primitive | When to use |
 |---|---|
 | `LauncherIconFile.qml` | `iconData` is an absolute file path. Renders as an `Image` with a letter-tile fallback if the path is empty or fails to load. Used by `apps`, `hyprland-windows` |
+| `LauncherIconGlyph.qml` | `iconData` is a text glyph (emoji, single character, nerd-font codepoint). Rendered as centred text sized to the slot. Used by `emoji` |
 
 Plugins with exotic rendering needs (colour swatches, animated badges, …)
 can skip the primitives and ship a custom QML file via `generatedFiles` in
@@ -109,13 +104,14 @@ file declares matching `iconData` / `labelText` properties.
 
 ### Removing a built-in plugin
 
-Built-in plugins (`apps`, `hyprland-windows`) are registered by their plugin
-sources. To remove one and only use your own plugins, override
+Built-in plugins (`apps`, `emoji`, `hyprland-windows`) are registered by
+their plugin sources. To remove one and only use your own plugins, override
 `PluginRegistry.qml` via `generatedFiles` in your flake. The simplest
 approach is to remove it at runtime via IPC after startup:
 
 ```bash
 qs ipc -c kh-launcher call launcher removePlugin apps
+qs ipc -c kh-launcher call launcher removePlugin emoji
 qs ipc -c kh-launcher call launcher removePlugin hyprland-windows
 ```
 
