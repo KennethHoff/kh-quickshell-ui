@@ -336,7 +336,9 @@ in
               name = "launcher";
               generatedFiles = {
                 "PluginRegistry.qml" = pluginRegistryQml;
-              };
+              }
+              // (appsPlugin.generatedFiles or { })
+              // (hyprlandWindowsPlugin.generatedFiles or { });
             };
           }
         )

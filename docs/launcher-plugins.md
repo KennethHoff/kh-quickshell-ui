@@ -23,6 +23,7 @@ A **plugin** is a named item source. Each plugin has:
 | `hasActions` | bool | Enable desktop-action sub-mode (parses `[Desktop Action]` sections from `.desktop` files) |
 | `placeholder` | string | Search field placeholder text |
 | `default` | bool | Activate this plugin on startup (first match wins) |
+| `iconDelegate` | string | Filename of the QML component that renders the icon slot (e.g. `"LauncherIconFile.qml"`). The launcher instantiates it via `Loader` and binds `iconData` (from the item's icon column) and `labelText` (from the item's label) onto it. Omit for a letter-tile fallback |
 
 Items are 4- or 5-field tab-separated lines:
 
@@ -32,7 +33,10 @@ label\tdescription\ticon\tcallback[\tid]
 
 - **label** — display name
 - **description** — secondary text (may be empty)
-- **icon** — absolute path to icon file (may be empty)
+- **icon** — plugin-defined string passed as `iconData` to the plugin's
+  `iconDelegate` component. Shape depends on the chosen delegate —
+  `LauncherIconFile.qml` expects an absolute file path. Empty falls back to
+  a letter-tile built from the label.
 - **callback** — shell command executed on launch
 - **id** — optional; defaults to label. Used for frecency tracking and
   desktop-action parsing (must be a `.desktop` file path for `hasActions`)
@@ -87,6 +91,21 @@ is purely cosmetic. If `label` is omitted, the chip shows the attribute name.
 > stays registered but lists nothing, since it depends on
 > `hyprctl clients -j`. Activate via
 > `qs ipc -c kh-launcher call launcher activatePlugin hyprland-windows`.
+
+### Icon primitives
+
+Shared QML components plugins reference via `iconDelegate`. Each primitive
+declares `property string iconData` / `property string labelText`; the
+launcher binds those from the item's icon and label columns.
+
+| Primitive | When to use |
+|---|---|
+| `LauncherIconFile.qml` | `iconData` is an absolute file path. Renders as an `Image` with a letter-tile fallback if the path is empty or fails to load. Used by `apps`, `hyprland-windows` |
+
+Plugins with exotic rendering needs (colour swatches, animated badges, …)
+can skip the primitives and ship a custom QML file via `generatedFiles` in
+their Nix helper — set `iconDelegate = "MyCustomIcon.qml"` and ensure the
+file declares matching `iconData` / `labelText` properties.
 
 ### Removing a built-in plugin
 

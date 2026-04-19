@@ -126,6 +126,8 @@ let
 
       _callback="$_hyprctl dispatch focuswindow address:$_addr"
 
+      # Icon is a bare absolute path; HyprlandWindowIcon.qml wraps it in
+      # file:// for its Image element.
       printf '%s\t%s\t%s\t%s\t%s\n' \
         "$_label" "$_desc" "$_icon_path" "$_callback" "$_addr"
     done
@@ -140,6 +142,9 @@ in
       placeholder = "Switch Hyprland window...";
       label = "Windows";
       default = false;
+      # Icon column carries an absolute path; shared image primitive with a
+      # letter-tile fallback covers the shape cleanly.
+      iconDelegate = "LauncherIconFile.qml";
     };
   };
 }

@@ -102,6 +102,8 @@ let
         else
           _callback="$_exec"
         fi
+        # Icon is a bare absolute path; AppsIcon.qml turns it into a
+        # file:// URI for its Image.
         printf '%s\t%s\t%s\t%s\t%s\n' \
           "$_name" "$_comment" "$_icon_resolved" "$_callback" "$_f"
       done
@@ -121,6 +123,9 @@ in
       placeholder = "Search applications...";
       label = "Apps";
       default = true;
+      # Icon column carries an absolute path; the shared file-image primitive
+      # renders it with a letter-tile fallback when the path doesn't resolve.
+      iconDelegate = "LauncherIconFile.qml";
     };
   };
 }

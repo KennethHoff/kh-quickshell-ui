@@ -122,7 +122,9 @@
         name = "launcher";
         generatedFiles = {
           "PluginRegistry.qml" = launcherPluginRegistry;
-        };
+        }
+        // (appsPlugin.generatedFiles or { })
+        // (hyprlandWindowsPlugin.generatedFiles or { });
       };
 
       barConfig = mkBarConfig {

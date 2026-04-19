@@ -860,19 +860,32 @@ Item {
                         width: 32
                         height: 32
 
-                        Image {
-                            id: itemIconImage
+                        // The icon slot is plugin-rendered. Each plugin
+                        // registers an `iconDelegate` QML file; the Loader
+                        // instantiates it and `Binding`s feed `iconData` /
+                        // `labelText` in as declared properties on the
+                        // loaded item. Plugins that don't set an
+                        // iconDelegate fall through to the letter tile.
+                        Loader {
+                            id: iconLoader
                             anchors.fill: parent
-                            source: modelData.icon !== "" ? ("file://" + modelData.icon) : ""
-                            fillMode: Image.PreserveAspectFit
-                            sourceSize: Qt.size(32, 32)
-                            smooth: true
-                            visible: status === Image.Ready
+                            source: pluginList._pluginConfig.iconDelegate || ""
+                            active: source != ""
+                        }
+                        Binding {
+                            target: iconLoader.item; property: "iconData"
+                            value: modelData.icon || ""
+                            when: iconLoader.item
+                        }
+                        Binding {
+                            target: iconLoader.item; property: "labelText"
+                            value: modelData.label || ""
+                            when: iconLoader.item
                         }
 
                         Rectangle {
                             anchors.fill: parent
-                            visible: itemIconImage.status !== Image.Ready
+                            visible: !iconLoader.active
                             color: cfg.color.base02
                             radius: 6
 
@@ -987,20 +1000,26 @@ Item {
                         width: 28
                         height: 28
 
-                        Image {
-                            id: actionIconImage
+                        Loader {
+                            id: actionIconLoader
                             anchors.fill: parent
-                            source: pluginList.selectedItem && pluginList.selectedItem.icon !== ""
-                                    ? ("file://" + pluginList.selectedItem.icon) : ""
-                            fillMode: Image.PreserveAspectFit
-                            sourceSize: Qt.size(28, 28)
-                            smooth: true
-                            visible: status === Image.Ready
+                            source: pluginList._pluginConfig.iconDelegate || ""
+                            active: source != ""
+                        }
+                        Binding {
+                            target: actionIconLoader.item; property: "iconData"
+                            value: pluginList.selectedItem ? (pluginList.selectedItem.icon || "") : ""
+                            when: actionIconLoader.item
+                        }
+                        Binding {
+                            target: actionIconLoader.item; property: "labelText"
+                            value: pluginList.selectedItem ? (pluginList.selectedItem.label || "") : ""
+                            when: actionIconLoader.item
                         }
 
                         Rectangle {
                             anchors.fill: parent
-                            visible: actionIconImage.status !== Image.Ready
+                            visible: !actionIconLoader.active
                             color: cfg.color.base02
                             radius: 5
 
