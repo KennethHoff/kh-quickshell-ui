@@ -1,15 +1,11 @@
 // Standalone fullscreen text / image viewer — supports N files side-by-side.
 //
 // Usage (via wrapper): nix run .#kh-view -- <file-or-dir> [<file-or-dir2> ...]
-//                      nix run .#kh-view -- --recall [N]
-//                      nix run .#kh-view -- --list-history
 //
 // Directory args are expanded by the wrapper to their image files.
 //
 // Direct (Quickshell): KH_VIEW_LIST=/path/to/list quickshell -p <config-dir>
-//   where the list file contains one TSV line per pane (path\tlabel\tdesc).
-//   Gallery history is read via MetaStore from
-//   $XDG_DATA_HOME/kh-view/meta/history (see `listHistory` / `recall` IPC).
+//   where the list file contains one file path per line.
 //
 // Split mode (default): Tab cycles focus between panes.
 // Fullscreen mode (f):  h/l steps through files one at a time.
@@ -43,17 +39,6 @@ ShellRoot {
             onRead: (line) => functionality.onListRead(line)
         }
         onExited: functionality.onListExited()
-    }
-
-    // ── Gallery history (MetaStore-backed) ────────────────────────────────────
-    // Rows are <epoch>\t<compact JSON items array>; the wrapper appends on
-    // every normal launch.  We only read here — mutation lives in the wrapper
-    // so history survives a crashed or accidentally-closed window.
-    MetaStore {
-        id: historyStore
-        bash:     bin.bash
-        appName:  "kh-view"
-        storeKey: "history"
     }
 
     // ── Functionality ─────────────────────────────────────────────────────────
@@ -90,12 +75,9 @@ ShellRoot {
             }
         }
         // ui only
-        function init(): void {
-            listProcess.running = true
-            historyStore.load()
-        }
+        function init(): void { listProcess.running = true }
         // ui only
-        function onListRead(line: string): void {
+        function onListRead(line: string): void { 
             if (line.trim() === "") return
             const parts = line.split("\t")
             root._listItems.push({ path: parts[0] ?? "", label: parts[1] ?? "", desc: parts[2] ?? "" })
@@ -106,41 +88,6 @@ ShellRoot {
             root._panes     = root._listItems.slice()
             root._listItems = []
             root._ready     = true
-        }
-        // ui only — history entries sorted oldest→newest by epoch key
-        function _sortedHistory(): var {
-            const rows = []
-            for (const [ts, json] of Object.entries(historyStore.values)) {
-                try {
-                    rows.push({ ts: parseInt(ts, 10), items: JSON.parse(json) })
-                } catch (_) { /* skip malformed entry */ }
-            }
-            rows.sort((a, b) => a.ts - b.ts)
-            return rows
-        }
-        // ipc only — 1-indexed from newest
-        function recall(n: int): void {
-            const rows = _sortedHistory()
-            if (n < 1 || n > rows.length) return
-            const entry = rows[rows.length - n]
-            if (!entry.items || entry.items.length === 0) return
-            root._panes       = entry.items.slice()
-            root._focusedPane = 0
-            root._fullscreen  = false
-        }
-        // ipc only — newest first, 1-indexed; one TSV line per entry
-        function listHistory(): string {
-            const rows  = _sortedHistory()
-            const lines = []
-            for (let i = rows.length - 1; i >= 0; i--) {
-                const e     = rows[i]
-                const idx   = rows.length - i
-                const count = e.items.length
-                const first = e.items[0] || {}
-                const head  = first.label || first.path || ""
-                lines.push(idx + "\t" + e.ts + "\t" + count + "\t" + head)
-            }
-            return lines.join("\n")
         }
         // ui only
         function onShow(): void { keyHandler.forceActiveFocus() }
@@ -169,7 +116,6 @@ ShellRoot {
         readonly property bool wrap:         root._wrap
         readonly property bool hasPrev:      root._wrap || root._focusedPane > 0
         readonly property bool hasNext:      root._wrap || root._focusedPane < root._panes.length - 1
-        readonly property int  historyCount: Object.keys(historyStore.values).length
 
         function quit()                  { functionality.quit() }
         function next()                  { functionality.next() }
@@ -178,8 +124,6 @@ ShellRoot {
         function setFullscreen(on: bool) { functionality.setFullscreen(on) }
         function setWrap(on: bool)       { functionality.setWrap(on) }
         function key(k: string)          { functionality.key(k) }
-        function recall(n: int)          { functionality.recall(n) }
-        function listHistory(): string   { return functionality.listHistory() }
     }
 
     // ── Yank ──────────────────────────────────────────────────────────────────
@@ -236,7 +180,6 @@ ShellRoot {
                     property bool   _isImage: false
                     property string _imgSrc:  ""
                     property bool   _loading: true
-                    property bool   _missing: false
                     property var    _lines:   []
                     readonly property int  _headerH:  pane.modelData.label ? 44 : 0
                     readonly property bool _hasDots:  root._fullscreen && root._panes.length > 1
@@ -251,15 +194,6 @@ ShellRoot {
                         function init(): void {
                             const ext = pane.modelData.path.split(".").pop().toLowerCase()
                             pane._isImage = ["png","jpg","jpeg","gif","webp","bmp","svg"].includes(ext)
-                            existsCheck.running = true
-                        }
-                        // ui only
-                        function onExistsChecked(exists: bool): void {
-                            if (!exists) {
-                                pane._missing = true
-                                pane._loading = false
-                                return
-                            }
                             if (pane._isImage) { pane._imgSrc = "file://" + pane.modelData.path; pane._loading = false }
                             else               readProc.running = true
                         }
@@ -274,12 +208,6 @@ ShellRoot {
                     }
 
                     Component.onCompleted: paneFunctionality.init()
-
-                    Process {
-                        id: existsCheck
-                        command: [bin.bash, "-c", "[ -e \"$1\" ]", "--", pane.modelData.path]
-                        onExited: (exitCode) => paneFunctionality.onExistsChecked(exitCode === 0)
-                    }
 
                     Process {
                         id: readProc
@@ -349,44 +277,8 @@ ShellRoot {
                         }
                     }
 
-                    // Placeholder shown when the file does not exist on disk
-                    Item {
-                        visible: pane._missing
-                        anchors {
-                            top: parent.top
-                            left: parent.left; right: parent.right; bottom: parent.bottom
-                            bottomMargin: pane._headerH + pane._dotsGap
-                        }
-
-                        Column {
-                            anchors.centerIn: parent
-                            spacing: 10
-
-                            Text {
-                                anchors.horizontalCenter: parent.horizontalCenter
-                                text: pane._isImage ? "image missing" : "file missing"
-                                color: cfg.color.base03
-                                font.family: cfg.fontFamily
-                                font.pixelSize: cfg.fontSize + 4
-                                font.bold: true
-                            }
-
-                            Text {
-                                anchors.horizontalCenter: parent.horizontalCenter
-                                text: pane.modelData.path
-                                color: cfg.color.base03
-                                font.family: cfg.fontFamily
-                                font.pixelSize: cfg.fontSize - 1
-                                elide: Text.ElideMiddle
-                                width: Math.min(pane.width - 60, 600)
-                                horizontalAlignment: Text.AlignHCenter
-                            }
-                        }
-                    }
-
                     ContentViewer {
                         id: paneViewer
-                        visible: !pane._missing
                         anchors {
                             top: parent.top
                             left: parent.left; right: parent.right; bottom: parent.bottom
