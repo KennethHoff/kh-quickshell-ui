@@ -1,10 +1,16 @@
-# Shell wrapper for kh-view that handles file/directory args and stdin.
+# Shell wrapper for kh-view with label support.
 # Usage:
-#   kh-view <file-or-dir> [<file-or-dir2> ...]  # View specific files
-#   <cmd> | kh-view                              # View stdin
+#   kh-view <file-or-dir> [<file-or-dir2> ...]                 # View files without labels
+#   kh-view --label <file> <label> <desc> [--label <file> ...]  # View files with labels
+#   <cmd> | kh-view                                            # View stdin
 #
 # Directory args are expanded to their image files (png/jpg/jpeg/gif/
 # webp/bmp/svg, non-recursive) sorted by filename.
+#
+# Examples:
+#   nix run .#kh-view -- image1.png image2.png
+#   nix run .#kh-view -- --label image1.png "Before" "Initial" --label image2.png "After" "Final"
+#   nix run .#kh-view -- --label ./screenshots/ "All" "Screenshot batch"
 {
   pkgs,
   lib,
@@ -17,27 +23,49 @@ pkgs.writeShellScript "kh-view-wrapper" ''
   sort=${lib.getExe' pkgs.coreutils "sort"}
   list=$(mktemp)
   trap 'rm -f "$list"' EXIT
-  if [[ $# -ge 1 ]]; then
-    for arg in "$@"; do
-      if [[ -d "$arg" ]]; then
-        "$find" "$arg" -maxdepth 1 -type f \
+
+  # Process args: mix of --label file label desc, positional files, or stdin
+  while [[ $# -gt 0 ]]; do
+    if [[ "$1" == "--label" ]]; then
+      shift
+      if [[ $# -lt 3 ]]; then
+        echo "Error: --label requires <file> <label> <description>" >&2
+        exit 1
+      fi
+      file="$1"
+      label="$2"
+      desc="$3"
+      shift 3
+      if [[ -d "$file" ]]; then
+        "$find" "$file" -maxdepth 1 -type f \
           \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' \
              -o -iname '*.gif' -o -iname '*.webp' -o -iname '*.bmp' \
-             -o -iname '*.svg' \) | "$sort" >> "$list"
+             -o -iname '*.svg' \) | "$sort" | while read -r fpath; do
+          printf '%s\t%s\t%s\n' "$fpath" "$label" "$desc" >> "$list"
+        done
       else
-        printf '%s\n' "$arg" >> "$list"
+        printf '%s\t%s\t%s\n' "$file" "$label" "$desc" >> "$list"
       fi
-    done
-    export KH_VIEW_LIST="$list"
-    ${
-      if viewConfigPath != null then "exec \"$qs\" -p ${viewConfigPath}" else "exec \"$qs\" -c kh-view"
-    }
-  else
+    elif [[ -d "$1" ]]; then
+      "$find" "$1" -maxdepth 1 -type f \
+        \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' \
+           -o -iname '*.gif' -o -iname '*.webp' -o -iname '*.bmp' \
+           -o -iname '*.svg' \) | "$sort" >> "$list"
+      shift
+    else
+      printf '%s\n' "$1" >> "$list"
+      shift
+    fi
+  done
+
+  # Handle stdin if no args provided
+  if [[ ! -s "$list" ]]; then
     tmp=$(mktemp)
     trap 'rm -f "$tmp"' EXIT
     cat > "$tmp"
     printf '%s\n' "$tmp" >> "$list"
-    export KH_VIEW_LIST="$list"
-    ${if viewConfigPath != null then "\"$qs\" -p ${viewConfigPath}" else "\"$qs\" -c kh-view"}
   fi
+
+  export KH_VIEW_LIST="$list"
+  ${if viewConfigPath != null then "exec \"$qs\" -p ${viewConfigPath}" else "exec \"$qs\" -c kh-view"}
 ''
