@@ -425,7 +425,8 @@ shows all files side-by-side with Tab to cycle focus between panes.
 - [5] ✅ IPC — `target: "view"`; `next()`/`prev()`/`seek(n)`/`quit()`/`setFullscreen(bool)`/`key(k)`; readable props `currentIndex`, `count`, `fullscreen`, `hasPrev`, `hasNext`
 - [6] ⬜ Optional pane labels — each pane optionally shows a header bar with a short name and description; `kh-view` accepts label metadata alongside each file via a sidecar format or extended list protocol *(implement together with Dev Tooling → screenshot skill labels)*
 - [7] ⬜ Monitor selection — `--monitor <name|index>` flag; defaults to the monitor containing the active window
-- [8] ⬜ Gallery history — persist recent sessions (file list + labels) to `$XDG_DATA_HOME/kh-view/history.jsonl`; recall a prior gallery via `--recall [N]` or IPC so a closed window can be reopened. Motivating case: "Show me the previous gallery please, I accidentally closed it"
+- [8] ✅ Gallery history — each invocation appends a session row (`<epoch>\t<compact JSON items>`) to `$XDG_DATA_HOME/kh-view/meta/history`, sharing the MetaStore path/format used by cliphist pins and launcher frecency; QML reads via `MetaStore { appName: "kh-view"; storeKey: "history" }`. `--recall [N]` (default 1) reopens the Nth-from-newest session without rewriting history (so recall is idempotent); `--list-history` prints a human-readable summary; IPC exposes `listHistory()` / `recall(n)` / `historyCount` for running instances. Missing files at recall time render an "image missing" / "file missing" placeholder pane with the path, so a partially-available session still opens cleanly
+- [9] ⬜ History cap / trimming — the history log is currently unbounded; add a configurable cap (default ~100, env-overridable) that prunes oldest entries when the wrapper appends; also consider dedupe for back-to-back identical sessions
 
 ### Navigation
 
