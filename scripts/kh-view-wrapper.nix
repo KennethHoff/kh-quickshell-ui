@@ -1,8 +1,7 @@
 # Shell wrapper for kh-view with label support.
 # Usage:
-#   kh-view <file-or-dir> [<file-or-dir2> ...]                 # View files without labels
+#   kh-view <file-or-dir> [<file-or-dir2> ...]                  # View files without labels
 #   kh-view --label <file> <label> <desc> [--label <file> ...]  # View files with labels
-#   <cmd> | kh-view                                            # View stdin
 #
 # Directory args are expanded to their image files (png/jpg/jpeg/gif/
 # webp/bmp/svg, non-recursive) sorted by filename.
@@ -24,7 +23,7 @@ pkgs.writeShellScript "kh-view-wrapper" ''
   list=$(mktemp)
   trap 'rm -f "$list"' EXIT
 
-  # Process args: mix of --label file label desc, positional files, or stdin
+  # Process args: mix of --label file label desc and positional files/dirs.
   while [[ $# -gt 0 ]]; do
     if [[ "$1" == "--label" ]]; then
       shift
@@ -58,12 +57,9 @@ pkgs.writeShellScript "kh-view-wrapper" ''
     fi
   done
 
-  # Handle stdin if no args provided
   if [[ ! -s "$list" ]]; then
-    tmp=$(mktemp)
-    trap 'rm -f "$tmp"' EXIT
-    cat > "$tmp"
-    printf '%s\n' "$tmp" >> "$list"
+    echo "Usage: kh-view <file-or-dir> [...]  |  --label <file> <label> <desc> ..." >&2
+    exit 1
   fi
 
   export KH_VIEW_LIST="$list"

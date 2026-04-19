@@ -1,7 +1,6 @@
 // Standalone fullscreen text / image viewer — supports N files side-by-side.
 //
 // Usage (via wrapper): nix run .#kh-view -- <file-or-dir> [<file-or-dir2> ...]
-//                      <cmd> | nix run .#kh-view
 //
 // Directory args are expanded by the wrapper to their image files.
 //

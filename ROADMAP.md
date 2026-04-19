@@ -413,12 +413,12 @@ Each plugin is **reactive** — subscribes to its own signal source, self-trigge
 
 ## File Viewer
 
-One-shot viewer for arbitrary text or image files. Accepts N file arguments
-or stdin; shows all files side-by-side with Tab to cycle focus between panes.
+One-shot viewer for arbitrary text or image files. Accepts N file arguments;
+shows all files side-by-side with Tab to cycle focus between panes.
 
 ### Core
 
-- [1] ✅ `nix run .#kh-view -- <file> [<file2> ...]` or `<cmd> | nix run .#kh-view`
+- [1] ✅ `nix run .#kh-view -- <file> [<file2> ...]`
 - [2] ✅ Image detection by extension (png/jpg/jpeg/gif/webp/bmp/svg)
 - [3] ✅ N files shown side-by-side in equal-width panes; Tab cycles focus; active divider highlights
 - [4] ✅ `q`/`Esc` quits
