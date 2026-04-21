@@ -23,9 +23,15 @@ Rectangle {
 
     readonly property color _accent: {
         // Flow-through gradient so left-to-right reads as one colour ramp:
-        //   source (green) → bridge (blue) → sink (red).
-        if (node.kind === "source") return cfg.color.base0B
-        if (node.kind === "sink")   return cfg.color.base08
+        //   source (green) → virt-source (cyan) → virt-sink (orange) → sink (red).
+        // Within a column, "stream" subtype (app I/O like Firefox) breaks
+        // to purple so a mic and a browser tab don't share the same accent.
+        // Anything outside the flow (bridges, unknown kinds) uses blue.
+        if (node.subtype === "stream")   return cfg.color.base0E
+        if (node.kind === "source")      return cfg.color.base0B
+        if (node.kind === "virt-source") return cfg.color.base0C
+        if (node.kind === "virt-sink")   return cfg.color.base09
+        if (node.kind === "sink")        return cfg.color.base08
         return cfg.color.base0D
     }
 
@@ -69,13 +75,40 @@ Rectangle {
             color:  parent.color
         }
 
+        // Default-node pill badge — renders in the header's top-right when
+        // PipeWire's default metadata points at this node. The title gives
+        // up right-margin space when visible so labels don't overlap.
+        Rectangle {
+            id: defaultPill
+            visible: node.isDefault === true
+            anchors.right: parent.right
+            anchors.top:   parent.top
+            anchors.rightMargin: 8
+            anchors.topMargin:   6
+            height: 16
+            width:  defaultPillLabel.implicitWidth + 14
+            radius: 8
+            color:  cfg.color.base09
+
+            Text {
+                id: defaultPillLabel
+                anchors.centerIn: parent
+                text:  "DEFAULT"
+                color: cfg.color.base00
+                font.family: cfg.fontFamily
+                font.pixelSize: cfg.fontSize - 5
+                font.bold: true
+                font.letterSpacing: 0.8
+            }
+        }
+
         Text {
             id: title
             anchors.left:    parent.left
             anchors.right:   parent.right
             anchors.top:     parent.top
             anchors.leftMargin:  10
-            anchors.rightMargin: 10
+            anchors.rightMargin: defaultPill.visible ? (defaultPill.width + 14) : 10
             anchors.topMargin:   4
             text:            node.description || node.name || ""
             color:           cfg.color.base05
@@ -116,6 +149,7 @@ Rectangle {
                 width:  parent.width
                 height: 18
 
+                // Port dot
                 Rectangle {
                     id: dot
                     width: 10
@@ -124,6 +158,8 @@ Rectangle {
                     color: cfg.color.base0B
                     border.color: cfg.color.base00
                     border.width: 1
+                    // Pull outward past the card edge so the dot straddles
+                    // the border — visually anchors the cable to the node.
                     anchors.left: parent.left
                     anchors.leftMargin: -5
                     anchors.verticalCenter: parent.verticalCenter
