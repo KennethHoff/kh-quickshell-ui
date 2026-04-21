@@ -345,12 +345,12 @@ via IPC. Toggle via IPC/keybind.
 
 ### Core
 
-- [1] ⬜ Node graph — all PipeWire nodes rendered as boxes with their name, media class (Audio/Sink, Audio/Source, Stream/Output/Audio, Midi/Bridge, Video/Source, …), and port list; sourced from `pw-dump` or the `libpipewire` Quickshell bindings if available
-- [2] ⬜ Port rows — each node shows input ports on the left edge and output ports on the right edge, labelled with channel/port name
-- [3] ⬜ Links — bezier/orthogonal edges drawn between connected output and input ports; colour-coded by media type (audio / MIDI / video)
+- [1] ✅ Node graph — `PwGraph` shells out to `pw-dump` on a 2 s timer while the window is visible, parses PipeWire `Node` / `Port` / `Link` objects into normalised models, and renders nodes as titled boxes showing `node.description` (or `node.name`) and `media.class`. `libpipewire`-based Quickshell bindings would remove the JSON-parse cost but the polling path works fine for a scaffolding pass; revisit when Core [4] lands
+- [2] ✅ Port rows — each node's input ports hug the left edge and output ports hug the right, each rendered as a coloured dot plus the `port.name`; ports are sorted inputs-then-outputs inside each node so the columns line up predictably
+- [3] ✅ Links — `LinkEdge` is a `Canvas` that reads source/target dot positions via `mapToItem` and draws a cubic bezier; stroke colour is keyed off the link's `info.format.mediaType` (audio = base0C-ish cyan, MIDI = yellow, video = magenta) so mixed graphs read at a glance
 - [4] ⬜ Live updates — subscribe to PipeWire registry events so node add/remove/link/unlink is reflected in the graph without polling
 - [5] ⬜ Media type filter — toggle audio / MIDI / video visibility independently; hidden types dim their nodes and links
-- [6] ⬜ IPC — `target: "patchbay"`; `toggle()`, `open()`, `close()`, `nav(dir)`, `key(k)`, `connect(srcNode, srcPort, dstNode, dstPort)`, `disconnect(...)`, `listNodes()`, `listLinks()`
+- [6] ⬜ IPC — `target: "patchbay"`; scaffold exposes `toggle()` / `open()` / `close()` / `refresh()` / `listNodes()` / `listLinks()` plus the `showing` readable prop. Remaining: `nav(dir)`, `key(k)`, `connect(srcNode, srcPort, dstNode, dstPort)`, `disconnect(...)` — all blocked on Navigation / Editing work below
 
 ### Navigation
 

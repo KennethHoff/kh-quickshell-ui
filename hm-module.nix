@@ -319,6 +319,17 @@ in
       '';
     };
 
+    patchbay.enable = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = ''
+        Enable the PipeWire graph editor daemon (kh-patchbay).
+
+        Long-running daemon; the overlay is toggled via IPC:
+        qs ipc call patchbay toggle
+      '';
+    };
+
     bar = {
       enable = lib.mkOption {
         type = lib.types.bool;
@@ -471,6 +482,15 @@ in
         }
         // lib.optionalAttrs config.programs.kh-ui.osd.enable {
           kh-osd = mkAppConfig { name = "osd"; };
+        }
+        // lib.optionalAttrs config.programs.kh-ui.patchbay.enable {
+          kh-patchbay = mkAppConfig {
+            name = "patchbay";
+            extraBins = {
+              pwDump = lib.getExe' pkgs.pipewire "pw-dump";
+              pwLink = lib.getExe' pkgs.pipewire "pw-link";
+            };
+          };
         };
     in
     lib.mkMerge [
@@ -535,6 +555,9 @@ in
           }
           // lib.optionalAttrs config.programs.kh-ui.osd.enable {
             kh-osd = mkQsService "kh-osd" { };
+          }
+          // lib.optionalAttrs config.programs.kh-ui.patchbay.enable {
+            kh-patchbay = mkQsService "kh-patchbay" { };
           };
       })
     ];

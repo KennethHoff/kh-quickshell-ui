@@ -228,6 +228,14 @@
       };
 
       osdConfig = mkAppConfig { name = "osd"; };
+
+      patchbayConfig = mkAppConfig {
+        name = "patchbay";
+        extraBins = {
+          pwDump = lib.getExe' pkgs.pipewire "pw-dump";
+          pwLink = lib.getExe' pkgs.pipewire "pw-link";
+        };
+      };
     in
     {
       formatter.${system} = pkgs.nixfmt-tree;
@@ -253,6 +261,7 @@
         kh-cliphist = cliphistConfig;
         cliphistDecodeAll = cliphistDecodeAllScript;
         kh-osd = osdConfig;
+        kh-patchbay = patchbayConfig;
         kh-view = viewConfig;
         kh-launcher = launcherConfig;
       };
@@ -368,6 +377,34 @@
               inherit pkgs lib;
               viewConfigPath = viewConfig;
             }
+          );
+        };
+        kh-patchbay = {
+          type = "app";
+          program = toString (
+            pkgs.writeShellScript "run-kh-patchbay" ''
+              qs=${lib.getExe' pkgs.quickshell "quickshell"}
+              "$qs" -p ${patchbayConfig} &
+              QS_PID=$!
+              for i in $(seq 30); do
+                sleep 0.1
+                "$qs" ipc --pid "$QS_PID" call patchbay toggle 2>/dev/null && break
+              done
+              while [[ "$("$qs" ipc --pid "$QS_PID" prop get patchbay showing 2>/dev/null)" == "true" ]]; do
+                sleep 0.2
+              done
+              kill "$QS_PID" 2>/dev/null
+              wait "$QS_PID" 2>/dev/null
+            ''
+          );
+        };
+        kh-patchbay-daemon = {
+          type = "app";
+          program = toString (
+            pkgs.writeShellScript "run-kh-patchbay-daemon" ''
+              qs=${lib.getExe' pkgs.quickshell "quickshell"}
+              exec "$qs" -p ${patchbayConfig}
+            ''
           );
         };
       };
