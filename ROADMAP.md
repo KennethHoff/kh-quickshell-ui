@@ -200,7 +200,7 @@ access stay consistent.
 
 ### Workspaces
 
-- [1] ✅ Workspace display — show Hyprland workspaces bound to this bar's monitor (`Hyprland.workspaces.values` filtered by `ws.monitor.name === barWindow.screen.name`); highlight the focused workspace. `bar.workspaces.list()` / `getFocused()` IPC also scoped to the bar's monitor so on-screen state and IPC stay consistent; `switchTo(name)` stays unscoped because focusing another monitor's workspace is a legal cross-monitor action
+- [1] ✅ Workspace display — show Hyprland workspaces; highlight the active workspace
 - [2] ✅ Workspace click to switch — click a workspace button to switch to it
 - [3] ✅ Workspace preview on hover — hovering a button for 300 ms shows a thumbnail popup; disappears on mouse leave
 - [4] ✅ Workspace preview thumbnails — composites per-window `ScreencopyView` captures at Hyprland IPC positions; scaled to 240 px wide

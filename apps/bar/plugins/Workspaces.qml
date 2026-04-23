@@ -1,6 +1,6 @@
 // Bar plugin: Hyprland workspace switcher with hover preview.
-// Shows workspaces bound to this bar's monitor; highlights the focused one.
-// Click to activate. Hover ~300 ms for a live thumbnail.
+// Shows all workspaces; highlights the focused one. Click to activate.
+// Hover for ~300 ms to show a live thumbnail of the workspace contents.
 //
 // Each workspace owns its own BarTooltip, parked in a sibling overlay
 // rather than inside the button. That lets the plugin move the tooltip
@@ -34,12 +34,6 @@ BarPlugin {
     readonly property int _fanGap: 4
     readonly property int _fanStep: _popupW + _fanGap
 
-    // Workspaces bound to this bar's monitor. Without this filter every
-    // bar on every monitor would show the union of all workspaces, which
-    // is noisy on multi-monitor setups.
-    readonly property var _workspaces:
-        Hyprland.workspaces.values.filter(ws => ws.monitor?.name === barWindow.screen.name)
-
     QtObject {
         id: functionality
 
@@ -49,19 +43,21 @@ BarPlugin {
 
         // ui+ipc
         function activateWorkspace(ws): void { ws.activate() }
-        // ipc only — scoped to this bar's monitor; empty when focus is elsewhere.
+        // ipc only
         function getFocused(): string {
-            for (const ws of root._workspaces)
-                if (ws.focused) return ws.name
+            for (let i = 0; i < Hyprland.workspaces.values.length; i++)
+                if (Hyprland.workspaces.values[i].focused)
+                    return Hyprland.workspaces.values[i].name
             return ""
         }
-        // ipc only — scoped to this bar's monitor.
+        // ipc only
         function list(): string {
-            return root._workspaces.map(ws => ws.name).join("\n")
+            const names = []
+            for (let i = 0; i < Hyprland.workspaces.values.length; i++)
+                names.push(Hyprland.workspaces.values[i].name)
+            return names.join("\n")
         }
-        // ipc only — unscoped: switching to an off-monitor workspace is a
-        // legal action (Hyprland focuses the other monitor), so don't
-        // restrict this to root._workspaces.
+        // ipc only
         function switchTo(name: string): void {
             for (let i = 0; i < Hyprland.workspaces.values.length; i++)
                 if (Hyprland.workspaces.values[i].name === name)
@@ -108,7 +104,7 @@ BarPlugin {
 
         Repeater {
             id: _repeater
-            model: root._workspaces
+            model: Hyprland.workspaces
 
             delegate: Rectangle {
                 id: _delegate
@@ -154,7 +150,7 @@ BarPlugin {
     // anchor widens to popupW and slots into the next fan-out position.
     Repeater {
         id: _tipRepeater
-        model: root._workspaces
+        model: Hyprland.workspaces
 
         delegate: Item {
             id: _anchor
