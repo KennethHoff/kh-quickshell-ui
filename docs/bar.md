@@ -2,22 +2,61 @@
 
 ## Configuration
 
-The bar requires an explicit layout — there is no default. Set it via `programs.kh-ui.bar.structure`:
+The bar is configured as an attrset of named **instances** — one entry per
+bar you want on screen. Each instance names the screen it anchors to. There
+is no default layout; at least one instance must be declared for the bar to
+render anything.
 
 ```nix
-programs.kh-ui.bar.structure = ''
-  BarRow {
-    Workspaces {}
-    MediaPlayer {}
-    BarSpacer {}
-    Clock {}
-    Volume {}
-    Tray {}
-  }
-'';
+programs.kh-ui.bar.instances.main = {
+  screen = "DP-1";
+  structure = ''
+    BarRow {
+      Workspaces {}
+      MediaPlayer {}
+      BarSpacer {}
+      Clock {}
+      Volume {}
+      Tray {}
+    }
+  '';
+};
 ```
 
-`BarRow` is a full-width `RowLayout` row. `BarSpacer` expands to fill remaining space — place it between plugin groups to push them apart (equivalent to CSS `space-between`). Multiple `BarRow`s, additional spacers, or any other QML types can appear at the top level.
+The attribute name (`main` above) doubles as the bar's root IPC target
+(`qs ipc call main getHeight`). Names must match `^[a-z][a-z0-9]*$` —
+lowercase letter followed by lowercase letters or digits.
+
+Bars anchor to the top edge of their screen and span its full width.
+`BarRow` is a full-width `RowLayout` row. `BarSpacer` expands to fill
+remaining space — place it between plugin groups to push them apart
+(equivalent to CSS `space-between`). Multiple `BarRow`s, additional spacers,
+or any other QML types can appear at the top level of a structure.
+
+### Multiple monitors
+
+Declare one instance per screen. Each lives in its own `PanelWindow` with
+its own IPC namespace. Two instances must not target the same screen —
+caught by a Nix eval-time assertion.
+
+```nix
+programs.kh-ui.bar.instances = {
+  main = {
+    screen = "DP-1";
+    structure = '' BarRow { Workspaces {} BarSpacer {} Clock {} Volume {} Tray {} } '';
+  };
+  side = {
+    screen = "HDMI-A-2";
+    structure = '' BarRow { Workspaces {} BarSpacer {} Clock {} } '';
+  };
+};
+```
+
+### Screen hotplug
+
+When an instance's `screen` isn't currently connected (e.g. an unplugged
+monitor), the bar simply doesn't spawn. Reconnecting the output materialises
+it automatically — no restart required.
 
 ## Layout types
 
@@ -33,43 +72,48 @@ programs.kh-ui.bar.structure = ''
 Use `BarGroup` to group plugins behind a single dropdown button:
 
 ```nix
-programs.kh-ui.bar.structure = ''
-  BarRow {
-    Workspaces {}
-    BarSpacer {}
-    BarGroup {
-      label: "●●●"
-      ipcName: "controlcenter"
-      panelWidth: 300
-      Row {
-        spacing: 8
-        EthernetPanel {}
-        TailscalePanel { id: ts }
+programs.kh-ui.bar.instances.main = {
+  screen = "DP-1";
+  structure = ''
+    BarRow {
+      Workspaces {}
+      BarSpacer {}
+      BarGroup {
+        label: "●●●"
+        ipcName: "controlcenter"
+        panelWidth: 300
+        Row {
+          spacing: 8
+          EthernetPanel {}
+          TailscalePanel { id: ts }
+        }
+        TailscalePeers { source: ts }
       }
-      TailscalePeers { source: ts }
+      Clock {}
+      Volume {}
+      Tray {}
     }
-    Clock {}
-    Volume {}
-    Tray {}
-  }
-'';
+  '';
+};
 ```
 
 ## Environment variables
 
-Some plugins require external configuration or secrets. You can pass environment variables to the bar service via the `environment` and `environmentFiles` options:
+Some plugins require external configuration or secrets. You can pass
+environment variables to the (single) kh-bar service via the `environment`
+and `environmentFiles` options — these are shared across every bar instance.
 
 ```nix
 programs.kh-ui.bar = {
-  structure = ''....'';
-  
+  instances.main = { screen = "DP-1"; structure = ''....''; };
+
   environment = {
-    // Direct environment variables (plaintext values)
+    # Direct environment variables (plaintext values)
     EXAMPLE_VAR = "value";
   };
-  
+
   environmentFiles = [
-    // Secret files (typically from sops/agenix)
+    # Secret files (typically from sops/agenix)
     config.sops.secrets."some/api-key".path
   ];
 };
@@ -260,38 +304,50 @@ BarPlugin {
 }
 ```
 
-Place your plugin files in a directory and pass it via `extraPluginDirs`. All `.qml` files in those directories are copied into the bar config root and become available by filename in `structure`:
+Place your plugin files in a directory and pass it via `extraPluginDirs`.
+All `.qml` files in those directories are copied into the bar config root
+and become available by filename in any instance's `structure` (the
+`extraPluginDirs` list applies to every bar — there is a single kh-bar
+service with one plugin search path):
 
 ```nix
 programs.kh-ui.bar = {
-  structure = ''
-    BarRow {
-      Workspaces {}
-      MyWidget {}
-    }
-  '';
+  instances.main = {
+    screen = "DP-1";
+    structure = ''
+      BarRow {
+        Workspaces {}
+        MyWidget {}
+      }
+    '';
+  };
   extraPluginDirs = [ ./bar-plugins ];  # directory containing MyWidget.qml
 };
 ```
 
 ## IPC
 
-Each plugin registers at a suffix derived from its `ipcName` property. The full target path is built from the nesting in your `structure` — every `BarPlugin` / `BarGroup` / `BarDropdown` / `BarTooltip` that declares an `ipcName` appends its own segment to the parent's prefix:
+Each bar instance owns its own IPC namespace, rooted at the instance's
+attribute name. Plugins inside it register at a suffix derived from their
+`ipcName` property. The full target path is built from the nesting in your
+`structure` — every `BarPlugin` / `BarGroup` / `BarDropdown` / `BarTooltip`
+that declares an `ipcName` appends its own segment to the parent's prefix:
 
 ```
-bar                                              (root)
-bar.<plugin>
-bar.<group-ipcName>.<plugin>
-bar.<group-ipcName>.<nested-group-ipcName>.<plugin>
+<instance>                                              (root)
+<instance>.<plugin>
+<instance>.<group-ipcName>.<plugin>
+<instance>.<group-ipcName>.<nested-group-ipcName>.<plugin>
 ```
 
-For example, a `TailscalePanel` inside `BarGroup { ipcName: "net" }` is reachable as `bar.net.tailscale`.
+For example, a `TailscalePanel` inside `BarGroup { ipcName: "net" }` inside
+`bar.instances.main` is reachable as `main.net.tailscale`.
 
-The root target (`bar`) exposes bar-wide queries:
+The root target (the instance name) exposes bar-wide queries:
 
 | Target | Functions |
 |---|---|
-| `bar` | `getHeight()` -> int (visible bar footprint in px — bar height plus the tallest currently-open dropdown popup), `getWidth()` -> int (bar width in px) |
+| `<instance>` | `getHeight()` -> int (visible bar footprint in px — bar height plus the tallest currently-open dropdown popup), `getWidth()` -> int (bar width in px), `getScreen()` -> string (screen name, e.g. `"DP-1"`) |
 
 | Plugin | Suffix | Functions / Properties |
 |---|---|---|
@@ -319,13 +375,13 @@ Any `BarGroup` or `BarDropdown` with `ipcName` set gets `toggle`/`open`/`close`/
 BarGroup {
     ipcName: "mypanel"
     label: "my panel"
-    // children reachable as bar.mypanel.<plugin>
+    // children reachable as <instance>.mypanel.<plugin>
 }
 ```
 
 ```bash
-qs ipc call bar.mypanel toggle
-qs ipc call bar.mypanel isOpen
+qs ipc call main.mypanel toggle
+qs ipc call main.mypanel isOpen
 ```
 
 Custom plugins inside a group get their prefix automatically — use `ipcPrefix + ".mywidget"` as the `IpcHandler` target (see the custom plugin example above).

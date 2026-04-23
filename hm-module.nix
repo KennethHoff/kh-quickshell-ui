@@ -57,16 +57,13 @@ let
 
   mkBarConfig =
     {
-      structure,
-      ipcName ? "bar",
+      instances,
       extraPluginDirs ? [ ],
       extraBins ? { },
     }:
     mkAppConfig {
       name = "bar";
-      generatedFiles = {
-        "BarLayout.qml" = import (src + "/bar-config.nix") { inherit pkgs structure ipcName; };
-      };
+      generatedFiles = import (src + "/bar-config.nix") { inherit pkgs lib instances; };
       extraBins = {
         df = lib.getExe' pkgs.coreutils "df";
         nmcli = lib.getExe' pkgs.networkmanager "nmcli";
@@ -325,51 +322,72 @@ in
         default = false;
         description = "Enable the status bar (kh-bar).";
       };
-      structure = lib.mkOption {
-        type = lib.types.str;
-        description = ''
-          QML structure for the bar layout. The string is placed verbatim
-          inside the root BarLayout Item, which exposes <literal>barHeight</literal>,
-          <literal>barWindow</literal>, and <literal>ipcPrefix</literal> to all
-          children via the parent chain.
+      instances = lib.mkOption {
+        type = lib.types.attrsOf (
+          lib.types.submodule {
+            options = {
+              screen = lib.mkOption {
+                type = lib.types.strMatching ".+";
+                description = ''
+                  Wayland output name the bar appears on (e.g.
+                  <literal>DP-1</literal>, <literal>HDMI-A-2</literal>). There
+                  is no "primary" concept in Wayland, so this is required.
+                  If the output isn't connected at launch — or gets unplugged
+                  later — the bar silently hides and reappears on reconnect.
+                '';
+              };
+              structure = lib.mkOption {
+                type = lib.types.str;
+                description = ''
+                  QML structure for this bar's layout. Inserted verbatim
+                  inside the generated BarLayout Item, which exposes
+                  <literal>barHeight</literal>, <literal>barWindow</literal>,
+                  and <literal>ipcPrefix</literal> to all children via the
+                  parent chain.
 
-          Use <literal>BarRow</literal> for a full-width row and
-          <literal>BarSpacer</literal> to push items apart (CSS space-between
-          equivalent). Any QML type available in $out/ can be used — built-in
-          plugins, lib components, and types from extraPluginDirs.
+                  Use <literal>BarRow</literal> for a full-width row and
+                  <literal>BarSpacer</literal> to push items apart. Built-in
+                  plugins: Workspaces, MediaPlayer, Clock, Volume, Tray,
+                  Notifications, CpuUsage, RamUsage, GpuUsage, DiskUsage,
+                  CpuTemp, GpuTemp. The *Usage / *Temp plugins are data-only
+                  — compose with BarText to render their values.
 
-          Built-in plugins: Workspaces, MediaPlayer, Clock, Volume, Tray,
-          Notifications, CpuUsage, RamUsage, GpuUsage, DiskUsage, CpuTemp,
-          GpuTemp. The *Usage / *Temp plugins are data-only — compose with
-          BarText (or any other component) to render their values.
-
-          Built-in layout / composition types:
-          BarRow, BarSpacer, BarPipe, BarGroup, BarDropdown, BarText,
-          BarIcon, BarTooltip, BarControlTile, BarDropdownHeader,
-          BarHorizontalDivider, BarDropdownItem, TailscalePanel,
-          EthernetPanel, TailscalePeers.
-
-          Example — network + audio grouped behind one button:
-          <programlisting>
-          BarRow {
-              Workspaces {}
-              BarSpacer {}
-              BarGroup {
-                  label: "●●●"
-                  ipcName: "controlcenter"
-                  panelWidth: 300
-                  Row {
-                      spacing: 8
-                      EthernetPanel {}
-                      TailscalePanel { id: ts }
-                  }
-                  TailscalePeers { source: ts }
-              }
-              Clock {}
-              Volume {}
-              Tray {}
+                  Built-in layout / composition types:
+                  BarRow, BarSpacer, BarPipe, BarGroup, BarDropdown, BarText,
+                  BarIcon, BarTooltip, BarControlTile, BarDropdownHeader,
+                  BarHorizontalDivider, BarDropdownItem, TailscalePanel,
+                  EthernetPanel, TailscalePeers.
+                '';
+              };
+            };
           }
-          </programlisting>
+        );
+        default = { };
+        example = lib.literalExpression ''
+          {
+            main = {
+              screen = "DP-1";
+              structure = '''
+                BarRow {
+                    Workspaces {}
+                    BarSpacer {}
+                    Clock {}
+                    Volume {}
+                    Tray {}
+                }
+              ''';
+            };
+          }
+        '';
+        description = ''
+          Bar instances keyed by <literal>ipcName</literal>. Each attribute
+          name becomes the root IPC target for that bar (e.g.
+          <literal>main</literal> → <literal>qs ipc call main getHeight</literal>),
+          so names must start with a lowercase letter and contain only
+          lowercase letters and digits (<literal>^[a-z][a-z0-9]*$</literal>).
+
+          Two instances may not target the same screen — enforced via
+          assertion.
         '';
       };
       extraPluginDirs = lib.mkOption {
@@ -416,7 +434,7 @@ in
         }
         // lib.optionalAttrs config.programs.kh-ui.bar.enable {
           kh-bar = mkBarConfig {
-            inherit (config.programs.kh-ui.bar) structure extraPluginDirs;
+            inherit (config.programs.kh-ui.bar) instances extraPluginDirs;
           };
         }
         // lib.optionalAttrs config.programs.kh-ui.launcher.enable (
@@ -472,6 +490,16 @@ in
         // lib.optionalAttrs config.programs.kh-ui.osd.enable {
           kh-osd = mkAppConfig { name = "osd"; };
         };
+      barCfg = config.programs.kh-ui.bar;
+      barInstanceList = lib.mapAttrsToList (name: spec: {
+        inherit name;
+        inherit (spec) screen;
+      }) barCfg.instances;
+      duplicateScreenGroups =
+        let
+          byScreen = lib.groupBy (i: i.screen) barInstanceList;
+        in
+        lib.filterAttrs (_: entries: builtins.length entries > 1) byScreen;
     in
     lib.mkMerge [
       (lib.mkIf config.programs.kh-ui.enable {
@@ -485,6 +513,37 @@ in
             toString (import (src + "/scripts/kh-view-wrapper.nix") { inherit pkgs lib; })
           ))
         ];
+
+        assertions = lib.optionals (config.programs.kh-ui.enable && barCfg.enable) (
+          (lib.mapAttrsToList (name: _spec: {
+            assertion = builtins.match "[a-z][a-z0-9]*" name != null;
+            message = ''
+              programs.kh-ui.bar.instances.${name}: ipcName must match ^[a-z][a-z0-9]*$
+              (lowercase letter followed by lowercase letters or digits). It becomes the
+              root IPC target for this bar, so it must be a legal identifier.
+            '';
+          }) barCfg.instances)
+          ++ (lib.mapAttrsToList (screen: entries: {
+            assertion = false;
+            message =
+              let
+                names = lib.concatMapStringsSep ", " (e: e.name) entries;
+              in
+              ''
+                programs.kh-ui.bar.instances: multiple bars target screen
+                ${screen}: ${names}. Each screen may host at most one bar.
+              '';
+          }) duplicateScreenGroups)
+        );
+
+        warnings =
+          lib.optional (config.programs.kh-ui.enable && barCfg.enable && barCfg.instances == { })
+            ''
+              programs.kh-ui.bar.enable is true but bar.instances is empty — the
+              kh-bar service will start but render no bars. Add at least one entry
+              under programs.kh-ui.bar.instances.<name> = { screen; structure; }
+              or set bar.enable = false to silence this warning.
+            '';
       })
 
       (lib.mkIf config.programs.kh-ui.enable {

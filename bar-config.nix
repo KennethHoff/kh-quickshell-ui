@@ -1,78 +1,94 @@
-# Generates BarLayout.qml from a user-provided QML structure string.
+# Generates per-instance BarLayout files plus a BarInstances registry.
 #
-# The structure string is inserted verbatim as children of the top-level
-# layout Item, which exposes barHeight and barWindow as required properties.
-# All layout and plugin types (BarRow, BarGroup, Clock, …) are resolved
-# at runtime from the files copied into $out/ — no imports or inlining
-# needed here.
+# Input: an attrset keyed by ipcName, each value { screen; structure }.
+# Output: attrset of { filename = <store-path>; } suitable for mkAppConfig's
+# generatedFiles, containing:
 #
-# Usage:
-#   import ./bar-config.nix { inherit pkgs; structure = "..."; }
+#   BarInstances.qml              — registry listing { ipcName, screen }
+#                                   entries; read by apps/kh-bar.qml
+#   BarLayout_<ipcName>.qml       — one per instance; carries its structure
+#                                   and root IPC handler
 #
-# Typical structure string:
-#   BarRow {
-#       Workspaces {}
-#       MediaPlayer {}
-#       BarSpacer {}
-#       BarGroup { label: "●●●"; ipcName: "controlcenter"; EthernetPanel {} }
-#       Clock {}
-#       Volume {}
-#       Tray {}
-#   }
+# The structure string for each instance is inserted verbatim as children of
+# the layout Item, which exposes barHeight, barWindow, and ipcPrefix.
+# Plugin types (BarRow, BarGroup, Clock, …) resolve from the other files
+# copied into $out/.
 {
   pkgs,
-  structure,
-  ipcName ? "bar",
+  lib,
+  instances,
 }:
-pkgs.writeText "BarLayout.qml" ''
-  // Generated from bar structure — do not edit by hand.
-  // To change the bar layout set programs.kh-ui.bar.structure in your
-  // home-manager configuration.
-  import QtQuick
-  import Quickshell
-  import Quickshell.Hyprland
-  import Quickshell.Io
-  import Quickshell.Services.Pipewire
-  import Quickshell.Services.Mpris
-  import Quickshell.Services.SystemTray
-  import Quickshell.Wayland
+let
+  mkLayoutFile =
+    ipcName: structure:
+    pkgs.writeText "BarLayout_${ipcName}.qml" ''
+      // Generated from programs.kh-ui.bar.instances.${ipcName} — do not edit by hand.
+      import QtQuick
+      import Quickshell
+      import Quickshell.Hyprland
+      import Quickshell.Io
+      import Quickshell.Services.Pipewire
+      import Quickshell.Services.Mpris
+      import Quickshell.Services.SystemTray
+      import Quickshell.Wayland
 
-  Item {
-      id: layout
-      required property int barHeight
-      required property var barWindow
-      property string ipcPrefix: "${ipcName}"
+      Item {
+          id: layout
+          anchors.fill: parent
 
-      // Walk the layout's object tree and return the tallest currently-
-      // visible PopupWindow. Popups live in a parent's `data` (Item's
-      // `children` is Items-only; PopupWindow is a Window), and have an
-      // `anchor` property plain Items don't — checking for that is enough
-      // to spot them without BarDropdown having to cooperate.
-      function _maxVisiblePopupHeight(item) {
-          let max = 0
-          if (item && item.anchor !== undefined && item.visible === true && item.height > 0) {
-              max = item.height
+          property int barHeight: parent.barHeight
+          property var barWindow: parent.barWindow
+
+          readonly property string ipcPrefix: "${ipcName}"
+
+          // PopupWindows live in a parent's `data` (Item's `children` is
+          // Items-only) and have an `anchor` property plain Items don't —
+          // spot them by that, so BarDropdown needs no cooperation.
+          function _maxVisiblePopupHeight(item) {
+              let max = 0
+              if (item && item.anchor !== undefined && item.visible === true && item.height > 0) {
+                  max = item.height
+              }
+              const d = (item && item.data) ? item.data : []
+              for (let i = 0; i < (d.length || 0); i++) {
+                  const h = layout._maxVisiblePopupHeight(d[i])
+                  if (h > max) max = h
+              }
+              return max
           }
-          const d = (item && item.data) ? item.data : []
-          for (let i = 0; i < (d.length || 0); i++) {
-              const h = layout._maxVisiblePopupHeight(d[i])
-              if (h > max) max = h
+
+          IpcHandler {
+              target: layout.ipcPrefix
+
+              function getHeight(): int {
+                  return layout.barHeight + layout._maxVisiblePopupHeight(layout)
+              }
+              function getWidth(): int  { return layout.width }
+              function getScreen(): string { return layout.barWindow.screen.name }
           }
-          return max
+
+      ${structure}
       }
+    '';
 
-      IpcHandler {
-          target: layout.ipcPrefix
-          // Visible bar footprint in px: the bar plus the tallest currently-
-          // open popup (popups are anchored flush to the bar's bottom edge,
-          // so multiple open popups don't stack — max wins).
-          function getHeight(): int {
-              return layout.barHeight + layout._maxVisiblePopupHeight(layout)
-          }
-          // Bar width in px (follows the screen since the bar anchors left+right).
-          function getWidth(): int { return layout.width }
-      }
+  instanceList = lib.mapAttrsToList (ipcName: spec: {
+    inherit ipcName;
+    inherit (spec) screen;
+  }) instances;
 
-  ${structure}
-  }
-''
+  instancesRegistry = pkgs.writeText "BarInstances.qml" ''
+    // Generated registry of configured bar instances — read by apps/kh-bar.qml
+    // to know which PanelWindow delegates to create.
+    import QtQuick
+
+    QtObject {
+        readonly property var instances: (${builtins.toJSON instanceList})
+    }
+  '';
+
+  layoutFiles = lib.mapAttrs' (ipcName: spec: {
+    name = "BarLayout_${ipcName}.qml";
+    value = mkLayoutFile ipcName spec.structure;
+  }) instances;
+in
+layoutFiles // { "BarInstances.qml" = instancesRegistry; }

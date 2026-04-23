@@ -23,8 +23,8 @@
 // barWindow and barHeight are read automatically from the plugin wrapper.
 //
 // Set ipcName to expose this dropdown via IPC as target "<ipcPrefix>.<ipcName>":
-//   qs ipc call bar.controlcenter toggle   (with default ipcName = "bar")
-//   qs ipc call bar.controlcenter isOpen
+//   qs ipc call main.controlcenter toggle   (where "main" is the bar's ipcName)
+//   qs ipc call main.controlcenter isOpen
 import QtQuick
 import Quickshell
 import Quickshell.Io
@@ -47,15 +47,21 @@ Item {
     property bool open: false
 
     // Optional IPC name. When set, this dropdown is reachable as target
-    // "<ipcPrefix>.<ipcName>" — e.g. `qs ipc call bar.controlcenter toggle`.
+    // "<ipcPrefix>.<ipcName>" — e.g. `qs ipc call main.controlcenter toggle`.
     property string ipcName: ""
 
-    // Inherited prefix from the parent BarPlugin / BarRow chain.
-    property string ipcPrefix: parent?.ipcPrefix ?? "bar"
+    readonly property string ipcPrefix: {
+        let p = parent
+        while (p) {
+            if (typeof p.ipcPrefix === "string") return p.ipcPrefix
+            p = p.parent
+        }
+        return ""
+    }
 
     // The prefix exposed to popup content children — appends this dropdown's
     // own segment so nested plugins get "<ipcPrefix>.controlcenter.tailscale" etc.
-    readonly property string _contentPrefix: ipcName !== ""
+    readonly property string _contentPrefix: ipcName !== "" && ipcPrefix !== ""
         ? ipcPrefix + "." + ipcName
         : ipcPrefix
 
@@ -72,7 +78,7 @@ Item {
 
     IpcHandler {
         target:  root._contentPrefix
-        enabled: root.ipcName !== ""
+        enabled: root.ipcName !== "" && root.ipcPrefix !== ""
 
         function toggle(): void { functionality.toggle() }
         function open(): void   { functionality.open() }

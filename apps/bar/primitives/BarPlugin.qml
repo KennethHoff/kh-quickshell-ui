@@ -19,25 +19,26 @@ Item {
 
     // The plugin's own IPC segment. When set, the plugin (and every child that
     // walks the parent chain for ipcPrefix) is addressable as
-    // "<parentPrefix>.<ipcName>" — e.g. ipcName: "tailscale" under the dev-bar
-    // yields "dev-bar.tailscale". Plugins that need IPC should set this and
-    // declare `IpcHandler { target: ipcPrefix; ... }`; children (BarTooltip
-    // with its own ipcName, etc.) automatically nest underneath.
+    // "<parentPrefix>.<ipcName>" — e.g. ipcName: "tailscale" under a bar
+    // whose BarLayout sets ipcPrefix="main" yields "main.tailscale". Plugins
+    // that need IPC should set this and declare `IpcHandler { target: ipcPrefix }`;
+    // children (BarTooltip with its own ipcName, etc.) automatically nest
+    // underneath.
     property string ipcName: ""
 
     // Walk the parent chain to find the nearest ancestor that exposes ipcPrefix,
-    // then append this plugin's own ipcName segment (if any) so children see
-    // the plugin-scoped prefix — same pattern as BarDropdown's _contentPrefix.
-    // Direct parents may be plain layout items (Row, RowLayout) that don't carry
-    // ipcPrefix — the walk skips them and finds the nearest BarPlugin, BarRow, or
-    // BarDropdown.col that does. Static tree means non-reactive walk is fine.
+    // then append this plugin's own ipcName segment (if any). Direct parents
+    // may be plain layout items (Row, RowLayout) that don't carry ipcPrefix —
+    // the walk skips them and finds the nearest BarPlugin, BarRow, or
+    // BarDropdown.col that does.
     readonly property string ipcPrefix: {
-        var inherited = "bar"
+        var inherited = ""
         var p = parent
         while (p) {
             if (typeof p.ipcPrefix === 'string') { inherited = p.ipcPrefix; break }
             p = p.parent
         }
+        if (inherited === "") return ""
         return ipcName !== "" ? inherited + "." + ipcName : inherited
     }
 
