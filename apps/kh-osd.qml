@@ -113,8 +113,9 @@ ShellRoot {
     // ── Window ────────────────────────────────────────────────────────────────
     WlrLayershell {
         id: win
-        // Always mapped; content visibility is gated by panel.opacity.
-        visible: true
+        // Mapped only while the panel is fading or shown — avoids continuous
+        // compositor/scene-graph work when idle.
+        visible: panel.opacity > 0
         layer: WlrLayer.Overlay
         keyboardFocus: WlrKeyboardFocus.None
         exclusionMode: ExclusionMode.Ignore
