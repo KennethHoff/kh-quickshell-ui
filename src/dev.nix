@@ -1,13 +1,12 @@
-# Dev plumbing — everything in this flake that isn't the home-manager
-# module or the formatter. Pre-built configs (with hardcoded Catppuccin
-# colours), the `nix run` / `nix build` wrappers, and the qmltestrunner
-# devShell live here. flake.nix re-exports `packages`, `apps`, and
-# `devShell` from this attrset so consumers still get the usual flake
-# surface, but the implementation stays out of flake.nix.
+# Dev plumbing — pre-built configs (with hardcoded Catppuccin colours)
+# plus the `nix run .#<name>` wrappers that launch them. flake.nix
+# re-exports `packages` and `apps` from this attrset.
 #
-# Consumers should reach for the home-manager module instead — these
-# pre-built configs only exist so contributors can `nix run .#kh-bar`
-# without setting up a downstream consumer.
+# Real consumers should reach for the home-manager module instead —
+# these pre-built configs only exist so contributors can `nix run
+# .#kh-bar` and so dev-tooling skills can `nix build .#kh-bar
+# --print-out-paths` to introspect a generated config without spinning
+# up a downstream consumer.
 {
   pkgs,
   lib,
@@ -22,19 +21,6 @@ let
     fontName = "monospace";
     fontSize = 14;
   };
-
-  # Named QML module directories for qmltestrunner / devShell.
-  nixGenDir = pkgs.runCommand "nix-gen-dir" { } ''
-    mkdir -p $out/NixConfig $out/NixBins
-
-    printf '%s\n' "module NixConfig" "NixConfig 1.0 NixConfig.qml" \
-      > $out/NixConfig/qmldir
-    cp ${nixConfigQml} $out/NixConfig/NixConfig.qml
-
-    printf '%s\n' "module NixBins" "NixBins 1.0 NixBins.qml" \
-      > $out/NixBins/qmldir
-    cp ${import ./ffi.nix { inherit pkgs lib; }} $out/NixBins/NixBins.qml
-  '';
 
   cliphistDecodeAllScript = import ./scripts/cliphist-decode-all.nix { inherit pkgs lib; };
   appsPlugin = import ./apps/launcher/plugins/apps.nix {
@@ -308,14 +294,5 @@ in
         }
       );
     };
-  };
-
-  devShell = pkgs.mkShell {
-    packages = [ pkgs.qt6.qtdeclarative ];
-    shellHook = ''
-      export QT_QPA_PLATFORM=offscreen
-      export QML_IMPORT_PATH=${pkgs.qt6.qtdeclarative}/lib/qt-6/qml:$PWD/src/lib:${nixGenDir}
-      echo "Run tests: qmltestrunner -input tests/"
-    '';
   };
 }

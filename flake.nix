@@ -27,6 +27,5 @@
 
       packages.${system} = dev.packages;
       apps.${system} = dev.apps;
-      devShells.${system}.default = dev.devShell;
     };
 }
