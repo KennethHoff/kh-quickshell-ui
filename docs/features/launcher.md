@@ -25,43 +25,10 @@ same contract.
 
 ## Plugins
 
-### Apps *(default, built-in)*
-
-Fuzzy search over installed `.desktop` applications; Enter launches.
-
-- [1] ✅ Haystack is `name + comment` from `.desktop` entries
-- [2] ✅ App icons in row — XDG resolution, SVG/PNG, label fallback
-- [3] ✅ `Terminal=true` apps wrap in configured terminal
-- [4] ✅ Ctrl+1–9 launches on workspace 1–9 *(see Core [12])*
-- [5] ✅ Frecency ranking — per-app decayed counter (`3·log2(1+count)` boost, 14 d half-life); empty query sorts by decayed count *(see Core [13])*
-- [6] ✅ `l`/Tab enters actions state (only if app has actions)
-- [7] ✅ `j`/`k` navigate actions, `Enter` launches, `h`/Esc returns
-- [8] ✅ Action rows show parent app's icon
-
-### Window switcher
-
-Compositor-specific — each compositor needs its own data source and focus
-dispatch, so they ship as separate plugins.
-
-- [1] ✅ **Hyprland window switcher** — IPC key `hyprland-windows`, chip label `Windows`. Fuzzy search over all open windows; Enter focuses via `hyprctl dispatch focuswindow address:<addr>`; sorted by `focusHistoryID`; icons via `StartupWMClass`
-- [2] ⬜ Per-item lifecycle keybinds — Quit, Force Quit, move-to-workspace
-
-### Emoji picker
-
-- [1] ✅ Fuzzy search emoji by name; Enter copies to clipboard. Glyphs from `pkgs.unicode-emoji` joined with `pkgs.cldr-annotations` at Nix eval time. Renders via plugin-owned `iconDelegate` (`LauncherIconGlyph.qml`). Frecency enabled. ~3944 items (Unicode 17.0)
-
-### Snippets
-
-- [1] ⬜ Text expansion triggered by abbreviation
-
-### System commands
-
-- [1] ⬜ Lock, sleep, reboot, etc. as searchable actions
-
-### Color picker *(long term)*
-
-- [1] ⬜ Screen dropper; Enter copies hex/rgb to clipboard
-
-### File search *(long term)*
-
-- [1] ⬜ `fd`/`fzf` over `$HOME`; Enter opens in default app
+- [Apps](launcher/apps.md) — fuzzy search over installed `.desktop` apps
+- [Window switcher](launcher/window-switcher.md) — fuzzy-focus open windows (Hyprland)
+- [Emoji picker](launcher/emoji-picker.md) — search emoji by name; copy to clipboard
+- [Snippets](launcher/snippets.md) — abbreviation-triggered text expansion
+- [System commands](launcher/system-commands.md) — lock, sleep, reboot as actions
+- [Color picker](launcher/color-picker.md) *(long term)* — screen dropper
+- [File search](launcher/file-search.md) *(long term)* — `fd`/`fzf` over `$HOME`
