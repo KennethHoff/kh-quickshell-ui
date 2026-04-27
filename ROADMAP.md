@@ -465,6 +465,39 @@ keybind or IPC, or open by clicking a System Stats bar widget.
 
 ---
 
+## Window Inspector
+
+Overlay showing detailed information about open windows (class, title, PID,
+geometry, workspace, monitor, etc.). Useful for writing Hyprland window
+rules, debugging focus or scale issues, and confirming what an app reports
+itself as. Spiritual sibling of AutoHotkey's *Window Spy* and browser
+DevTools' element inspector, adapted for Hyprland. Triggered via keybind
+or IPC.
+
+### Core
+
+- [1] ⬜ Window list — all open windows with class, title, PID, address, workspace, monitor, geometry, floating/fullscreen state; sourced from `hyprctl clients -j`
+- [2] ⬜ Detail panel — full property dump for the selected window covering every field `hyprctl clients -j` exposes (`address`, `mapped`, `hidden`, `pinned`, `xwayland`, `grouped`, `tags`, `swallowing`, `focusHistoryID`, `inhibitingIdle`, `xdgTag`, `xdgDescription`, `contentType`, `stableId`, …)
+- [3] ⬜ Surface `initialClass` / `initialTitle` alongside `class` / `title` — explicit "rule-stable" label on the initial fields, since most apps mutate their title after launch and `windowrulev2` matchers almost always want the initial values; this is the single most common Hyprland-rule footgun and the inspector's main reason to exist
+- [4] ⬜ Geometry block — `at` / `size` shown in both global layout coords AND monitor-local coords, with the containing monitor's name + scale + transform; geometry bugs almost always involve scale or coordinate-space confusion
+- [5] ⬜ Live updates — subscribe to Hyprland IPC events (`openwindow`, `closewindow`, `windowtitle`, `movewindow`, `activewindow`) so titles/geometry stay fresh without polling
+- [6] ⬜ IPC — `target: "window-inspector"`; `toggle()`, `open()`, `close()`, `inspectActive()`, `inspectByAddress(<addr>)`, `inspectByPid(<pid>)`
+
+### Navigation
+
+- [1] ⬜ Modal normal/insert — opens in normal mode; `j`/`k` navigate, `/` enters insert mode filtering by class/title/pid/address, `Enter` opens detail panel, `Esc`/`q` closes
+- [2] ⬜ Pick mode — `p` enters pick mode; cursor-over-window draws a translucent outline overlay plus a floating tag with class/title/size; click or `Enter` locks selection. Browser-DevTools-inspector UX, adapted for Wayland
+- [3] ⬜ Freeze toggle — `f` freezes the panel on the currently-targeted window so the cursor can move off the target to read the panel without the selection following the mouse; AutoHotkey Window Spy's defining UX trick — pick mode is unusable without it
+- [4] ⬜ View toggle — `Tab` toggles between flat list (fast fuzzy filter, wmctrl-style) and tree view (monitor → workspace → window, sway-style); flat is fastest for "find that window", tree is best for spatial reasoning across multi-monitor setups
+
+### Copy & Actions
+
+- [1] ⬜ Copy as Hyprland rule — `y` copies the selected window as a ready-to-paste `windowrulev2` line built from `initialClass` / `initialTitle` (e.g. `windowrulev2 = float, class:^(foo)$, title:^(bar)$`); a small menu offers variants keyed on `pid`, `address`, `workspace`, or `monitor` so users don't have to remember matcher syntax
+- [2] ⬜ Copy as JSON — `Y` copies the full `hyprctl clients -j` record for the selected window
+- [3] ⬜ Dispatch actions from the panel — `F` focus, `X` close, `m<n>` move to workspace N, `t` toggle floating, `T` toggle pinned; thin wrappers around `hyprctl dispatch` so the inspector doubles as a lightweight window manager once you've found the target
+
+---
+
 ## Diff Viewer
 
 Side-by-side two-pane file diff. `kh-diff file1 file2` or pipe from `git diff`
