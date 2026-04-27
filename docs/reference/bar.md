@@ -171,7 +171,7 @@ BarText { text: "cpu " + cpuUsage.usage + "%" }
 Key configuration:
 
 - `GpuUsage.cardPath` — default `/sys/class/drm/card1/device`. Nvidia is not yet
-  supported — see [features/bar.md](features/bar.md)'s "System Stats" section.
+  supported — see [features/bar.md](../features/bar.md)'s "System Stats" section.
 - `DiskUsage.mounts` — default `["/"]`; list of paths to pass to `df`.
 - `CpuTemp.sensor` / `GpuTemp.sensor` — default `"zenpower"` / `"amdgpu"`.
   Inspect your machine with

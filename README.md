@@ -71,11 +71,11 @@ programs.kh-ui = {
 
 | Component | Description | Docs |
 |---|---|---|
-| `kh-bar` | Status bar — layout, plugins, custom plugins, IPC | **[docs/bar.md](docs/bar.md)** |
-| `kh-launcher` | Launcher — plugin system, custom plugins, IPC | **[docs/launcher-plugins.md](docs/launcher-plugins.md)** |
-| `kh-cliphist` | Clipboard history — IPC | **[docs/clipboard-history.md](docs/clipboard-history.md)** |
-| `kh-view` | File/image viewer — IPC | **[docs/view.md](docs/view.md)** |
-| `kh-osd` | Volume OSD — configuration, keybinds, IPC | **[docs/osd.md](docs/osd.md)** |
+| `kh-bar` | Status bar — layout, plugins, custom plugins, IPC | **[docs/reference/bar.md](docs/reference/bar.md)** |
+| `kh-launcher` | Launcher — plugin system, custom plugins, IPC | **[docs/reference/launcher.md](docs/reference/launcher.md)** |
+| `kh-cliphist` | Clipboard history — IPC | **[docs/reference/cliphist.md](docs/reference/cliphist.md)** |
+| `kh-view` | File/image viewer — IPC | **[docs/reference/view.md](docs/reference/view.md)** |
+| `kh-osd` | Volume OSD — configuration, keybinds, IPC | **[docs/reference/osd.md](docs/reference/osd.md)** |
 
 ---
 

@@ -19,9 +19,9 @@ same contract.
 - [9] ✅ Plugin switching — `]`/`[` cycle, click chip; full IPC
 - [10] ✅ Script plugins — push items via TSV stdout or IPC; Nix opt `programs.kh-ui.launcher.scriptPlugins`
 - [11] ⬜ Combi plugin *(depends on 10)* — concatenate multiple sources rofi-style; per-source tagging and Enter semantics
-- [12] ✅ Plugin-owned keybindings — Core handles only navigation; plugins declare bindings as shell templates with `{callback}` substitution; inline `helpKey`/`helpDesc` per binding. See [docs/launcher-plugins.md](../launcher-plugins.md)
+- [12] ✅ Plugin-owned keybindings — Core handles only navigation; plugins declare bindings as shell templates with `{callback}` substitution; inline `helpKey`/`helpDesc` per binding. See [docs/reference/launcher.md](../reference/launcher.md)
 - [13] ⬜ Plugin-owned ranking — current frecency counter is the only ranking signal; window switcher wants Hyprland focus order, snippets want alphabetical. Expose ranking as a per-plugin hook
-- [14] ✅ Plugin label distinct from IPC key — `label` (chip text) defaults to the stable attribute-name `key`; lets `hyprland-windows` show as `Windows`. See [docs/launcher-plugins.md](../launcher-plugins.md)
+- [14] ✅ Plugin label distinct from IPC key — `label` (chip text) defaults to the stable attribute-name `key`; lets `hyprland-windows` show as `Windows`. See [docs/reference/launcher.md](../reference/launcher.md)
 
 ## Plugins
 
