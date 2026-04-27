@@ -113,13 +113,15 @@ ShellRoot {
     // ── Window ────────────────────────────────────────────────────────────────
     WlrLayershell {
         id: win
-        // Mapped only while the panel is fading or shown — avoids continuous
-        // compositor/scene-graph work when idle.
-        visible: panel.opacity > 0
+        // Always mapped; content visibility is gated by panel.opacity.
+        visible: true
         layer: WlrLayer.Overlay
         keyboardFocus: WlrKeyboardFocus.None
         exclusionMode: ExclusionMode.Ignore
         namespace: "kh-osd"
+
+        // Empty input region — clicks pass through to windows underneath.
+        mask: Region {}
 
         // Bottom-center: anchor bottom only; compositor centres horizontally.
         anchors.bottom: true
