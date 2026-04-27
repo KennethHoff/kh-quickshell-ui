@@ -98,7 +98,7 @@ Item {
         _buf            = []
         _processed      = []
         _processedIdx   = {}
-        _mode           = "normal"   // per ROADMAP: opens in normal mode
+        _mode           = "normal"   // opens in normal mode
         _pendingG                = false
         _confirmingDelete        = false
         _pendingDeleteLines      = []

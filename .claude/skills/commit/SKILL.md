@@ -25,7 +25,7 @@ Stage and commit the current changes using [Conventional Commits](https://www.co
 ## Commit conventions
 
 - **Logical commits, not file-by-file.** Group changes by concern: QML UI in one commit, Nix packaging in another, etc.
-- **Roadmap always travels with the impl.** If `ROADMAP.md` has a corresponding entry for the work being committed, update it (mark ✅, revise the description) and stage it in the same commit. Never commit a feature/fix and leave the roadmap stale.
+- **Feature lists travel with the impl.** If a file under `docs/features/` has a corresponding entry for the work being committed, update it (mark ✅, revise the description) and stage it in the same commit. Never commit a feature/fix and leave the feature list stale.
 - **Scope reflects the component.** Use the logical component being changed — e.g. `(cliphist)`, `(launcher)`, `(bar)`, `(hm-module)`, `(skills)` — not the directory or file name. Omit scope for cross-cutting changes with no clear single owner.
 - **Don't squash unrelated things.** Separate concerns get separate commits.
 - **Subject line**: `type(scope): short description` — keep under 72 chars. Scope must be lowercase.
