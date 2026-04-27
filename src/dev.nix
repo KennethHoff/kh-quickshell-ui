@@ -77,6 +77,7 @@ let
         df = lib.getExe' pkgs.coreutils "df";
         nmcli = lib.getExe' pkgs.networkmanager "nmcli";
         tailscale = lib.getExe pkgs.tailscale;
+        swayncClient = lib.getExe' pkgs.swaynotificationcenter "swaync-client";
       }
       // extraBins;
       inherit extraPluginDirs;

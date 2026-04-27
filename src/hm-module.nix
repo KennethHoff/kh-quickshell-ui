@@ -68,6 +68,7 @@ let
         df = lib.getExe' pkgs.coreutils "df";
         nmcli = lib.getExe' pkgs.networkmanager "nmcli";
         tailscale = lib.getExe pkgs.tailscale;
+        swayncClient = lib.getExe' pkgs.swaynotificationcenter "swaync-client";
       }
       // extraBins;
       inherit extraPluginDirs;
@@ -418,6 +419,27 @@ in
           Each file should contain VAR=value lines that will be sourced by systemd.
         '';
       };
+      notifications.enable = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = ''
+          Enable the bar's notification bell, backed by swaync.
+
+          Activates <option>services.swaync.enable</option> (via
+          <literal>lib.mkDefault</literal>, so external overrides win) and
+          points the bell plugin at <literal>swaync-client --subscribe-waybar</literal>
+          for live count updates. swaync becomes the sole owner of
+          <literal>org.freedesktop.Notifications</literal> on the session bus,
+          which means kh-bar restarts no longer drop the notification daemon
+          out from under apps mid-Notify (the previous setup crashed
+          Firefox/Zen on every <literal>home-manager switch</literal>).
+
+          Disable to opt out of the bell entirely or to wire your own
+          notification daemon — the <literal>Notifications {}</literal> plugin
+          will be non-functional in that case, so omit it from
+          <option>bar.instances.&lt;name&gt;.structure</option> too.
+        '';
+      };
     };
   };
 
@@ -502,6 +524,22 @@ in
         lib.filterAttrs (_: entries: builtins.length entries > 1) byScreen;
     in
     lib.mkMerge [
+      (lib.mkIf
+        (
+          config.programs.kh-ui.enable
+          && config.programs.kh-ui.bar.enable
+          && config.programs.kh-ui.bar.notifications.enable
+        )
+        {
+          # swaync owns org.freedesktop.Notifications on the session bus.
+          # mkDefault so a user already running swaync (or a downstream
+          # override) wins. Lifetime is independent of kh-bar — sd-switch
+          # only restarts swaync on its own ExecStart change, which only
+          # moves on a swaync version bump.
+          services.swaync.enable = lib.mkDefault true;
+        }
+      )
+
       (lib.mkIf config.programs.kh-ui.enable {
         programs.quickshell = {
           enable = lib.mkDefault true;
