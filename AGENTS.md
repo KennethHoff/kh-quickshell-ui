@@ -18,4 +18,4 @@ git add <file>
 
 before `nix build` or `nix run`. Without this, the build will succeed but the file will be missing at runtime, causing errors like `Foo is not a type` or missing imports that are impossible to reproduce from the diff alone.
 
-This applies even to files in `lib/` that are picked up by a glob (`cp ${self}/lib/*.qml ...`) — the glob only sees tracked files.
+This applies even to files in `src/lib/` that are picked up by a glob (`cp ${self}/src/lib/*.qml ...`) — the glob only sees tracked files.

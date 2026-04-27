@@ -4,17 +4,17 @@
 
 ### File not found after rename
 
-If a `.qml` file in `lib/` is renamed, the build will fail because `flake.nix` copies files by explicit path:
+If a `.qml` file in `src/lib/` is renamed, the build will fail because `flake.nix` copies files by explicit path:
 
 ```
-error: path '/nix/store/...-source/lib/OldName.qml' does not exist
+error: path '/nix/store/...-source/src/lib/OldName.qml' does not exist
 ```
 
 Fix: update the file reference in `flake.nix` to match the new name.
 
 ### NixConfig / NixBins missing properties
 
-If `config.nix` or `ffi.nix` is edited and a property is removed or renamed, QML will fail at runtime with binding errors. These are not caught by `nix flake check` — you'll see them in the screenshot step or at launch.
+If `src/config.nix` or `src/ffi.nix` is edited and a property is removed or renamed, QML will fail at runtime with binding errors. These are not caught by `nix flake check` — you'll see them in the screenshot step or at launch.
 
 ```
 TypeError: Cannot read property 'fontFamily' of undefined

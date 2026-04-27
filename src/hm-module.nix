@@ -14,7 +14,7 @@ self:
   ...
 }:
 let
-  src = self;
+  src = self + "/src";
   system = pkgs.stdenv.hostPlatform.system;
 
   cliphistDecodeAll = import (src + "/scripts/cliphist-decode-all.nix") { inherit pkgs lib; };

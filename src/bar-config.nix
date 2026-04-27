@@ -5,7 +5,7 @@
 # generatedFiles, containing:
 #
 #   BarInstances.qml              — registry listing { ipcName, screen }
-#                                   entries; read by apps/kh-bar.qml
+#                                   entries; read by src/apps/kh-bar.qml
 #   BarLayout_<ipcName>.qml       — one per instance; carries its structure
 #                                   and root IPC handler
 #
@@ -77,7 +77,7 @@ let
   }) instances;
 
   instancesRegistry = pkgs.writeText "BarInstances.qml" ''
-    // Generated registry of configured bar instances — read by apps/kh-bar.qml
+    // Generated registry of configured bar instances — read by src/apps/kh-bar.qml
     // to know which PanelWindow delegates to create.
     import QtQuick
 

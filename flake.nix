@@ -13,7 +13,7 @@
       pkgs = nixpkgs.legacyPackages.${system};
       lib = pkgs.lib;
 
-      defaultColors = import ./themes/default-light.nix;
+      defaultColors = import ./src/themes/default-light.nix;
 
       # Named QML module directories for qmltestrunner / devShell.
       nixGenDir = pkgs.runCommand "nix-gen-dir" { } ''
@@ -22,7 +22,7 @@
         printf '%s\n' "module NixConfig" "NixConfig 1.0 NixConfig.qml" \
           > $out/NixConfig/qmldir
         cp ${
-          import ./config.nix {
+          import ./src/config.nix {
             inherit pkgs;
             colors = defaultColors;
             fontName = "monospace";
@@ -33,25 +33,25 @@
         printf '%s\n' "module NixBins" "NixBins 1.0 NixBins.qml" \
           > $out/NixBins/qmldir
         cp ${
-          import ./ffi.nix {
+          import ./src/ffi.nix {
             inherit pkgs lib;
           }
         } $out/NixBins/NixBins.qml
       '';
 
-      cliphistDecodeAllScript = import ./scripts/cliphist-decode-all.nix { inherit pkgs lib; };
-      appsPlugin = import ./apps/launcher/plugins/apps.nix {
+      cliphistDecodeAllScript = import ./src/scripts/cliphist-decode-all.nix { inherit pkgs lib; };
+      appsPlugin = import ./src/apps/launcher/plugins/apps.nix {
         inherit pkgs lib;
         terminal = pkgs.kitty;
       };
-      hyprlandWindowsPlugin = import ./apps/launcher/plugins/hyprland-windows.nix {
+      hyprlandWindowsPlugin = import ./src/apps/launcher/plugins/hyprland-windows.nix {
         inherit pkgs lib;
       };
-      emojiPlugin = import ./apps/launcher/plugins/emoji.nix {
+      emojiPlugin = import ./src/apps/launcher/plugins/emoji.nix {
         inherit pkgs lib;
       };
 
-      nixConfigQml = import ./config.nix {
+      nixConfigQml = import ./src/config.nix {
         inherit pkgs;
         colors = defaultColors;
         fontName = "monospace";
@@ -59,9 +59,9 @@
       };
 
       # mkAppConfig builds a kh-{name} app derivation following the static layout:
-      #   apps/kh-{name}.qml     → $out/shell.qml
-      #   apps/{name}/**/*.qml   → $out/   (recursive — any subdir works: primitives/, plugins/, …)
-      #   lib/*.qml              → $out/lib/
+      #   src/apps/kh-{name}.qml     → $out/shell.qml
+      #   src/apps/{name}/**/*.qml   → $out/   (recursive — any subdir works: primitives/, plugins/, …)
+      #   src/lib/*.qml              → $out/lib/
       # generatedFiles: { "Dest.qml" = <store-path>; } for eval-time generated files.
       # extraPluginDirs: list of paths whose *.qml files are copied into $out/.
       mkAppConfig =
@@ -72,13 +72,13 @@
           extraPluginDirs ? [ ],
         }:
         let
-          appDir = "${self}/apps/${name}";
-          nixBins = import ./ffi.nix { inherit pkgs lib extraBins; };
+          appDir = "${self}/src/apps/${name}";
+          nixBins = import ./src/ffi.nix { inherit pkgs lib extraBins; };
         in
         pkgs.runCommand "kh-${name}-config" { } ''
           mkdir -p $out/lib
-          cp ${self}/lib/*.qml $out/lib/
-          cp ${self}/apps/kh-${name}.qml $out/shell.qml
+          cp ${self}/src/lib/*.qml $out/lib/
+          cp ${self}/src/apps/kh-${name}.qml $out/shell.qml
           ${lib.optionalString (builtins.pathExists appDir) "find ${appDir} -name '*.qml' -exec cp -t $out/ {} +"}
           ${lib.concatStrings (lib.mapAttrsToList (dest: src: "cp ${src} $out/${dest}\n") generatedFiles)}
           ${lib.concatMapStrings (d: "cp ${toString d}/*.qml $out/\n") extraPluginDirs}
@@ -96,7 +96,7 @@
         }:
         mkAppConfig {
           name = "bar";
-          generatedFiles = import ./bar-config.nix { inherit pkgs lib instances; };
+          generatedFiles = import ./src/bar-config.nix { inherit pkgs lib instances; };
           extraBins = {
             df = lib.getExe' pkgs.coreutils "df";
             nmcli = lib.getExe' pkgs.networkmanager "nmcli";
@@ -227,8 +227,8 @@
 
       homeModules.default = {
         imports = [
-          (import ./hm-module.nix self)
-          ./stylix-integration.nix
+          (import ./src/hm-module.nix self)
+          ./src/stylix-integration.nix
         ];
       };
 
@@ -236,7 +236,7 @@
         packages = [ pkgs.qt6.qtdeclarative ];
         shellHook = ''
           export QT_QPA_PLATFORM=offscreen
-          export QML_IMPORT_PATH=${pkgs.qt6.qtdeclarative}/lib/qt-6/qml:$PWD/lib:${nixGenDir}
+          export QML_IMPORT_PATH=${pkgs.qt6.qtdeclarative}/lib/qt-6/qml:$PWD/src/lib:${nixGenDir}
           echo "Run tests: qmltestrunner -input tests/"
         '';
       };
@@ -357,7 +357,7 @@
         kh-view = {
           type = "app";
           program = toString (
-            import ./scripts/kh-view-wrapper.nix {
+            import ./src/scripts/kh-view-wrapper.nix {
               inherit pkgs lib;
               viewConfigPath = viewConfig;
             }
