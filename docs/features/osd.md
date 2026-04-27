@@ -11,8 +11,7 @@ independent QML component with its own bindings and IPC.
 - [2] ✅ Auto-dismiss — fades after ~2 s; timer resets on change
 - [3] ✅ IPC — `osd showVolume <0–100>` / `osd showMuted`
 - [4] ⬜ Plugin system — composable OSD plugins matching the bar pattern
-- [5] ⬜ Volume plugin — extract current display into `OsdVolume`
-- [6] ⬜ Per-plugin dismiss timer — independent visibility per plugin
+- [5] ⬜ Per-plugin dismiss timer — independent visibility per plugin
 
 ## Audio plugins
 

@@ -24,7 +24,7 @@ list of clipboard entries from `cliphist`. SUPER+V toggles it via IPC.
 - [1] ✅ Always-visible 40/60 side pane; 120 ms debounce
 - [2] ✅ Char/word/line count for text entries
 - [3] ✅ Dimensions and file size for image entries
-- [4] ✅ `Tab`/`l` enters; `Tab`/`Esc` returns
+- [4] ✅ `Tab` toggles in/out of detail; `l` enters; `Esc` returns
 - [5] ✅ Cursor motions — `hjkl`/`w`/`b`/`e`/`W`/`B`/`E`, `0`/`$`/`^`
 - [6] ✅ Visual select — `v`/`V`/`Ctrl+V`; `o`/`O` swap; `y` copies
 - [7] ⬜ Insert mode — edit text inline; vim operators (`ciw`, `dw`)

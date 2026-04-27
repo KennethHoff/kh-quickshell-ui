@@ -25,28 +25,24 @@ access stay consistent.
 - [2] ✅ `BarRow` — full-width `RowLayout`, carries `ipcPrefix`
 - [3] ✅ `BarSpacer` — flexible spacer (CSS space-between equivalent)
 - [4] ✅ `BarPipe` — thin vertical separator; theme-aware default
-- [5] ✅ `BarGroup` — dropdown wrapping arbitrary children (see Core [4])
-- [6] ✅ `BarDropdown` — generic dropdown primitive used by `BarGroup`
-- [7] ✅ `BarText` — theme-styled text with `normalColor`/`warnColor`/`errorColor`/`mutedColor`
-- [8] ✅ `BarIcon` — `BarText` contract but loads bundled nerd-font for deterministic PUA codepoints
-- [9] ✅ `BarTooltip` — generic hover tooltip (300 ms delay), edge-clamped; optional `ipcName` exposes `pin`/`unpin`/`togglePin` for keyboard/IPC visibility
-- [10] ✅ `BarHorizontalDivider` — 1 px theme-aware separator; configurable colour/height
-- [11] ✅ `BarControlTile` — toggle-pill primitive with active/pending states; used in Tailscale/Ethernet panels
-- [12] ✅ `BarDropdownHeader`/`BarDropdownItem` — section heading + dot-and-two-labels row primitives
+- [5] ✅ `BarDropdown` — generic dropdown primitive used by `BarGroup` (see Core [4])
+- [6] ✅ `BarText` — theme-styled text with `normalColor`/`warnColor`/`errorColor`/`mutedColor`
+- [7] ✅ `BarIcon` — `BarText` contract but loads bundled nerd-font for deterministic PUA codepoints
+- [8] ✅ `BarTooltip` — generic hover tooltip (300 ms delay), edge-clamped; optional `ipcName` exposes `pin`/`unpin`/`togglePin` for keyboard/IPC visibility
+- [9] ✅ `BarHorizontalDivider` — 1 px theme-aware separator; configurable colour/height
+- [10] ✅ `BarControlTile` — toggle-pill primitive with active/pending states; used in Tailscale/Ethernet panels
+- [11] ✅ `BarDropdownHeader`/`BarDropdownItem` — section heading + dot-and-two-labels row primitives
 
 ## Workspaces
 
 - [1] ✅ Workspace display — show Hyprland workspaces, highlight active
 - [2] ✅ Click to switch workspace
-- [3] ✅ Hover preview popup (300 ms delay)
-- [4] ✅ Preview thumbnails — composite `ScreencopyView` per window at IPC positions; 240 px wide
-- [5] ✅ Preview badge — workspace name in corner of thumbnail
-- [6] ⬜ Click-through — clicking a window in the thumbnail focuses that window
-- [7] ⬜ Submap indicator — show non-default Hyprland submap name; sourced from `submap` IPC event
-- [8] ⬜ Scratchpad indicator — count of hidden scratchpad windows; click cycles via `togglespecialworkspace`
-- [9] ✅ Per-delegate preview popup via `BarTooltip` — addressable at `<ipcPrefix>.workspaces.ws<name>` for direct pin/unpin
-- [10] ✅ Fan-out layout for multi-pinned previews — anchors live in a sibling overlay so coexisting pins don't stack at the same x
-- [11] ✅ Background-workspace preview geometry — reads `workspace.monitor` directly so workspaces on inactive outputs still produce correctly-sized thumbnails
+- [3] ✅ Preview thumbnails — composite `ScreencopyView` per window at IPC positions; 240 px wide
+- [4] ✅ Preview badge — workspace name in corner of thumbnail
+- [5] ⬜ Click-through — clicking a window in the thumbnail focuses that window
+- [6] ⬜ Submap indicator — show non-default Hyprland submap name; sourced from `submap` IPC event
+- [7] ⬜ Scratchpad indicator — count of hidden scratchpad windows; click cycles via `togglespecialworkspace`
+- [8] ✅ Per-delegate preview popup via `BarTooltip` — addressable at `<ipcPrefix>.workspaces.ws<name>` for direct pin/unpin
 
 ## Active Window
 
@@ -86,17 +82,18 @@ access stay consistent.
 - [2] ✅ Tile appearance — `BarControlTile` pill with IP sublabel; highlights when connected
 - [3] ✅ Toggle on click — runs `tailscale up`/`down` and re-polls; requires user as operator (see [Notes](#notes))
 - [4] ✅ IPC — `bar.tailscale` exposes `isConnected`/`getSelfIp`/`toggle`
-- [5] ✅ Pending state — pulses opacity, `…` sublabel; double-clicks ignored
+- [5] ✅ Pending state — pulses opacity, `…` sublabel
 - [6] ⬜ Toggle error feedback — surface non-zero exit visibly; common cause is operator not configured
 - [7] ✅ Peer ping — click peer row to run `tailscale ping -c 1 <ip>`; latency shown inline in `base0E` for 5 s
 - [8] ✅ Exit node selection — exit-capable peers in separate section; click to set/clear; active highlighted in `base0A`
 - [9] ⬜ Advertise exit node toggle
 - [10] ⬜ Shields-up toggle
-- [11] ✅ Hover highlight on peer rows; suppressed during pending operations
+- [11] ✅ Hover highlight on peer/exit-node rows
 
-## Network
+## Ethernet
 
-- [1] ⬜ Wired interface name and link state via nmcli; hidden when disconnected
+- [1] ✅ Wired interface name via `nmcli` polled every 10 s; `BarControlTile` with `off` sublabel when disconnected
+- [2] ✅ IPC — `bar.ethernet` exposes `isConnected`/`getIface`
 
 ## System Stats
 
@@ -123,8 +120,8 @@ properties; users compose them with a sibling `BarText` to render the value.
 
 ## Notifications
 
-- [1] ✅ Bell icon; hidden when unread count is zero
-- [2] ⬜ Unread badge from `Quickshell.Services.Notifications`
+- [1] ✅ Bell icon — visible only when `Quickshell.Services.Notifications` reports unread count > 0
+- [2] ⬜ Unread count badge — number overlay on the bell icon
 - [3] ⬜ DND indicator — muted icon variant when DND active
 - [4] ⬜ Click toggles [Notification Center](notification-center.md) panel
 
