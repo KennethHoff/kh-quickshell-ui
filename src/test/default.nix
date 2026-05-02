@@ -46,12 +46,12 @@ let
 
   runner = nixosConfig.config.microvm.declaredRunner;
 
-  mkApp = name: program: {
+  mkApp = program: {
     type = "app";
     inherit program;
   };
 
-  daemonApp = mkApp "kh-test-vm-daemon" (
+  daemonApp = mkApp (
     let
       pkg = import ./daemon.nix {
         inherit pkgs;
@@ -62,7 +62,7 @@ let
     "${pkg}/bin/kh-test-vm-daemon"
   );
 
-  screenshotApp = mkApp "screenshot-bar-vm" (
+  screenshotApp = mkApp (
     let
       pkg = import ./client.nix {
         inherit pkgs;

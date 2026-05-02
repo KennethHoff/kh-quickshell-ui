@@ -29,7 +29,6 @@ pkgs.writeShellApplication {
     pkgs.quickshell
     pkgs.grim
     pkgs.coreutils
-    pkgs.inotify-tools
     pkgs.gawk
   ];
   text = ''
@@ -114,9 +113,7 @@ pkgs.writeShellApplication {
         all)
           drive_variant chrome kh-bar-chrome.png
           drive_variant stats  kh-bar-stats.png
-          quickshell ipc --pid "$QS_PID" call testbar.stats close >/dev/null 2>&1 || true
           drive_variant cc     kh-bar-cc.png
-          quickshell ipc --pid "$QS_PID" call testbar.controlcenter close >/dev/null 2>&1 || true
           ;;
         *)
           echo "harness: unknown variant '$v'" >&2
@@ -144,9 +141,7 @@ pkgs.writeShellApplication {
         wait_ready || { echo "FAIL reload" > "$SHARED/out/$uuid.err"; touch "$SHARED/out/$uuid.done"; return; }
       fi
 
-      if drive_variant "$variant" "$out"; then
-        : # success
-      else
+      if ! drive_variant "$variant" "$out"; then
         echo "FAIL variant=$variant" > "$SHARED/out/$uuid.err"
       fi
       touch "$SHARED/out/$uuid.done"
@@ -170,7 +165,7 @@ pkgs.writeShellApplication {
         process_request "$req"
       done
       shopt -u nullglob
-      sleep 0.1
+      sleep 0.5
     done
   '';
 }

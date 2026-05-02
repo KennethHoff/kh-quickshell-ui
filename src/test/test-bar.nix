@@ -10,6 +10,9 @@
   dev,
   mocks,
 }:
+let
+  hwmonGlob = "/run/khtest/hwmon/hwmon*";
+in
 dev.mkBarConfig {
   instances.testbar = {
     screen = "Virtual-1";
@@ -27,8 +30,8 @@ dev.mkBarConfig {
               RamUsage  { id: ramUsage;  path: "/run/khtest/proc/meminfo" }
               GpuUsage  { id: gpuUsage;  cardPath: "/run/khtest/drm/device" }
               DiskUsage { id: diskUsage }
-              CpuTemp   { id: cpuTemp;   sensor: "fake-cpu"; hwmonGlob: "/run/khtest/hwmon/hwmon*" }
-              GpuTemp   { id: gpuTemp;   sensor: "fake-gpu"; hwmonGlob: "/run/khtest/hwmon/hwmon*" }
+              CpuTemp   { id: cpuTemp;   sensor: "fake-cpu"; hwmonGlob: "${hwmonGlob}" }
+              GpuTemp   { id: gpuTemp;   sensor: "fake-gpu"; hwmonGlob: "${hwmonGlob}" }
 
               Column {
                   spacing: 8

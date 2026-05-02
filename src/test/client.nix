@@ -85,7 +85,8 @@ pkgs.writeShellApplication {
     reload=$reload
     config=$config
     EOF
-    # Atomic move so inotifywait sees a complete file via moved_to.
+    # Write under a *.req.XXXXXX temp name and atomically rename to *.req so
+    # the harness's `*.req` glob can't pick up a half-written file mid-cat.
     mv "$req" "$SHARE/cmd/$uuid.req"
 
     # Poll for the done sentinel — give Hyprland's first cold layout time.

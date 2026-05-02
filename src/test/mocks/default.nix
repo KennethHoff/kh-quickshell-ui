@@ -21,25 +21,20 @@ let
     "mock-tray" = ./mock-tray.py;
   };
 
-  installShell = lib.concatStringsSep "\n" (
-    lib.mapAttrsToList (name: src: ''
-      install -Dm755 ${src} $out/bin/${name}
-      # Patch shebang so the script runs against the package's bash.
-      substituteInPlace $out/bin/${name} \
-        --replace-fail '#!/usr/bin/env bash' '#!${pkgs.bash}/bin/bash'
-    '') shellMocks
-  );
-
-  installPython = lib.concatStringsSep "\n" (
-    lib.mapAttrsToList (name: src: ''
-      install -Dm755 ${src} $out/bin/${name}
-      substituteInPlace $out/bin/${name} \
-        --replace-fail '#!/usr/bin/env python3' '#!${py}/bin/python3'
-    '') pythonMocks
-  );
+  # Patch the env shebang to the package-pinned interpreter so each script
+  # runs under a store-stable binary.
+  install =
+    shebang: interp: mocks:
+    lib.concatStringsSep "\n" (
+      lib.mapAttrsToList (name: src: ''
+        install -Dm755 ${src} $out/bin/${name}
+        substituteInPlace $out/bin/${name} \
+          --replace-fail '${shebang}' '${interp}'
+      '') mocks
+    );
 in
 pkgs.runCommand "kh-test-mocks" { } ''
   mkdir -p $out/bin
-  ${installShell}
-  ${installPython}
+  ${install "#!/usr/bin/env bash" "#!${pkgs.bash}/bin/bash" shellMocks}
+  ${install "#!/usr/bin/env python3" "#!${py}/bin/python3" pythonMocks}
 ''
