@@ -1,12 +1,18 @@
 {
   description = "Quickshell QML unit tests";
 
-  inputs.nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
+  inputs = {
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
+
+    microvm.url = "github:astro/microvm.nix";
+    microvm.inputs.nixpkgs.follows = "nixpkgs";
+  };
 
   outputs =
     {
       self,
       nixpkgs,
+      microvm,
     }:
     let
       system = "x86_64-linux";
@@ -14,6 +20,17 @@
       lib = pkgs.lib;
 
       dev = import ./src/dev.nix { inherit pkgs lib self; };
+
+      test = import ./src/test {
+        inherit
+          pkgs
+          lib
+          self
+          nixpkgs
+          microvm
+          dev
+          ;
+      };
     in
     {
       formatter.${system} = pkgs.nixfmt-tree;
@@ -25,7 +42,16 @@
         ];
       };
 
-      packages.${system} = dev.packages;
-      apps.${system} = dev.apps;
+      packages.${system} = dev.packages // {
+        kh-test-vm = test.runner;
+        kh-bar-vm-test = test.barConfig;
+      };
+
+      apps.${system} = dev.apps // {
+        kh-test-vm-daemon = test.daemonApp;
+        screenshot-bar-vm = test.screenshotApp;
+      };
+
+      nixosConfigurations.kh-test-vm = test.nixosConfig;
     };
 }

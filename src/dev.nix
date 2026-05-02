@@ -210,6 +210,8 @@ let
   };
 in
 {
+  inherit mkAppConfig mkBarConfig;
+
   packages = {
     kh-bar = barConfig;
     kh-cliphist = cliphistConfig;
