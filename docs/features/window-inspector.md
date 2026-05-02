@@ -42,7 +42,7 @@ mnemonic without crowding the top-level namespace. Auto-freezes the
 picked window on open so the cursor can move freely while you read.
 
 - [1] ✅ Panel surface — opens on `Enter` from pick/frozen mode; `Esc` returns to pick/frozen, `q` closes the inspector entirely
-- [2] ✅ Vim-style row navigator — `j`/`k` (or arrows) move row by row, `h`/`l` jump section by section. The highlighted row gets a left-caret + bg highlight. `y` yanks: matcher-capable rows yield a `windowrulev2 = <action>, …` line; raw rows yank the value directly; `full record` yanks the JSON
+- [2] ✅ Vim-style row navigator — `j`/`k` (or arrows) move row by row, `h`/`l` jump section by section. The highlighted row gets a left-caret + bg highlight; `y` flashes it green on yank as confirmation. Matcher-capable rows yank a `windowrulev2 = <action>, …` line; raw rows yank the value directly; `full record` yanks the JSON. Yazi-style `Space` marks rows for multi-select; with marks, `y` yanks the **union** — matcher-capable marked rows AND together into one line, so the Battle.net case (`initialClass + initialTitle`) lands in one keystroke
 - [3] ⬜ Dispatch — close / focus / toggle floating / toggle pinned / move to workspace 1–9
 
 ## List View (secondary)

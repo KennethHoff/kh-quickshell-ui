@@ -13,8 +13,11 @@ Item {
     id: root
 
     // ── Inputs ────────────────────────────────────────────────────────────────
-    property var rows:          []   // [{ section, label, value, yank }]
+    property var rows:          []   // [{ section, label, value, yank, matcher }]
     property int selectedIndex: 0
+    // Yazi-style row marks — list of marked row indices. Marked rows
+    // render a green bullet at the row start; `y` yanks the union.
+    property var marked:        []
     // Bumped externally on every yank — the row at `selectedIndex` flashes.
     // Same pattern as ClipDelegate.flash() in cliphist.
     property int yankTick:      0
@@ -90,6 +93,7 @@ Item {
                     readonly property bool _isSectionStart:
                         index === 0 || root.rows[index - 1].section !== modelData.section
                     readonly property bool _isSelected: index === root.selectedIndex
+                    readonly property bool _isMarked:   root.marked.indexOf(index) >= 0
                     readonly property int  _headerH: _isSectionStart ? 22 : 0
 
                     width: contentCol.width
@@ -135,8 +139,18 @@ Item {
                             anchors.left: parent.left
                             anchors.leftMargin: 10
                             anchors.verticalCenter: parent.verticalCenter
-                            spacing: 12
+                            spacing: 8
 
+                            // Mark indicator — green bullet when this row
+                            // is marked. Reserves the slot in either case
+                            // so labels stay aligned across rows.
+                            Text {
+                                text: "●"
+                                color: rowItem._isMarked ? root.stableColor : "transparent"
+                                font.family: root.fontFamily
+                                font.pixelSize: root.fontSize - 3
+                                width: 10
+                            }
                             Text {
                                 text: rowItem.modelData.label
                                 color: rowItem.modelData.section === "Identity"
@@ -154,7 +168,7 @@ Item {
                                 font.pixelSize: root.fontSize - 1
                                 font.bold: rowItem._isSelected
                                 elide: Text.ElideRight
-                                width: card.width - 180
+                                width: card.width - 200
                             }
                         }
 
@@ -199,7 +213,9 @@ Item {
 
             // Footer
             Text {
-                text: "j/k row · h/l section · y yank · Esc back · q quit"
+                text: root.marked.length > 0
+                    ? "j/k row · h/l section · Space mark (" + root.marked.length + " marked) · y yank union · Esc back"
+                    : "j/k row · h/l section · Space mark · y yank · Esc back · q quit"
                 color: root.mutedColor
                 font.family: root.fontFamily
                 font.pixelSize: root.fontSize - 4

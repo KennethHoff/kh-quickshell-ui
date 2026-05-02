@@ -50,6 +50,11 @@ ShellRoot {
     // Highlighted row inside the details panel. Reset to 0 on every
     // open. The panel binds its visual selection to this index.
     property int    panelSelected:  0
+    // Marked row indices (Yazi-style multi-select). When non-empty, `y`
+    // yanks the union of marked rows: matcher-capable rows get AND'd
+    // into one `windowrulev2 = <action>, …` line; raw rows fall back to
+    // newline-joined values.
+    property var    panelMarked:    []
     // Bumps on every yank so the panel can flash the selected row as
     // visual confirmation. Same pattern as ClipDelegate's flash().
     property int    yankTick:       0
@@ -136,6 +141,7 @@ ShellRoot {
             root.frozenAddr     = ""
             root.frozenIpc      = null
             root.detailsShowing = false
+            root.panelMarked    = []
         }
         // ui only — fires once per layer surface when the layer becomes
         // visible. Refresh is cheap and idempotent across calls. The
@@ -324,6 +330,7 @@ ShellRoot {
             if (!root.pickedAddr) return
             if (root.mode !== "frozen") freeze()
             root.panelSelected  = 0
+            root.panelMarked    = []
             root.detailsShowing = true
         }
         // ui+ipc
@@ -335,9 +342,12 @@ ShellRoot {
 
         // ── Row model ─────────────────────────────────────────────────────────
         // Build the flat row list the panel renders and navigates over. Each
-        // row carries the value to display *and* the value to yank — for
-        // matcher-capable fields that's a `windowrulev2` line, for raw
-        // fields (live class/title, geometry) it's the value itself.
+        // row carries:
+        //   value   — what's displayed
+        //   yank    — what `y` copies when this row is the only selection
+        //   matcher — the bare matcher fragment (e.g. `initialClass:^X$`),
+        //             empty for non-matcher rows. Used to AND multiple marked
+        //             rows into one `windowrulev2 = <action>, m1, m2` line.
         function buildRows(ipc): var {
             if (!ipc) return []
             const cls   = ipc.initialClass || ""
@@ -357,27 +367,37 @@ ShellRoot {
                 if (ipc.pinned)     f.push("pinned")
                 return f.length ? f.join(" · ") : ""
             })()
-            const rule = function (kind, val, exact) {
+            const M = function (kind, val, exact) {
                 if (!val) return ""
-                return "windowrulev2 = <action>, " + kind + ":"
-                    + (exact ? "^" + escapeRegex(val) + "$" : val)
+                return kind + ":" + (exact ? "^" + escapeRegex(val) + "$" : val)
+            }
+            const ruleOf = function (m) {
+                return m ? "windowrulev2 = <action>, " + m : ""
+            }
+            const matchers = {
+                cls:  M("initialClass", cls, true),
+                ttl:  M("initialTitle", ttl, true),
+                pid:  M("pid",       pid,  false),
+                addr: M("address",   addr, false),
+                ws:   M("workspace", ws,   false),
+                mon:  M("monitor",   mon,  false)
             }
             return [
                 // Identity — rule-stable matchers come first; the live values
                 // are shown so the drift is visible but yank the raw value
                 // (rules off live class/title would silently break on retitle).
-                { section: "Identity",   label: "initialClass",  value: cls,   yank: rule("initialClass",  cls,  true)  },
-                { section: "Identity",   label: "class (live)",  value: lcls,  yank: lcls  },
-                { section: "Identity",   label: "initialTitle",  value: ttl,   yank: rule("initialTitle",  ttl,  true)  },
-                { section: "Identity",   label: "title (live)",  value: lttl,  yank: lttl  },
-                { section: "Attributes", label: "pid",           value: pid,   yank: rule("pid",       pid,   false) },
-                { section: "Attributes", label: "address",       value: addr,  yank: rule("address",   addr,  false) },
-                { section: "Attributes", label: "workspace",     value: ws,    yank: rule("workspace", ws,    false) },
-                { section: "Attributes", label: "monitor",       value: mon,   yank: rule("monitor",   mon,   false) },
-                { section: "Geometry",   label: "at (global)",   value: atG,   yank: atG   },
-                { section: "Geometry",   label: "size",          value: sizeG, yank: sizeG },
-                { section: "Geometry",   label: "flags",         value: flags || "—", yank: flags },
-                { section: "Raw",        label: "full record",   value: "(JSON)", yank: JSON.stringify(ipc, null, 2) }
+                { section: "Identity",   label: "initialClass",  value: cls,   yank: ruleOf(matchers.cls),  matcher: matchers.cls  },
+                { section: "Identity",   label: "class (live)",  value: lcls,  yank: lcls,                  matcher: ""            },
+                { section: "Identity",   label: "initialTitle",  value: ttl,   yank: ruleOf(matchers.ttl),  matcher: matchers.ttl  },
+                { section: "Identity",   label: "title (live)",  value: lttl,  yank: lttl,                  matcher: ""            },
+                { section: "Attributes", label: "pid",           value: pid,   yank: ruleOf(matchers.pid),  matcher: matchers.pid  },
+                { section: "Attributes", label: "address",       value: addr,  yank: ruleOf(matchers.addr), matcher: matchers.addr },
+                { section: "Attributes", label: "workspace",     value: ws,    yank: ruleOf(matchers.ws),   matcher: matchers.ws   },
+                { section: "Attributes", label: "monitor",       value: mon,   yank: ruleOf(matchers.mon),  matcher: matchers.mon  },
+                { section: "Geometry",   label: "at (global)",   value: atG,   yank: atG,                   matcher: ""            },
+                { section: "Geometry",   label: "size",          value: sizeG, yank: sizeG,                 matcher: ""            },
+                { section: "Geometry",   label: "flags",         value: flags || "—", yank: flags,          matcher: ""            },
+                { section: "Raw",        label: "full record",   value: "(JSON)", yank: JSON.stringify(ipc, null, 2), matcher: "" }
             ]
         }
         // ui only — escape regex metacharacters so initialClass / initialTitle
@@ -426,10 +446,51 @@ ShellRoot {
             while (prevStart > 0 && rows[prevStart - 1].section === prev) prevStart--
             root.panelSelected = prevStart
         }
+        // ui+ipc — Yazi-style: Space toggles a mark on the current row.
+        function toggleMark(): void {
+            const rows = buildRows(root.pickedIpc)
+            if (rows.length === 0) return
+            const idx = root.panelSelected
+            if (idx < 0 || idx >= rows.length) return
+            const arr = root.panelMarked.slice()
+            const pos = arr.indexOf(idx)
+            if (pos >= 0) arr.splice(pos, 1)
+            else { arr.push(idx); arr.sort(function (a, b) { return a - b }) }
+            root.panelMarked = arr
+        }
         // ui+ipc
+        function clearMarks(): void { root.panelMarked = [] }
+
+        // ui+ipc
+        // With marks, yank a single combined `windowrulev2 = <action>, m1, m2`
+        // line built from each marked row's `matcher` fragment — that's
+        // the multi-matcher case (e.g. initialClass + initialTitle for
+        // disambiguating Steam launcher windows). If no marked row
+        // contributes a matcher, fall back to newline-joining the raw
+        // yank values. Without marks, behave as before.
         function yankSelected(): void {
             const rows = buildRows(root.pickedIpc)
             if (rows.length === 0) return
+
+            if (root.panelMarked.length > 0) {
+                const matchers = []
+                const fallbacks = []
+                for (let i = 0; i < root.panelMarked.length; i++) {
+                    const idx = root.panelMarked[i]
+                    if (idx < 0 || idx >= rows.length) continue
+                    const r = rows[idx]
+                    if (r.matcher) matchers.push(r.matcher)
+                    else if (r.yank) fallbacks.push(r.yank)
+                }
+                let text = ""
+                if (matchers.length > 0) text = "windowrulev2 = <action>, " + matchers.join(", ")
+                else if (fallbacks.length > 0) text = fallbacks.join("\n")
+                if (!text) return
+                impl.copyText(text)
+                root.yankTick = root.yankTick + 1
+                return
+            }
+
             const idx = Math.max(0, Math.min(rows.length - 1, root.panelSelected))
             const text = rows[idx].yank
             if (!text) return
@@ -488,6 +549,7 @@ ShellRoot {
             if (event.key === Qt.Key_Up    || event.text === "k") { selectPrev();        event.accepted = true; return }
             if (event.key === Qt.Key_Left  || event.text === "h") { selectPrevSection(); event.accepted = true; return }
             if (event.key === Qt.Key_Right || event.text === "l") { selectNextSection(); event.accepted = true; return }
+            if (event.key === Qt.Key_Space)                       { toggleMark();        event.accepted = true; return }
             if (event.text === "y")                               { yankSelected();      event.accepted = true; return }
         }
 
@@ -508,6 +570,7 @@ ShellRoot {
             else if (lk === "k" || lk === "up")    selectPrev()
             else if (lk === "h" || lk === "left")  selectPrevSection()
             else if (lk === "l" || lk === "right") selectNextSection()
+            else if (lk === "space")               toggleMark()
             else if (lk === "y")                   yankSelected()
         }
         // ipc only
@@ -526,6 +589,7 @@ ShellRoot {
         readonly property string pickedAddress:  root.pickedAddr
         readonly property bool   detailsShowing: root.detailsShowing
         readonly property int    panelSelected:  root.panelSelected
+        readonly property int    panelMarkCount: root.panelMarked.length
         readonly property int    yankTick:       root.yankTick
 
         function toggle(): void                       { functionality.toggle() }
@@ -541,6 +605,8 @@ ShellRoot {
         function selectPrev(): void                   { functionality.selectPrev() }
         function selectNextSection(): void            { functionality.selectNextSection() }
         function selectPrevSection(): void            { functionality.selectPrevSection() }
+        function toggleMark(): void                   { functionality.toggleMark() }
+        function clearMarks(): void                   { functionality.clearMarks() }
         function yank(): void                         { functionality.yankSelected() }
         function inspectActive(): void                { functionality.inspectActive() }
         function inspectByAddress(addr: string): void { functionality.inspectByAddress(addr) }
@@ -633,6 +699,7 @@ ShellRoot {
                 visible: root.detailsShowing && win.isCursorMonitor
                 rows: functionality.buildRows(root.pickedIpc)
                 selectedIndex: root.panelSelected
+                marked: root.panelMarked
                 yankTick: root.yankTick
 
                 bgColor:        cfg.color.base01
