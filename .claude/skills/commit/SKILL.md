@@ -19,8 +19,14 @@ Stage and commit the current changes using [Conventional Commits](https://www.co
    - You're about to revert or move files and want to make sure the user expects it.
 
    Skip the confirmation only when the commit is genuinely trivial and self-contained — a one-file typo fix, a docs-only tweak, a single bugfix with no adjacent churn. When in doubt, ask.
-5. **Stage** — Stage one logical group at a time. Use `git add -p <file>` to stage only the specific hunks that belong to your task. Do not use `git add -A`.
+5. **Stage** — Stage one logical group at a time. Use `git add -p :/<path>` to stage only the specific hunks that belong to your task. Do not use `git add -A`.
+
+   ```bash
+   git add -p :/.claude/skills/commit/SKILL.md
+   ```
 6. **Commit** — Commit the staged group with a message following the conventions below. Repeat steps 5–6 for each remaining group.
+
+> **Why `:/<path>`?** Every git pathspec in this skill is prefixed with `:/` (git's "top" pathspec magic) so it resolves relative to the repo root regardless of the inherited cwd. Without it, a cwd like `.claude/skills/` turns `git add .claude/skills/foo` into `.claude/skills/.claude/skills/foo` and fails.
 
 ## Commit conventions
 
