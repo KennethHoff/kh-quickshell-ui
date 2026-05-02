@@ -55,18 +55,29 @@ ShellRoot {
 
     // ── Cursor polling ───────────────────────────────────────────────────────
     // A long-running shell loop streams cursorpos lines instead of the
-    // QML Timer firing a fresh `hyprctl` Process every 50 ms. The Timer
+    // QML Timer firing a fresh `hyprctl` Process every tick. The Timer
     // approach paid the QML→Process round-trip and the hyprctl spawn cost
-    // on every tick, which capped the effective rate well below the timer
-    // interval and made the outline lag the cursor visibly. With one
-    // bash + one hyprctl child fork per tick (no QML round-trip), the
-    // sleep interval is the dominant cost and we can run at ~60 Hz.
+    // on every iteration, which capped the effective rate well below the
+    // timer interval and made the outline lag the cursor visibly.
+    //
+    // Hyprland's socket2 event stream doesn't surface cursor moves, and
+    // the layer surface uses an empty input region (so it can't receive
+    // pointer events itself), so polling is the only option — but the
+    // pace is derived from the focused monitor's refresh rate rather
+    // than a hardcoded value. One frame's worth of sleep keeps work
+    // bounded to "as fast as the user can see" without burning cycles.
+    readonly property real _frameSeconds: {
+        const m = Hyprland.focusedMonitor && Hyprland.focusedMonitor.lastIpcObject
+        const hz = m && m.refreshRate ? m.refreshRate : 60
+        return 1.0 / hz
+    }
     Process {
         id: cursorProc
         running: root.showing && root.mode === "pick"
         command: [
             bin.bash, "-c",
-            "while :; do " + bin.hyprctl + " cursorpos || exit 0; sleep 0.016; done"
+            "while :; do " + bin.hyprctl + " cursorpos || exit 0; sleep "
+                + root._frameSeconds.toFixed(4) + "; done"
         ]
         stdout: SplitParser {
             onRead: (line) => functionality.onCursorRead(line)
@@ -107,7 +118,10 @@ ShellRoot {
         // ui only — fires once per layer surface when the layer becomes
         // visible. Refresh is cheap and idempotent across calls. The
         // cursor stream starts on its own via `cursorProc.running`.
+        // Refresh monitors so `_frameSeconds` resolves to the real refresh
+        // rate before the bash loop's sleep is computed.
         function onShow(): void {
+            Hyprland.refreshMonitors()
             Hyprland.refreshToplevels()
         }
         // ui only
@@ -115,14 +129,16 @@ ShellRoot {
 
         // ── Cursor + hit-testing ──────────────────────────────────────────────
         // ui only
-        // Output is "X, Y" (comma + space). Parse and update state, then
-        // recompute the picked window.
+        // Output is "X, Y" (comma + space). Parse, dedup against the last
+        // known position so an aggressive poll loop doesn't burn cycles
+        // recomputing the pick on identical samples, and update state.
         function onCursorRead(line: string): void {
             const parts = line.split(",")
             if (parts.length < 2) return
             const x = parseInt(parts[0].trim())
             const y = parseInt(parts[1].trim())
             if (isNaN(x) || isNaN(y)) return
+            if (x === root.cursorX && y === root.cursorY) return
             root.cursorX = x
             root.cursorY = y
             recomputePick()
