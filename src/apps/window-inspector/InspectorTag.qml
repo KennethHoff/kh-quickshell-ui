@@ -18,8 +18,6 @@ Item {
     property int  screenW:    0
     property int  screenH:    0
     property bool frozen:     false
-    property bool yankChord:  false
-    property bool mChord:     false
 
     // ── Style ─────────────────────────────────────────────────────────────────
     property color  bgColor:     "#181825"
@@ -102,20 +100,6 @@ Item {
                     font.pixelSize: root.fontSize - 3
                     font.bold: true
                     font.letterSpacing: 1
-                }
-                Text {
-                    visible: root.yankChord
-                    text: "y… (c/t/p/a/w/m)"
-                    color: root.warnColor
-                    font.family: root.fontFamily
-                    font.pixelSize: root.fontSize - 3
-                }
-                Text {
-                    visible: root.mChord
-                    text: "m… (1-9)"
-                    color: root.warnColor
-                    font.family: root.fontFamily
-                    font.pixelSize: root.fontSize - 3
                 }
                 Text {
                     visible: !root.ipc
@@ -313,9 +297,8 @@ Item {
 
             // ── Footer hint ───────────────────────────────────────────────────
             Text {
-                text: root.frozen
-                    ? "f unfreeze · y rule · Y json · X close · F focus · t/T float/pin · m1-9 ws · ? help · Esc quit"
-                    : "f freeze · y rule · Y json · X close · F focus · t/T float/pin · m1-9 ws · ? help · Esc quit"
+                text: root.frozen ? "f unfreeze · Esc quit"
+                                  : "f freeze · Esc quit"
                 color: root.mutedColor
                 font.family: root.fontFamily
                 font.pixelSize: root.fontSize - 4

@@ -8,6 +8,10 @@ focus, copy as a `windowrulev2` line). Triggered via keybind or IPC.
 The launcher's [Hyprland window switcher](launcher/window-switcher.md) is
 the multi-window browser; this one is single-target by design.
 
+The fast path is "point, read, freeze if needed, act in details panel" —
+the top-level keymap stays minimal so the inspector doesn't accidentally
+overload `f`/`F` / `t`/`T` / `y`/`Y` for cross-cutting actions.
+
 ## Core
 
 - [1] ✅ Window data from `hyprctl clients -j` — class, title, PID, address, workspace, monitor, geometry, floating/fullscreen
@@ -22,16 +26,24 @@ the multi-window browser; this one is single-target by design.
 - [1] ✅ Inspector opens here by default. Cursor-over-window draws outline overlay + floating tag with `initialClass`/`class`/`initialTitle`/`title`/geometry
 - [2] ✅ Freeze — `f` pins the tag so the cursor can move off the target. Window Spy's defining trick; needed any time the window dismisses on focus loss (tooltips, popups)
 - [3] ⬜ `l` toggles into list view for windows the cursor can't grab
-- [4] ✅ `?` opens the help overlay; `Esc`/`q` closes the inspector
+- [4] ✅ `Esc`/`q` closes the inspector
 
-## Copy & Actions
+Top-level keybinds are intentionally minimal — only `f` (freeze toggle)
+and `Esc`/`q` (close). Window actions and copy variants live in the
+details panel below; this keeps the global keymap small and avoids the
+`f`/`F` / `t`/`T` / `y`/`Y` collisions of a flat scheme.
 
-Act on the picked (or list-selected) window directly — no separate
-"select" step. Expected fast path: point, read, `X`, done.
+## Details Panel (secondary, planned)
 
-- [1] ✅ Copy as Hyprland rule — `y` then variant emits a ready-to-paste `windowrulev2` line: bare `y` / `yc` initial-class (default), `yt` initial-title, `yp` pid, `ya` address, `yw` workspace, `ym` monitor
-- [2] ✅ Copy as JSON — `Y` copies the full `hyprctl clients -j` record
-- [3] ✅ Dispatch — `X` close, `F` focus, `m<1-9>` move to workspace, `t` toggle floating, `T` toggle pinned
+A panel attached to the picked window — opened with a single key from
+pick/frozen mode — hosting all the "act on this window" affordances.
+Keybinds inside the panel are scoped to that mode, so they can be
+mnemonic without crowding the top-level namespace.
+
+- [1] ⬜ Panel surface — opens on `d` (or similar) from pick/frozen mode; closes on `Esc`/`q`/the same key
+- [2] ⬜ Copy as Hyprland rule — `c` (initialClass, default), `t` (initialTitle), `p` (pid), `a` (address), `w` (workspace), `m` (monitor) emit a ready-to-paste `windowrulev2` line
+- [3] ⬜ Copy as JSON — copies the full `hyprctl clients -j` record
+- [4] ⬜ Dispatch — close / focus / toggle floating / toggle pinned / move to workspace 1–9
 
 ## List View (secondary)
 

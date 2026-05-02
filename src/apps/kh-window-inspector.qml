@@ -3,14 +3,18 @@
 // Daemon: quickshell -p <config-dir>
 // Toggle: quickshell ipc -c kh-window-inspector call window-inspector toggle
 //
-// This file owns: window, IPC, key dispatch, cursor polling, hit-testing,
-// yank chord state, and dispatcher actions. Visual layers (outline, tag,
-// help) live in window-inspector/*.qml.
+// This file owns: window, IPC, key dispatch, cursor polling, hit-testing.
+// Visual layers (outline, tag) live in window-inspector/*.qml.
 //
 // Pick mode is the default: an empty input region lets the cursor pass
 // through to the underlying windows; we poll `hyprctl cursorpos`, find
 // the topmost window under the cursor, and render an outline + tag.
 // `f` freezes the picked window so it survives focus loss.
+//
+// Top-level keybinds are intentionally minimal — only `Esc`/`q` (close)
+// and `f` (freeze toggle). Window actions (close/focus/float/pin/move-
+// to-workspace), copy-as-rule, and copy-as-JSON will live in a future
+// "details" panel attached to the picked window, not at the top level.
 import QtQuick
 import Quickshell
 import Quickshell.Hyprland
@@ -42,8 +46,6 @@ ShellRoot {
     // Cursor position in global Hyprland coords.
     property int    cursorX:    0
     property int    cursorY:    0
-    // Yank chord state — when true, the next key resolves to a copy variant.
-    property bool   yankChord:  false
 
     // ── Hyprland event subscription — keep toplevel data live ────────────────
     Connections {
@@ -69,9 +71,9 @@ ShellRoot {
 
     // ── Active-window probe (used by inspectActive) ──────────────────────────
     // Pipe through `tr -d '\n'` so the JSON arrives as a single line — keeps
-    // SplitParser straightforward. Quickshell's `Hyprland.activeWindow` can
-    // be stale or null right after taking keyboard focus, so we ask hyprctl
-    // directly.
+    // SplitParser straightforward. Quickshell's `Hyprland.activeWindow` is
+    // null while a layer surface holds keyboard focus (Hyprland's "active"
+    // tracks toplevels, not layer surfaces), so we ask hyprctl directly.
     property string _activeBuf: ""
     Process {
         id: activeProc
@@ -80,17 +82,6 @@ ShellRoot {
             onRead: (line) => functionality.onActiveRead(line)
         }
         onExited: functionality.onActiveExited()
-    }
-
-    // ── Yank / dispatch processes ────────────────────────────────────────────
-    Process { id: copyProc }
-
-    QtObject {
-        id: impl
-        function copyText(text: string): void {
-            copyProc.command = [bin.bash, "-c", "printf '%s' \"$1\" | " + bin.wlCopy, "--", text]
-            copyProc.running = true
-        }
     }
 
     // ── Functionality ────────────────────────────────────────────────────────
@@ -108,8 +99,7 @@ ShellRoot {
         function onShow(): void {
             root.mode = "pick"
             root.frozenAddr = ""
-            root.yankChord = false
-            helpOverlay.close()
+            root.frozenIpc  = null
             keyHandler.forceActiveFocus()
             Hyprland.refreshToplevels()
             pollCursor()
@@ -211,8 +201,6 @@ ShellRoot {
                 }
             }
         }
-        // ipc only
-        function pickedAddress(): string { return root.pickedAddr }
 
         // ── Inspect by selector (IPC entry points) ────────────────────────────
         // ipc only — `Hyprland.activeWindow` reports null while a layer
@@ -286,97 +274,6 @@ ShellRoot {
         // ui+ipc
         function toggleFreeze(): void { root.mode === "frozen" ? unfreeze() : freeze() }
 
-        // ── Help ──────────────────────────────────────────────────────────────
-        // ui+ipc
-        function openHelp(): void  { helpOverlay.open() }
-        // ui+ipc
-        function closeHelp(): void { helpOverlay.close() }
-        // ipc only
-        function toggleHelp(): void { helpOverlay.showing ? closeHelp() : openHelp() }
-
-        // ── Yank ──────────────────────────────────────────────────────────────
-        // ui only
-        // Format a windowrulev2 line for the picked window using the requested
-        // matcher field. The action is left as `<action>` so the user fills
-        // it in — there's no sensible default, and emitting `float` would
-        // surprise people who actually wanted `tile` or `move`.
-        function ruleLine(ipc, variant: string): string {
-            const cls   = ipc.initialClass || ""
-            const ttl   = ipc.initialTitle || ""
-            const pid   = ipc.pid !== undefined ? String(ipc.pid) : ""
-            const addr  = ipc.address || ""
-            const ws    = ipc.workspace ? (ipc.workspace.name || String(ipc.workspace.id)) : ""
-            const mon   = ipc.monitor || ""
-            if (variant === "t") return "windowrulev2 = <action>, initialTitle:^" + escapeRegex(ttl) + "$"
-            if (variant === "p") return "windowrulev2 = <action>, pid:" + pid
-            if (variant === "a") return "windowrulev2 = <action>, address:" + addr
-            if (variant === "w") return "windowrulev2 = <action>, workspace:" + ws
-            if (variant === "m") return "windowrulev2 = <action>, monitor:" + mon
-            // Default ("c" or bare y) — initialClass.
-            return "windowrulev2 = <action>, initialClass:^" + escapeRegex(cls) + "$"
-        }
-        // ui only
-        function escapeRegex(s: string): string {
-            return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-        }
-        // ui+ipc
-        function yank(variant: string): void {
-            const ipc = ipcForAddr(root.pickedAddr)
-            if (!ipc) return
-            impl.copyText(ruleLine(ipc, variant))
-            root.yankChord = false
-        }
-        // ui+ipc
-        function yankJson(): void {
-            const ipc = ipcForAddr(root.pickedAddr)
-            if (!ipc) return
-            impl.copyText(JSON.stringify(ipc, null, 2))
-            root.yankChord = false
-        }
-        // ui only
-        function startYankChord(): void {
-            if (!root.pickedAddr) return
-            root.yankChord = true
-            yankChordTimer.restart()
-        }
-        // ui only
-        function cancelYankChord(): void {
-            root.yankChord = false
-            yankChordTimer.stop()
-        }
-        // ui only
-        function yankChordTimedOut(): void {
-            if (!root.yankChord) return
-            yank("c")
-        }
-
-        // ── Dispatch actions ──────────────────────────────────────────────────
-        // ui+ipc
-        function closeWindow(): void {
-            if (!root.pickedAddr) return
-            Hyprland.dispatch("closewindow address:" + root.pickedAddr)
-        }
-        // ui+ipc
-        function focusWindow(): void {
-            if (!root.pickedAddr) return
-            Hyprland.dispatch("focuswindow address:" + root.pickedAddr)
-        }
-        // ui+ipc
-        function toggleFloating(): void {
-            if (!root.pickedAddr) return
-            Hyprland.dispatch("togglefloating address:" + root.pickedAddr)
-        }
-        // ui+ipc
-        function togglePinned(): void {
-            if (!root.pickedAddr) return
-            Hyprland.dispatch("pin address:" + root.pickedAddr)
-        }
-        // ui+ipc
-        function moveToWorkspace(n: int): void {
-            if (!root.pickedAddr || n < 1) return
-            Hyprland.dispatch("movetoworkspace " + n + ",address:" + root.pickedAddr)
-        }
-
         // ── Hyprland events — refresh toplevels on relevant ones ──────────────
         // ui only
         function onHyprlandEvent(ev): void {
@@ -396,59 +293,18 @@ ShellRoot {
 
         // ── Key handling (UI) ─────────────────────────────────────────────────
         // ui only
+        // Top-level keys are intentionally minimal. Window actions and
+        // copy-as-rule will hang off a future details panel rather than
+        // crowding the global namespace.
         function handleKeyEvent(event): void {
             if (event.key === Qt.Key_Shift   || event.key === Qt.Key_Control ||
                 event.key === Qt.Key_Alt     || event.key === Qt.Key_Meta) return
 
-            if (helpOverlay.showing) {
-                event.accepted = helpOverlay.handleKey(event)
-                return
-            }
-
-            // Yank chord — next key resolves the variant.
-            if (root.yankChord) {
-                if (event.key === Qt.Key_Escape) { cancelYankChord(); event.accepted = true; return }
-                const t = event.text
-                if      (t === "y" || t === "c") yank("c")
-                else if (t === "t") yank("t")
-                else if (t === "p") yank("p")
-                else if (t === "a") yank("a")
-                else if (t === "w") yank("w")
-                else if (t === "m") yank("m")
-                else cancelYankChord()
-                event.accepted = true
-                return
-            }
-
-            // Close.
             if (event.key === Qt.Key_Escape || event.text === "q") {
                 close(); event.accepted = true; return
             }
-
-            // Help.
-            if (event.text === "?") { openHelp(); event.accepted = true; return }
-
-            // Freeze toggle.
-            if (event.text === "f") { toggleFreeze(); event.accepted = true; return }
-
-            // Yank.
-            if (event.text === "y") { startYankChord(); event.accepted = true; return }
-            if (event.text === "Y") { yankJson(); event.accepted = true; return }
-
-            // Dispatch actions — gated on having a picked window.
-            if (event.text === "X") { closeWindow();    event.accepted = true; return }
-            if (event.text === "F") { focusWindow();    event.accepted = true; return }
-            if (event.text === "t") { toggleFloating(); event.accepted = true; return }
-            if (event.text === "T") { togglePinned();   event.accepted = true; return }
-
-            // m1..m9 — move to workspace. `m` enters a one-shot chord.
-            if (event.text === "m") { mChord.armed = true; event.accepted = true; return }
-            if (mChord.armed) {
-                mChord.armed = false
-                const d = parseInt(event.text)
-                if (!isNaN(d) && d >= 1 && d <= 9) moveToWorkspace(d)
-                event.accepted = true
-                return
+            if (event.text === "f") {
+                toggleFreeze(); event.accepted = true; return
             }
         }
 
@@ -456,25 +312,8 @@ ShellRoot {
         // ipc only
         function key(k: string): void {
             const lk = k.toLowerCase()
-            if      (lk === "?")                       toggleHelp()
-            else if (lk === "escape" || lk === "esc" || lk === "q") close()
-            else if (lk === "f")                       toggleFreeze()
-            else if (lk === "y")                       yank("c")
-            else if (lk === "yc")                      yank("c")
-            else if (lk === "yt")                      yank("t")
-            else if (lk === "yp")                      yank("p")
-            else if (lk === "ya")                      yank("a")
-            else if (lk === "yw")                      yank("w")
-            else if (lk === "ym")                      yank("m")
-            else if (lk === "shift+y" || k === "Y")    yankJson()
-            else if (lk === "shift+x" || k === "X")    closeWindow()
-            else if (lk === "shift+f" || k === "F")    focusWindow()
-            else if (lk === "t")                       toggleFloating()
-            else if (lk === "shift+t" || k === "T")    togglePinned()
-            else if (lk.startsWith("m") && lk.length === 2) {
-                const d = parseInt(lk.slice(1))
-                if (!isNaN(d) && d >= 1 && d <= 9) moveToWorkspace(d)
-            }
+            if      (lk === "escape" || lk === "esc" || lk === "q") close()
+            else if (lk === "f")                                    toggleFreeze()
         }
         // ipc only
         function setMode(m: string): void {
@@ -483,26 +322,13 @@ ShellRoot {
         }
     }
 
-    // One-shot chord state for `m<1-9>`.
-    QtObject {
-        id: mChord
-        property bool armed: false
-    }
-
-    Timer {
-        id: yankChordTimer
-        interval: 700
-        repeat: false
-        onTriggered: functionality.yankChordTimedOut()
-    }
-
     // ── IPC ───────────────────────────────────────────────────────────────────
     IpcHandler {
         target: "window-inspector"
 
-        readonly property bool   showing:        root.showing
-        readonly property string mode:           root.mode
-        readonly property string pickedAddress:  root.pickedAddr
+        readonly property bool   showing:       root.showing
+        readonly property string mode:          root.mode
+        readonly property string pickedAddress: root.pickedAddr
 
         function toggle(): void                       { functionality.toggle() }
         function open(): void                         { functionality.open() }
@@ -514,11 +340,6 @@ ShellRoot {
         function inspectActive(): void                { functionality.inspectActive() }
         function inspectByAddress(addr: string): void { functionality.inspectByAddress(addr) }
         function inspectByPid(pid: int): void         { functionality.inspectByPid(pid) }
-        function focusWindow(): void                  { functionality.focusWindow() }
-        function closeWindow(): void                  { functionality.closeWindow() }
-        function toggleFloating(): void               { functionality.toggleFloating() }
-        function togglePinned(): void                 { functionality.togglePinned() }
-        function moveToWorkspace(n: int): void        { functionality.moveToWorkspace(n) }
     }
 
     // ── Window ────────────────────────────────────────────────────────────────
@@ -534,7 +355,6 @@ ShellRoot {
 
         // Empty input region — pointer events fall through to underlying
         // windows so the user can hover them. Keyboard focus is unaffected.
-        // The help overlay is keyboard-only, so we never need pointer input.
         mask: Region {}
 
         onVisibleChanged: functionality.onVisibleChanged()
@@ -558,14 +378,14 @@ ShellRoot {
                 ? functionality.monitorAt(outline.ipc.at[0], outline.ipc.at[1])
                 : null
             frozen: root.mode === "frozen"
-            outlineColor:    cfg.color.base0D
-            frozenColor:     cfg.color.base0A
+            outlineColor: cfg.color.base0D
+            frozenColor:  cfg.color.base0A
         }
 
         InspectorTag {
             id: tag
             anchors.fill: parent
-            visible: root.showing && !helpOverlay.showing
+            visible: root.showing
             ipc: root.pickedIpc
             // Layer surface coords are local to its output; convert global
             // cursor coords by subtracting the focused monitor's origin.
@@ -574,62 +394,16 @@ ShellRoot {
             screenW: win.width
             screenH: win.height
             frozen: root.mode === "frozen"
-            yankChord: root.yankChord
-            mChord: mChord.armed
 
-            bgColor:      cfg.color.base01
-            headerBg:     cfg.color.base02
-            textColor:    cfg.color.base05
-            mutedColor:   cfg.color.base03
-            keyColor:     cfg.color.base0D
-            warnColor:    cfg.color.base0A
-            stableColor:  cfg.color.base0B
-            fontFamily:   cfg.fontFamily
-            fontSize:     cfg.fontSize
-        }
-
-        // ── Help overlay ──────────────────────────────────────────────────────
-        HelpOverlay {
-            id: helpOverlay
-            anchors.fill: parent
-
-            sections: [{
-                title: "PICK MODE",
-                bindings: [
-                    { key: "f",            desc: "freeze / unfreeze picked window" },
-                    { key: "Esc / q",      desc: "close inspector" },
-                    { key: "?",            desc: "toggle this help" }
-                ]
-            }, {
-                title: "COPY",
-                bindings: [
-                    { key: "y",            desc: "copy as windowrulev2 (initialClass, default)" },
-                    { key: "yc",           desc: "copy as windowrulev2 (initialClass)" },
-                    { key: "yt",           desc: "copy as windowrulev2 (initialTitle)" },
-                    { key: "yp",           desc: "copy as windowrulev2 (pid)" },
-                    { key: "ya",           desc: "copy as windowrulev2 (address)" },
-                    { key: "yw",           desc: "copy as windowrulev2 (workspace)" },
-                    { key: "ym",           desc: "copy as windowrulev2 (monitor)" },
-                    { key: "Y",            desc: "copy full hyprctl clients -j record" }
-                ]
-            }, {
-                title: "DISPATCH",
-                bindings: [
-                    { key: "X",            desc: "close window" },
-                    { key: "F",            desc: "focus window" },
-                    { key: "t",            desc: "toggle floating" },
-                    { key: "T",            desc: "toggle pinned" },
-                    { key: "m1…m9",   desc: "move to workspace 1…9" }
-                ]
-            }]
-
-            bgColor:    cfg.color.base01
-            headerBg:   cfg.color.base02
-            textColor:  cfg.color.base05
-            keyColor:   cfg.color.base0D
-            dimColor:   cfg.color.base03
-            fontFamily: cfg.fontFamily
-            fontSize:   cfg.fontSize
+            bgColor:     cfg.color.base01
+            headerBg:    cfg.color.base02
+            textColor:   cfg.color.base05
+            mutedColor:  cfg.color.base03
+            keyColor:    cfg.color.base0D
+            warnColor:   cfg.color.base0A
+            stableColor: cfg.color.base0B
+            fontFamily:  cfg.fontFamily
+            fontSize:    cfg.fontSize
         }
     }
 }
