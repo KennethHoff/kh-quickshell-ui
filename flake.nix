@@ -46,14 +46,14 @@
         dev.packages
         // test.testConfigs
         // {
-          kh-test-vm = test.runner;
+          kh-headless-vm = test.runner;
         };
 
       apps.${system} = dev.apps // {
-        kh-test-vm-daemon = test.daemonApp;
-        kh-test = test.khTestApp;
+        kh-headless-daemon = test.daemonApp;
+        kh-headless = test.khTestApp;
       };
 
-      nixosConfigurations.kh-test-vm = test.nixosConfig;
+      nixosConfigurations.kh-headless-vm = test.nixosConfig;
     };
 }

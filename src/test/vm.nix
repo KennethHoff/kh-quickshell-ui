@@ -1,8 +1,8 @@
-# NixOS module for the kh-test-vm. Brings up a minimal microvm running
+# NixOS module for the kh-headless-vm. Brings up a minimal microvm running
 # Hyprland on a vkms virtual DRM device. The harness daemon, mocks and
 # quickshell all run as the autologin user `test`.
 #
-# Host ↔ guest: virtiofs share, /tmp/khtest-current ↔ /shared.
+# Host ↔ guest: virtiofs share, /tmp/kh-headless ↔ /shared.
 {
   pkgs,
   lib,
@@ -31,8 +31,8 @@
 
     shares = [
       {
-        tag = "khtest-share";
-        source = "/tmp/khtest-current";
+        tag = "kh-headless-share";
+        source = "/tmp/kh-headless";
         mountPoint = "/shared";
         proto = "virtiofs";
       }

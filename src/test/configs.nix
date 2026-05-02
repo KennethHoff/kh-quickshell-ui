@@ -1,5 +1,5 @@
 # Test-time qs configs. Only kh-bar needs overrides (Virtual-1 screen,
-# fake /run/khtest fixtures, mock binaries). Other apps reuse the dev
+# fake /run/kh-headless fixtures, mock binaries). Other apps reuse the dev
 # configs unchanged — they don't depend on hardware-specific paths or a
 # specific screen name.
 {
@@ -22,12 +22,12 @@ let
                 ipcName: "stats"
                 panelWidth: 320
 
-                CpuUsage  { id: cpuUsage;  path: "/run/khtest/proc/stat" }
-                RamUsage  { id: ramUsage;  path: "/run/khtest/proc/meminfo" }
-                GpuUsage  { id: gpuUsage;  cardPath: "/run/khtest/drm/device" }
+                CpuUsage  { id: cpuUsage;  path: "/run/kh-headless/proc/stat" }
+                RamUsage  { id: ramUsage;  path: "/run/kh-headless/proc/meminfo" }
+                GpuUsage  { id: gpuUsage;  cardPath: "/run/kh-headless/drm/device" }
                 DiskUsage { id: diskUsage }
-                CpuTemp   { id: cpuTemp;   sensor: "fake-cpu"; hwmonGlob: "/run/khtest/hwmon/hwmon*" }
-                GpuTemp   { id: gpuTemp;   sensor: "fake-gpu"; hwmonGlob: "/run/khtest/hwmon/hwmon*" }
+                CpuTemp   { id: cpuTemp;   sensor: "fake-cpu"; hwmonGlob: "/run/kh-headless/hwmon/hwmon*" }
+                GpuTemp   { id: gpuTemp;   sensor: "fake-gpu"; hwmonGlob: "/run/kh-headless/hwmon/hwmon*" }
 
                 Column {
                     spacing: 8
@@ -101,5 +101,5 @@ let
   };
 in
 {
-  kh-bar-vm-test = bar;
+  kh-bar-headless = bar;
 }

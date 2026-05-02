@@ -1,6 +1,6 @@
 # In-guest harness daemon. Run by Hyprland's exec-once after the compositor
 # is up. Generic primitive dispatcher driven by request files dropped into
-# /shared/cmd by the host-side `kh-test` CLI.
+# /shared/cmd by the host-side `kh-headless` CLI.
 #
 # Request file format (KEY=VALUE per line):
 #   uuid=<id>
@@ -28,7 +28,7 @@
   pkgs,
 }:
 pkgs.writeShellApplication {
-  name = "kh-test-harness";
+  name = "kh-headless-harness";
   runtimeInputs = [
     pkgs.quickshell
     pkgs.grim

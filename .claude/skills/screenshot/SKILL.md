@@ -1,37 +1,100 @@
 ---
 name: screenshot
-description: Capture headless screenshots of a quickshell app (kh-bar, kh-launcher, kh-cliphist, kh-osd, kh-view) via a sway + quickshell + grim pipeline. Use when the user asks for a screenshot / "take a shot", for visual verification after .qml or theme changes, to debug UI regressions, to compare revisions side-by-side ("it worked earlier" / "why does this look different"), or to compare multiple unimplemented variations/plans ("screenshot all three designs"). This skill only captures — to display the captured shots back to the user, use the separate `show-image` skill.
+description: Capture headless screenshots of a quickshell app (kh-bar, kh-launcher, kh-cliphist, kh-osd, kh-window-inspector, kh-view) by driving a persistent NixOS microvm via the kh-headless host CLI. Use when the user asks for a screenshot / "take a shot", for visual verification after .qml or theme changes, to debug UI regressions, to compare revisions side-by-side ("it worked earlier" / "why does this look different"), or to compare multiple unimplemented variations/plans ("screenshot all three designs"). This skill only captures — to display the captured shots back to the user, use the separate `show-image` skill.
 allowed-tools: Bash, Read
 ---
 
 # Screenshot skill
 
-Output files go to `/tmp/qs-screenshots/<timestamp>/<name>.png`.
+Screenshots come from a persistent VM running Hyprland on a vkms virtual
+DRM device. The host-side `kh-headless` CLI sends primitive operations
+(load / call / prop / show / list / grim / status / kill) over a virtiofs
+share. The harness inside the VM dispatches them.
 
-**Default behaviour:** after capture, print the file paths back to the
-user. Do **not** open `kh-view` — the paths alone are enough for the
-user to inspect them on their own. If the user explicitly asks to see
-the shots (e.g. "show me", "open them", "view the screenshots"), hand
-off to the `show-image` skill.
+Output files are written to `/tmp/kh-headless/out/<name>` by the harness;
+client commands echo absolute paths back. Move them to a timestamped
+subdir under `/tmp/qs-screenshots/<ts>/` if you want the historical
+on-disk convention.
 
-## App table
+## Default behaviour
 
-| App | Config package | IPC target | Default crop | Notes |
-|---|---|---|---|---|
-| kh-bar | `.#kh-bar` | `dev-bar` (root + per-plugin) | dynamic | See [references/kh-bar.md](references/kh-bar.md) for crop sizing, settling, and readiness probe. |
-| kh-cliphist | `.#kh-cliphist` | `cliphist` (`toggle`) | full screen | |
-| kh-launcher | `.#kh-launcher` | `launcher` (`toggle`) | full screen | |
-| kh-osd | `.#kh-osd` | `osd` (`showVolume N`, `showMuted`) | `1720,2000 400x100` | OSD fades; screenshot before it disappears. |
-| kh-view | `.#kh-view` | — | full screen | Accepts file or directory paths. |
+After capture, print the file paths back to the user. Do **not** open
+`kh-view` — paths alone are enough. If the user asks to see the shots
+("show me", "open them", "view the screenshots"), hand off to the
+`show-image` skill.
+
+## Prerequisite: the daemon must be running
+
+Every command below assumes one daemon is alive:
+
+```bash
+nix run .#kh-headless-daemon
+```
+
+It boots the VM and holds the foreground; Ctrl-C tears down. The
+daemon writes `/tmp/kh-headless/state/daemon.pid` as a lock and
+refuses to start a second instance.
+
+If `nix run .#kh-headless` reports `daemon not ready (no
+/tmp/kh-headless/state/ready)`, start the daemon in a separate
+terminal first.
+
+## Primitive flow
+
+The whole API is six operations driven by `nix run .#kh-headless --`:
+
+| Op | Args | Effect |
+|---|---|---|
+| `load` | `<config-store-path>` | Kill+respawn quickshell with that config. |
+| `kill` | — | Stop quickshell. |
+| `call` | `<target> <method> [args...]` | Invoke an IPC method. |
+| `prop` | `<target> <prop> [<value>]` | Read (no value) or write a prop. |
+| `show` | `[<target>]` | Print IPC surface — every method/prop on every target. Filters when given a target. |
+| `list` | — | Just target names (one per line). |
+| `grim` | `"<x,y wxh>" [name]` | Capture region. Returns absolute host path. |
+| `status` | — | `running <config>` or `idle`. |
+
+Discovery flow ("screenshot kh-bar with the volume muted"):
+
+```bash
+cfg=$(nix build .#kh-bar-headless --no-link --print-out-paths)
+nix run .#kh-headless -- load "$cfg"
+nix run .#kh-headless -- list                # find testbar.* targets
+nix run .#kh-headless -- show testbar.volume # methods on the volume tile
+nix run .#kh-headless -- call testbar.volume setMuted true
+nix run .#kh-headless -- grim "0,0 3840x32" muted-bar.png
+```
+
+The final command echoes `/tmp/kh-headless/out/muted-bar.png`.
+
+## App config table
+
+| App | Test config package | IPC target prefix | Notes |
+|---|---|---|---|
+| kh-bar | `.#kh-bar-headless` | `testbar` (root) + `testbar.<plugin>` | Dropdowns are addressable as `testbar.stats`, `testbar.controlcenter`. See [references/kh-bar.md](references/kh-bar.md) for crop sizing and dropdown variants. |
+| kh-cliphist | `.#kh-cliphist` | `cliphist` (`toggle`) | Reuses the dev config (no test overrides needed). |
+| kh-launcher | `.#kh-launcher` | `launcher` (`toggle`) | Reuses the dev config. |
+| kh-osd | `.#kh-osd` | `osd` (`showVolume N`, `showMuted`) | OSD popup at bottom-center, fades after 2s. Crop suggestion: `1720,2000 400x100`. |
+| kh-window-inspector | `.#kh-window-inspector` | `window-inspector` (`toggle`) | Hyprland-only — finally captureable in this VM. |
+| kh-view | `.#kh-view` | — | Used as the *display* target by `show-image`; rarely needs to be screenshotted. |
+
+For most apps the *dev* config is the test config. Only `kh-bar` needs
+overrides (the test bar is pinned to `Virtual-1` and points its
+`/proc`/`/sys` plugins at fake fixtures under `/run/kh-headless`).
+
+## Settling
+
+For dropdowns and other content with dynamic geometry, poll a height
+property until two consecutive reads agree before grim'ing. See
+[references/kh-bar.md](references/kh-bar.md) for the kh-bar pattern.
+For OSD-style popups that animate via opacity, a 0.4 s sleep is
+enough — they don't change size.
 
 ## References
 
-Read the reference for the specific task — don't load them all up front.
-
 | Task | Reference |
 |---|---|
-| Capture one or more shots of a single app | [pipeline.md](references/pipeline.md) — bash pipeline, readiness probe, timing table, multi-shot, fonts |
-| Screenshot kh-bar (dynamic crop, popup settling) | [kh-bar.md](references/kh-bar.md) |
+| Screenshot kh-bar (dynamic crop, dropdown variants) | [kh-bar.md](references/kh-bar.md) |
 | Compare how the UI looked across git revisions | [compare-revisions.md](references/compare-revisions.md) |
-| Compare multiple **uncommitted** plan variations (A/B/C) | [compare-plans.md](references/compare-plans.md) — includes worktree layout and Agent parallelisation |
+| Compare uncommitted plan variations (A/B/C) | [compare-plans.md](references/compare-plans.md) |
 | Display captured shots to the user | Use the `show-image` skill. |

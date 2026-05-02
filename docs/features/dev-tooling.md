@@ -3,13 +3,38 @@
 Improvements to the Claude skills and agentic development workflow.
 
 - [1] ✅ `screenshot` skill passes labels to `kh-view` *(implement together with [File Viewer → optional pane labels](view.md))*
-- [2] ⬜ Headless Hyprland for workspace preview screenshots — see [Notes](#notes)
+- [2] ✅ Headless Hyprland for workspace preview screenshots — see [Notes](#notes)
 
 ## Notes
 
 **Headless Hyprland** *([2])* — `kh-bar`'s Workspaces plugin uses
 `Quickshell.Hyprland` types and `ScreencopyView`, which require a live
-Hyprland session; Sway headless can't drive them.
+Hyprland session; Sway headless can't drive them. Same applies to
+`kh-window-inspector`.
+
+Solved by `src/test/`: a NixOS microvm running Hyprland on a vkms
+virtual DRM device. The host-side `kh-headless` CLI sends primitive
+ops (load / call / prop / show / list / grim / status / kill) over a
+virtiofs share. The harness inside the VM dispatches them and writes
+PNGs back to the host.
+
+Boot the VM once:
+
+```sh
+nix run .#kh-headless-daemon
+```
+
+Drive it from any other terminal:
+
+```sh
+cfg=$(nix build .#kh-bar-headless --no-link --print-out-paths)
+nix run .#kh-headless -- load "$cfg"
+nix run .#kh-headless -- call testbar.volume setMuted true
+nix run .#kh-headless -- grim "0,0 3840x32" muted-bar.png
+```
+
+The screenshot skill (`.claude/skills/screenshot/`) routes through this
+flow — see SKILL.md.
 
 **Dead ends already tried** (don't bother):
 
@@ -21,15 +46,6 @@ Hyprland session; Sway headless can't drive them.
   [`hyprtester`](https://github.com/hyprwm/Hyprland/tree/main/hyprtester) CI framework,
   but creates no Wayland display socket; Hyprland's IPC socket exists but Quickshell
   can't connect as a Wayland client. Only useful for testing Hyprland internals directly.
-
-**Fix:** `boot.kernelModules = [ "vkms" ]` in NixOS config. VKMS is a
-virtual kernel DRM device with no physical output; Hyprland's DRM backend
-accepts it and Aquamarine initialises fully, including creating a Wayland
-display socket for clients to connect.
-
-**Implementation sketch** (once VKMS is loaded): add `--compositor hyprland`
-to `nix run .#screenshot`; launch with `WAYLAND_DISPLAY`, `DISPLAY`, and
-`HYPRLAND_INSTANCE_SIGNATURE` unset; detect the Wayland socket at
-`$XDG_RUNTIME_DIR/wayland-*` and IPC sig at `$XDG_RUNTIME_DIR/hypr/<sig>/`;
-seed fake windows via `exec-once = [workspace N] weston-simple-shm` so
-`ScreencopyView` has something to capture.
+- Running `Hyprland` directly without `start-hyprland` — works, but the
+  on-screen "started without start-hyprland" CHyprError overlay covers
+  the right half of the bar in screenshots.

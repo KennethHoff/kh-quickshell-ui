@@ -1,13 +1,13 @@
 # Test infrastructure entry point. Wires the test qs configs, mocks,
-# Hyprland config, harness, NixOS test VM, and host-side daemon + kh-test
+# Hyprland config, harness, NixOS test VM, and host-side daemon + kh-headless
 # CLI into a single attrset consumed by flake.nix.
 #
 # Returns:
 #   nixosConfig    — nixosSystem result (declares the test VM)
 #   runner         — the microvm runner derivation
-#   testConfigs    — { kh-bar-vm-test = <derivation>; ... }
-#   daemonApp      — flake `app` for kh-test-vm-daemon
-#   khTestApp      — flake `app` for kh-test (single primitive CLI)
+#   testConfigs    — { kh-bar-headless = <derivation>; ... }
+#   daemonApp      — flake `app` for kh-headless-daemon
+#   khTestApp      — flake `app` for kh-headless (single primitive CLI)
 {
   pkgs,
   lib,
@@ -75,7 +75,7 @@ let
 
   khTestApp = mkApp (
     let
-      pkg = import ./kh-test.nix { inherit pkgs; };
+      pkg = import ./kh-headless.nix { inherit pkgs; };
     in
     lib.getExe pkg
   );

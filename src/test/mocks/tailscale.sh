@@ -7,8 +7,8 @@ case "$*" in
   "BackendState": "Running",
   "Self": {
     "ID": "self",
-    "HostName": "khtest",
-    "DNSName": "khtest.tail-mock.ts.net.",
+    "HostName": "kh-headless",
+    "DNSName": "kh-headless.tail-mock.ts.net.",
     "TailscaleIPs": ["100.64.1.10"],
     "Online": true
   },

@@ -26,7 +26,7 @@ class Root(ServiceInterface):
 
     @dbus_property(access=PropertyAccess.READ)
     def Identity(self) -> "s":
-        return "kh-test mock player"
+        return "kh-headless mock player"
 
     @dbus_property(access=PropertyAccess.READ)
     def DesktopEntry(self) -> "s":

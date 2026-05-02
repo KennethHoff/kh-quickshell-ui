@@ -33,7 +33,7 @@ let
       '') mocks
     );
 in
-pkgs.runCommand "kh-test-mocks" { } ''
+pkgs.runCommand "kh-headless-mocks" { } ''
   mkdir -p $out/bin
   ${install "#!/usr/bin/env bash" "#!${lib.getExe' pkgs.bash "bash"}" shellMocks}
   ${install "#!/usr/bin/env python3" "#!${lib.getExe' py "python3"}" pythonMocks}

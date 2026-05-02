@@ -1,32 +1,32 @@
-# Host-side CLI for the kh-test VM. One binary, one operation per call.
-# Drops a request into /tmp/khtest-current/cmd/, polls for the .done
+# Host-side CLI for the kh-headless VM. One binary, one operation per call.
+# Drops a request into /tmp/kh-headless/cmd/, polls for the .done
 # sentinel, prints stdout, exits non-zero on .err.
 #
 # Usage:
-#   kh-test load <config-store-path>     boot quickshell with that config
-#   kh-test kill                         stop quickshell
-#   kh-test call <target> <method> [args...]
-#   kh-test prop <target> <prop> [<value>]
-#   kh-test show [<target>]              introspect IPC surface
-#   kh-test list                         list active IPC targets
-#   kh-test grim "<x,y wxh>" [name]      capture region; PNG saved to
-#                                         /tmp/khtest-current/out/<name>
+#   kh-headless load <config-store-path>     boot quickshell with that config
+#   kh-headless kill                         stop quickshell
+#   kh-headless call <target> <method> [args...]
+#   kh-headless prop <target> <prop> [<value>]
+#   kh-headless show [<target>]              introspect IPC surface
+#   kh-headless list                         list active IPC targets
+#   kh-headless grim "<x,y wxh>" [name]      capture region; PNG saved to
+#                                         /tmp/kh-headless/out/<name>
 #                                         (default <uuid>.png), printed on
 #                                         stdout as an absolute path
-#   kh-test status                       running <config> | idle
+#   kh-headless status                       running <config> | idle
 #
 # Agent flow ("screenshot kh-bar with volume muted"):
-#   $ cfg=$(nix build .#kh-bar-vm-test --no-link --print-out-paths)
-#   $ kh-test load "$cfg"
-#   $ kh-test list                       # discover testbar.* targets
-#   $ kh-test show testbar.volume        # see methods
-#   $ kh-test call testbar.volume setMuted true
-#   $ kh-test grim "0,0 3840x32" muted-bar.png
+#   $ cfg=$(nix build .#kh-bar-headless --no-link --print-out-paths)
+#   $ kh-headless load "$cfg"
+#   $ kh-headless list                       # discover testbar.* targets
+#   $ kh-headless show testbar.volume        # see methods
+#   $ kh-headless call testbar.volume setMuted true
+#   $ kh-headless grim "0,0 3840x32" muted-bar.png
 {
   pkgs,
 }:
 pkgs.writeShellApplication {
-  name = "kh-test";
+  name = "kh-headless";
   runtimeInputs = [
     pkgs.coreutils
     pkgs.util-linux
@@ -34,20 +34,20 @@ pkgs.writeShellApplication {
   text = ''
     set -eu
 
-    SHARE=/tmp/khtest-current
+    SHARE=/tmp/kh-headless
     READY="$SHARE/state/ready"
 
     if [[ ! -f "$READY" ]]; then
       cat >&2 <<EOF
-    kh-test: daemon not ready (no $READY).
-      Start it first:  nix run .#kh-test-vm-daemon
+    kh-headless: daemon not ready (no $READY).
+      Start it first:  nix run .#kh-headless-daemon
     EOF
       exit 2
     fi
 
     if [[ $# -lt 1 ]]; then
       cat >&2 <<EOF
-    usage: kh-test <op> [args...]
+    usage: kh-headless <op> [args...]
       ops: load <config> | kill | call <target> <method> [args] |
            prop <target> <prop> [value] | show [target] | list |
            grim "<x,y wxh>" [name] | status
@@ -74,7 +74,7 @@ pkgs.writeShellApplication {
     deadline=$(( $(date +%s) + 30 ))
     while [[ ! -f "$SHARE/out/$uuid.done" ]]; do
       if (( $(date +%s) > deadline )); then
-        echo "kh-test: timeout (no $SHARE/out/$uuid.done after 30s)" >&2
+        echo "kh-headless: timeout (no $SHARE/out/$uuid.done after 30s)" >&2
         exit 1
       fi
       sleep 0.1

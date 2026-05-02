@@ -4,9 +4,9 @@
 # children so SIGTERM teardown is leak-free.
 #
 # Refuses to start a second daemon while one is already running — a lock
-# file under /tmp/khtest-current/state/daemon.pid encodes the live PID.
+# file under /tmp/kh-headless/state/daemon.pid encodes the live PID.
 #
-# The share path is hardcoded at /tmp/khtest-current to match what's baked
+# The share path is hardcoded at /tmp/kh-headless to match what's baked
 # into the VM's microvm.shares config.
 #
 # Why we don't use the runner's bundled `virtiofsd-run`: that wrapper is a
@@ -20,14 +20,14 @@
   virtiofsd,
 }:
 pkgs.writeShellApplication {
-  name = "kh-test-vm-daemon";
+  name = "kh-headless-daemon";
   runtimeInputs = [ pkgs.coreutils ];
   text = ''
     set -eu
 
     if [[ ! -r /dev/kvm ]]; then
       cat >&2 <<'EOF'
-    kh-test-vm-daemon: /dev/kvm not available.
+    kh-headless-daemon: /dev/kvm not available.
       The VM is built for KVM acceleration. On NixOS, ensure the host has:
         boot.kernelModules = [ "kvm-amd" ];   # or kvm-intel
       and that your user is in the 'kvm' group.
@@ -36,14 +36,14 @@ pkgs.writeShellApplication {
       exit 2
     fi
 
-    SHARE=/tmp/khtest-current
+    SHARE=/tmp/kh-headless
     mkdir -p "$SHARE/cmd" "$SHARE/out" "$SHARE/state"
 
     PIDFILE="$SHARE/state/daemon.pid"
     if [[ -f "$PIDFILE" ]]; then
       old_pid=$(cat "$PIDFILE" 2>/dev/null || echo)
       if [[ -n "$old_pid" ]] && kill -0 "$old_pid" 2>/dev/null; then
-        echo "kh-test-vm-daemon: already running (pid $old_pid)" >&2
+        echo "kh-headless-daemon: already running (pid $old_pid)" >&2
         echo "  stop it first with: kill $old_pid" >&2
         exit 1
       fi
@@ -59,7 +59,7 @@ pkgs.writeShellApplication {
           "$SHARE/state/harness.log" "$SHARE/state/hypr.log" \
           "$SHARE/state/probe.log" "$SHARE/state/virtiofsd.log"
 
-    WORKDIR=$(mktemp -d -t khtest-vm-XXXXXX)
+    WORKDIR=$(mktemp -d -t kh-headless-vm-XXXXXX)
     cd "$WORKDIR"
 
     declare -a VFPIDS=()
@@ -114,12 +114,12 @@ pkgs.writeShellApplication {
         sleep 0.1
       done
       if [[ ! -S "$sock" ]]; then
-        echo "kh-test-vm-daemon: virtiofsd socket $sock never appeared (see $local_log)" >&2
+        echo "kh-headless-daemon: virtiofsd socket $sock never appeared (see $local_log)" >&2
         exit 1
       fi
     done
 
-    echo "kh-test-vm-daemon: share at $SHARE — booting VM (Ctrl-C to stop)" >&2
+    echo "kh-headless-daemon: share at $SHARE — booting VM (Ctrl-C to stop)" >&2
     ${lib.getExe' vmRunner "microvm-run"} &
     QEMU_PID=$!
     wait "$QEMU_PID"

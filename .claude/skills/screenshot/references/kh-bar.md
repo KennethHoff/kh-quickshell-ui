@@ -1,53 +1,80 @@
 # kh-bar screenshots
 
-The dev bar uses ipcPrefix `devbar`. The root target (`devbar`) exposes
-two queries that make cropping and settling-detection precise:
+The test bar uses ipcPrefix `testbar`. The root target (`testbar`)
+exposes two queries that make cropping and settling-detection precise:
 
 | Call | Returns |
 |---|---|
-| `devbar getHeight` | Visible bar footprint in px — bar height plus the tallest currently-open dropdown popup. |
-| `devbar getWidth` | Bar width in px — follows the screen (the bar anchors left+right). |
+| `testbar getHeight` | Visible bar footprint in px — bar height plus the tallest currently-open dropdown popup. |
+| `testbar getWidth` | Bar width in px (3840 on the headless VM's vkms output). |
 
-Plugins sit under `devbar.<plugin>` (e.g. `devbar.volume`). Groups/dropdowns
-sit under `devbar.<ipcName>` and expose `toggle`/`open`/`close`/`isOpen`
-(e.g. `devbar.controlcenter open`).
+Plugins sit under `testbar.<plugin>` — e.g. `testbar.volume`,
+`testbar.workspaces`, `testbar.media`, `testbar.notifications`.
+Groups/dropdowns sit under `testbar.<ipcName>` and expose
+`toggle`/`open`/`close`/`isOpen` — the test bar exposes
+`testbar.stats` and `testbar.controlcenter`.
+
+Run `kh-headless show` to dump the full surface, or `kh-headless show
+testbar.<target>` to filter to one target's methods.
+
+## Standard variants
+
+```bash
+cfg=$(nix build .#kh-bar-headless --no-link --print-out-paths)
+nix run .#kh-headless -- load "$cfg"
+
+# Chrome only (no dropdowns open).
+nix run .#kh-headless -- call testbar.stats         close
+nix run .#kh-headless -- call testbar.controlcenter close
+# … settle, then capture (see Dynamic crop below).
+
+# Stats dropdown open.
+nix run .#kh-headless -- call testbar.controlcenter close
+nix run .#kh-headless -- call testbar.stats open
+
+# Controlcenter dropdown open.
+nix run .#kh-headless -- call testbar.stats         close
+nix run .#kh-headless -- call testbar.controlcenter open
+```
 
 ## Dynamic crop
 
-Always prefer sizing the crop from the live IPC — no guessing, no wasted
-pixels, and the shot resizes automatically when popups open or close.
+Always size the crop from live IPC — no guessing, and the shot
+auto-resizes when popups open or close.
 
 ```bash
-h=$("$qs" ipc --pid "$QPID" call devbar getHeight)
-w=$("$qs" ipc --pid "$QPID" call devbar getWidth)
-"$grim" -g "0,0 ${w}x${h}" "$out"
+h=$(nix run .#kh-headless -- call testbar getHeight)
+w=$(nix run .#kh-headless -- call testbar getWidth)
+nix run .#kh-headless -- grim "0,0 ${w}x${h}" bar.png
 ```
 
-Re-read between shots — `getHeight` changes with dropdown state.
+Re-read `getHeight` between shots — it changes with dropdown state.
 
-## Settling via getHeight (better than a fixed sleep)
+## Settling via getHeight
 
-`getHeight` reflects the rendered popup's `implicitHeight`, so a stable
-value for two consecutive reads means the popup has committed. Poll it
-instead of guessing a sleep duration:
+`getHeight` reflects the rendered popup's `implicitHeight`, so a
+stable value across two consecutive reads means the popup has
+committed. Poll it instead of guessing a fixed sleep:
 
 ```bash
 prev=""; cur=""
 for _ in $(seq 30); do
-  cur=$("$qs" ipc --pid "$QPID" call devbar getHeight)
+  cur=$(nix run .#kh-headless -- call testbar getHeight)
   [[ "$cur" == "$prev" && -n "$cur" ]] && break
-  prev=$cur; sleep 0.1
+  prev=$cur
+  sleep 0.1
 done
 ```
 
-## Readiness probe
+## Performance note
 
-Use `devbar getHeight` as the startup readiness probe too — it's a safe
-query with no side effects and it returns as soon as the bar's IPC is up.
+`nix run .#kh-headless` rebuilds the wrapper on every invocation while
+the flake is dirty — fine for one-off shots, painful in a loop. For
+multi-shot sequences resolve the binary once:
 
 ```bash
-for i in $(seq 80); do
-  sleep 0.1
-  "$qs" ipc --pid "$QPID" call devbar getHeight >/dev/null 2>&1 && break
-done
+khh=$(nix eval --raw .#apps.x86_64-linux.kh-headless.program)
+"$khh" load "$cfg"
+"$khh" call testbar.stats open
+# …
 ```
