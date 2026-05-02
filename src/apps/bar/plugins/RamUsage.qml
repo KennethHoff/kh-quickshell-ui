@@ -8,7 +8,8 @@ BarPlugin {
     id: root
     ipcName: "ram"
 
-    property int interval: 2000
+    property int    interval: 2000
+    property string path:     "/proc/meminfo"
 
     readonly property alias totalKb:     state.totalKb
     readonly property alias availableKb: state.availableKb
@@ -57,7 +58,7 @@ BarPlugin {
 
     FileView {
         id: _fv
-        path: "/proc/meminfo"
+        path: root.path
         blockAllReads: true
     }
 

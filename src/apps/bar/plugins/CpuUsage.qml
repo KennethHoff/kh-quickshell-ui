@@ -8,7 +8,8 @@ BarPlugin {
     id: root
     ipcName: "cpu"
 
-    property int interval: 2000
+    property int    interval: 2000
+    property string path:     "/proc/stat"
 
     readonly property alias usage: state.usage
 
@@ -49,7 +50,7 @@ BarPlugin {
 
     FileView {
         id: _fv
-        path: "/proc/stat"
+        path: root.path
         blockAllReads: true
     }
 

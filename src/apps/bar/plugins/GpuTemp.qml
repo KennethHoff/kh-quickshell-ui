@@ -13,8 +13,9 @@ BarPlugin {
     ipcName: "gpuTemp"
     NixBins { id: bin }
 
-    property string sensor:   "amdgpu"
-    property int    interval: 5000
+    property string sensor:    "amdgpu"
+    property int    interval:  5000
+    property string hwmonGlob: "/sys/class/hwmon/hwmon*"
 
     readonly property alias temp: state.temp
 
@@ -54,7 +55,7 @@ BarPlugin {
         running: true
         command: [
             bin.bash, "-c",
-            'for d in /sys/class/hwmon/hwmon*; do ' +
+            'for d in ' + root.hwmonGlob + '; do ' +
             '  n="$(cat "$d/name" 2>/dev/null)"; ' +
             '  t="$(cat "$d/temp1_input" 2>/dev/null)"; ' +
             '  [ -n "$t" ] && printf "%s %s\\n" "$n" "$t"; ' +
