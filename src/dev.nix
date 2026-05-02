@@ -200,6 +200,8 @@ let
 
   osdConfig = mkAppConfig { name = "osd"; };
 
+  windowInspectorConfig = mkAppConfig { name = "window-inspector"; };
+
   qs = lib.getExe' pkgs.quickshell "quickshell";
 
   mkApp = name: script: {
@@ -215,6 +217,7 @@ in
     kh-osd = osdConfig;
     kh-view = viewConfig;
     kh-launcher = launcherConfig;
+    kh-window-inspector = windowInspectorConfig;
   };
 
   apps = {
@@ -295,5 +298,23 @@ in
         }
       );
     };
+
+    kh-window-inspector = mkApp "kh-window-inspector" ''
+      ${qs} -p ${windowInspectorConfig} &
+      QS_PID=$!
+      for i in $(seq 30); do
+        sleep 0.1
+        ${qs} ipc --pid "$QS_PID" call window-inspector toggle 2>/dev/null && break
+      done
+      while [[ "$(${qs} ipc --pid "$QS_PID" prop get window-inspector showing 2>/dev/null)" == "true" ]]; do
+        sleep 0.2
+      done
+      kill "$QS_PID" 2>/dev/null
+      wait "$QS_PID" 2>/dev/null
+    '';
+
+    kh-window-inspector-daemon = mkApp "kh-window-inspector-daemon" ''
+      exec ${qs} -p ${windowInspectorConfig}
+    '';
   };
 }

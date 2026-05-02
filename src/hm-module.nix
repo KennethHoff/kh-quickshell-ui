@@ -317,6 +317,16 @@ in
       '';
     };
 
+    window-inspector.enable = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = ''
+        Enable the window inspector (kh-window-inspector) — a pick-first
+        overlay over open Hyprland windows. Toggle via:
+        qs ipc -c kh-window-inspector call window-inspector toggle
+      '';
+    };
+
     bar = {
       enable = lib.mkOption {
         type = lib.types.bool;
@@ -511,6 +521,9 @@ in
         }
         // lib.optionalAttrs config.programs.kh-ui.osd.enable {
           kh-osd = mkAppConfig { name = "osd"; };
+        }
+        // lib.optionalAttrs config.programs.kh-ui.window-inspector.enable {
+          kh-window-inspector = mkAppConfig { name = "window-inspector"; };
         };
       barCfg = config.programs.kh-ui.bar;
       barInstanceList = lib.mapAttrsToList (name: spec: {
@@ -632,6 +645,9 @@ in
           }
           // lib.optionalAttrs config.programs.kh-ui.osd.enable {
             kh-osd = mkQsService "kh-osd" { };
+          }
+          // lib.optionalAttrs config.programs.kh-ui.window-inspector.enable {
+            kh-window-inspector = mkQsService "kh-window-inspector" { };
           };
       })
     ];

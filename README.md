@@ -13,6 +13,7 @@ Everything controllable via keyboard is also controllable via [Quickshell IPC](h
 | `kh-cliphist` | Clipboard history overlay | `cliphist` | `qs ipc call cliphist toggle` |
 | `kh-view` | File / image viewer overlay | `view` | `qs ipc call view toggle` |
 | `kh-osd` | Volume on-screen display | `osd` | reacts to PipeWire automatically |
+| `kh-window-inspector` | Pick-first window inspector overlay (Hyprland-only) | `window-inspector` | `qs ipc call window-inspector toggle` |
 
 ## Quick start
 
@@ -62,6 +63,7 @@ programs.kh-ui = {
   clipboard-history.enable = true;
   view.enable = true;
   osd.enable = true;
+  window-inspector.enable = true;
 };
 ```
 
@@ -76,6 +78,7 @@ programs.kh-ui = {
 | `kh-cliphist` | Clipboard history — IPC | **[docs/reference/cliphist.md](docs/reference/cliphist.md)** |
 | `kh-view` | File/image viewer — IPC | **[docs/reference/view.md](docs/reference/view.md)** |
 | `kh-osd` | Volume OSD — configuration, keybinds, IPC | **[docs/reference/osd.md](docs/reference/osd.md)** |
+| `kh-window-inspector` | Window inspector — pick mode, keybinds, IPC | **[docs/reference/window-inspector.md](docs/reference/window-inspector.md)** |
 
 ---
 
