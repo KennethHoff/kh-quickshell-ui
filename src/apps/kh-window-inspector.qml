@@ -29,23 +29,27 @@ ShellRoot {
     NixBins   { id: bin }
 
     // ── State ─────────────────────────────────────────────────────────────────
-    property bool   showing:    false
+    property bool   showing:        false
     // "pick" (default) | "frozen" — list mode is deferred to a follow-up.
-    property string mode:       "pick"
+    property string mode:           "pick"
     // The currently picked window's address (empty when none).
-    property string pickedAddr: ""
+    property string pickedAddr:     ""
     // The picked window's full ipc record. Stored as an explicit state
     // property because `HyprlandToplevel.lastIpcObject` is updated lazily
     // and Quickshell does not always notify QML bindings when its contents
     // change — re-evaluating bindings off `pickedAddr` alone misses
     // post-refresh updates.
-    property var    pickedIpc:  null
+    property var    pickedIpc:      null
     // Frozen address — separate so unfreezing returns to live picking.
-    property string frozenAddr: ""
-    property var    frozenIpc:  null
+    property string frozenAddr:     ""
+    property var    frozenIpc:      null
+    // Details panel — secondary surface where copy / dispatch keys live.
+    // Auto-freezes on open so the cursor can move without changing the
+    // window under inspection.
+    property bool   detailsShowing: false
     // Cursor position in global Hyprland coords.
-    property int    cursorX:    0
-    property int    cursorY:    0
+    property int    cursorX:        0
+    property int    cursorY:        0
 
     // ── Hyprland event subscription — keep toplevel data live ────────────────
     Connections {
@@ -99,6 +103,17 @@ ShellRoot {
         onExited: functionality.onActiveExited()
     }
 
+    // ── Clipboard ────────────────────────────────────────────────────────────
+    Process { id: copyProc }
+
+    QtObject {
+        id: impl
+        function copyText(text: string): void {
+            copyProc.command = [bin.bash, "-c", "printf '%s' \"$1\" | " + bin.wlCopy, "--", text]
+            copyProc.running = true
+        }
+    }
+
     // ── Functionality ────────────────────────────────────────────────────────
     QtObject {
         id: functionality
@@ -110,10 +125,11 @@ ShellRoot {
         function open(): void   { root.showing = true }
         // ui+ipc — also resets mode so the next open starts in live pick.
         function close(): void  {
-            root.showing    = false
-            root.mode       = "pick"
-            root.frozenAddr = ""
-            root.frozenIpc  = null
+            root.showing        = false
+            root.mode           = "pick"
+            root.frozenAddr     = ""
+            root.frozenIpc      = null
+            root.detailsShowing = false
         }
         // ui only — fires once per layer surface when the layer becomes
         // visible. Refresh is cheap and idempotent across calls. The
@@ -294,6 +310,60 @@ ShellRoot {
         // ui+ipc
         function toggleFreeze(): void { root.mode === "frozen" ? unfreeze() : freeze() }
 
+        // ── Details panel ─────────────────────────────────────────────────────
+        // ui+ipc — opens the secondary surface where copy / dispatch keys
+        // live. Auto-freezes the picked window so the cursor can move
+        // freely without changing what the panel is acting on.
+        function openDetails(): void {
+            if (!root.pickedAddr) return
+            if (root.mode !== "frozen") freeze()
+            root.detailsShowing = true
+        }
+        // ui+ipc
+        function closeDetails(): void { root.detailsShowing = false }
+        // ipc only
+        function toggleDetails(): void {
+            root.detailsShowing ? closeDetails() : openDetails()
+        }
+
+        // ── Copy ──────────────────────────────────────────────────────────────
+        // ui only
+        // Format a windowrulev2 line for the picked window using the requested
+        // matcher field. The action is left as `<action>` so the user fills
+        // it in — there's no sensible default, and emitting `float` would
+        // surprise people who actually wanted `tile` or `move`.
+        function ruleLine(ipc, variant: string): string {
+            const cls   = ipc.initialClass || ""
+            const ttl   = ipc.initialTitle || ""
+            const pid   = ipc.pid !== undefined ? String(ipc.pid) : ""
+            const addr  = ipc.address || ""
+            const ws    = ipc.workspace ? (ipc.workspace.name || String(ipc.workspace.id)) : ""
+            const mon   = ipc.monitor !== undefined ? String(ipc.monitor) : ""
+            if (variant === "t") return "windowrulev2 = <action>, initialTitle:^" + escapeRegex(ttl) + "$"
+            if (variant === "p") return "windowrulev2 = <action>, pid:" + pid
+            if (variant === "a") return "windowrulev2 = <action>, address:" + addr
+            if (variant === "w") return "windowrulev2 = <action>, workspace:" + ws
+            if (variant === "m") return "windowrulev2 = <action>, monitor:" + mon
+            // Default ("c") — initialClass.
+            return "windowrulev2 = <action>, initialClass:^" + escapeRegex(cls) + "$"
+        }
+        // ui only
+        function escapeRegex(s: string): string {
+            return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+        }
+        // ui+ipc
+        function copyRule(variant: string): void {
+            const ipc = root.pickedIpc
+            if (!ipc) return
+            impl.copyText(ruleLine(ipc, variant))
+        }
+        // ui+ipc
+        function copyJson(): void {
+            const ipc = root.pickedIpc
+            if (!ipc) return
+            impl.copyText(JSON.stringify(ipc, null, 2))
+        }
+
         // ── Hyprland events — refresh toplevels on relevant ones ──────────────
         // ui only
         function onHyprlandEvent(ev): void {
@@ -313,12 +383,14 @@ ShellRoot {
 
         // ── Key handling (UI) ─────────────────────────────────────────────────
         // ui only
-        // Top-level keys are intentionally minimal. Window actions and
-        // copy-as-rule will hang off a future details panel rather than
-        // crowding the global namespace.
+        // Top-level keys (pick/frozen mode) are intentionally minimal:
+        // f / Esc / q / Enter. The details panel owns its own keymap so
+        // copy-as-rule and dispatch don't crowd the global namespace.
         function handleKeyEvent(event): void {
             if (event.key === Qt.Key_Shift   || event.key === Qt.Key_Control ||
                 event.key === Qt.Key_Alt     || event.key === Qt.Key_Meta) return
+
+            if (root.detailsShowing) { handleDetailsKeyEvent(event); return }
 
             if (event.key === Qt.Key_Escape || event.text === "q") {
                 close(); event.accepted = true; return
@@ -326,14 +398,51 @@ ShellRoot {
             if (event.text === "f") {
                 toggleFreeze(); event.accepted = true; return
             }
+            if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                openDetails(); event.accepted = true; return
+            }
+        }
+        // ui only
+        // Esc closes only the panel (back to pick/frozen mode). q closes
+        // the inspector entirely so the user always has a one-press exit
+        // even when buried in a sub-mode.
+        function handleDetailsKeyEvent(event): void {
+            if (event.key === Qt.Key_Escape) { closeDetails(); event.accepted = true; return }
+            if (event.text === "q")          { close();        event.accepted = true; return }
+
+            const t = event.text
+            if      (t === "c") copyRule("c")
+            else if (t === "t") copyRule("t")
+            else if (t === "p") copyRule("p")
+            else if (t === "a") copyRule("a")
+            else if (t === "w") copyRule("w")
+            else if (t === "m") copyRule("m")
+            else if (t === "J") copyJson()
+            else return
+
+            event.accepted = true
         }
 
         // ── Key handling (IPC) ────────────────────────────────────────────────
-        // ipc only
+        // ipc only — mirrors UI cascade: Esc closes the topmost surface
+        // (panel if open, inspector otherwise); q always closes inspector.
         function key(k: string): void {
             const lk = k.toLowerCase()
-            if      (lk === "escape" || lk === "esc" || lk === "q") close()
-            else if (lk === "f")                                    toggleFreeze()
+            if (lk === "escape" || lk === "esc") {
+                root.detailsShowing ? closeDetails() : close()
+                return
+            }
+            if (lk === "q") { close(); return }
+            if (lk === "f") { toggleFreeze(); return }
+            if (lk === "enter" || lk === "return") { openDetails(); return }
+            if (!root.detailsShowing) return
+            if      (lk === "c")              copyRule("c")
+            else if (lk === "t")              copyRule("t")
+            else if (lk === "p")              copyRule("p")
+            else if (lk === "a")              copyRule("a")
+            else if (lk === "w")              copyRule("w")
+            else if (lk === "m")              copyRule("m")
+            else if (k === "J" || lk === "j") copyJson()
         }
         // ipc only
         function setMode(m: string): void {
@@ -346,9 +455,10 @@ ShellRoot {
     IpcHandler {
         target: "window-inspector"
 
-        readonly property bool   showing:       root.showing
-        readonly property string mode:          root.mode
-        readonly property string pickedAddress: root.pickedAddr
+        readonly property bool   showing:        root.showing
+        readonly property string mode:           root.mode
+        readonly property string pickedAddress:  root.pickedAddr
+        readonly property bool   detailsShowing: root.detailsShowing
 
         function toggle(): void                       { functionality.toggle() }
         function open(): void                         { functionality.open() }
@@ -357,6 +467,10 @@ ShellRoot {
         function key(k: string): void                 { functionality.key(k) }
         function freeze(): void                       { functionality.freeze() }
         function unfreeze(): void                     { functionality.unfreeze() }
+        function openDetails(): void                  { functionality.openDetails() }
+        function closeDetails(): void                 { functionality.closeDetails() }
+        function copyRule(variant: string): void      { functionality.copyRule(variant) }
+        function copyJson(): void                     { functionality.copyJson() }
         function inspectActive(): void                { functionality.inspectActive() }
         function inspectByAddress(addr: string): void { functionality.inspectByAddress(addr) }
         function inspectByPid(pid: int): void         { functionality.inspectByPid(pid) }
@@ -419,7 +533,9 @@ ShellRoot {
 
             InspectorTag {
                 anchors.fill: parent
-                visible: root.showing && win.isCursorMonitor
+                // Hide the floating tag while the details panel is up;
+                // the panel re-renders the same info in a fixed location.
+                visible: root.showing && win.isCursorMonitor && !root.detailsShowing
                 ipc: root.pickedIpc
                 // Convert global cursor coords to this surface's local coords.
                 cursorX: root.cursorX - (win.monitor ? win.monitor.x : 0)
@@ -427,6 +543,24 @@ ShellRoot {
                 screenW: win.width
                 screenH: win.height
                 frozen: root.mode === "frozen"
+
+                bgColor:     cfg.color.base01
+                headerBg:    cfg.color.base02
+                textColor:   cfg.color.base05
+                mutedColor:  cfg.color.base03
+                keyColor:    cfg.color.base0D
+                warnColor:   cfg.color.base0A
+                stableColor: cfg.color.base0B
+                fontFamily:  cfg.fontFamily
+                fontSize:    cfg.fontSize
+            }
+
+            DetailsPanel {
+                anchors.fill: parent
+                // Only render on the cursor's monitor so we don't ghost
+                // the panel on every output.
+                visible: root.detailsShowing && win.isCursorMonitor
+                ipc: root.pickedIpc
 
                 bgColor:     cfg.color.base01
                 headerBg:    cfg.color.base02

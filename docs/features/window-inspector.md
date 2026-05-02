@@ -33,16 +33,17 @@ and `Esc`/`q` (close). Window actions and copy variants live in the
 details panel below; this keeps the global keymap small and avoids the
 `f`/`F` / `t`/`T` / `y`/`Y` collisions of a flat scheme.
 
-## Details Panel (secondary, planned)
+## Details Panel (secondary)
 
-A panel attached to the picked window — opened with a single key from
-pick/frozen mode — hosting all the "act on this window" affordances.
+A panel attached to the picked window — opened with `Enter` from pick
+or frozen mode — hosting all the "act on this window" affordances.
 Keybinds inside the panel are scoped to that mode, so they can be
-mnemonic without crowding the top-level namespace.
+mnemonic without crowding the top-level namespace. Auto-freezes the
+picked window on open so the cursor can move freely while you read.
 
-- [1] ⬜ Panel surface — opens on `d` (or similar) from pick/frozen mode; closes on `Esc`/`q`/the same key
-- [2] ⬜ Copy as Hyprland rule — `c` (initialClass, default), `t` (initialTitle), `p` (pid), `a` (address), `w` (workspace), `m` (monitor) emit a ready-to-paste `windowrulev2` line
-- [3] ⬜ Copy as JSON — copies the full `hyprctl clients -j` record
+- [1] ✅ Panel surface — opens on `Enter` from pick/frozen mode; `Esc` returns to pick/frozen, `q` closes the inspector entirely
+- [2] ✅ Copy as Hyprland rule — `c` (initialClass), `t` (initialTitle), `p` (pid), `a` (address), `w` (workspace), `m` (monitor) emit a ready-to-paste `windowrulev2` line with `<action>` placeholder
+- [3] ✅ Copy as JSON — `J` copies the full `hyprctl clients -j` record
 - [4] ⬜ Dispatch — close / focus / toggle floating / toggle pinned / move to workspace 1–9
 
 ## List View (secondary)
