@@ -54,19 +54,23 @@ ShellRoot {
     }
 
     // ── Cursor polling ───────────────────────────────────────────────────────
+    // A long-running shell loop streams cursorpos lines instead of the
+    // QML Timer firing a fresh `hyprctl` Process every 50 ms. The Timer
+    // approach paid the QML→Process round-trip and the hyprctl spawn cost
+    // on every tick, which capped the effective rate well below the timer
+    // interval and made the outline lag the cursor visibly. With one
+    // bash + one hyprctl child fork per tick (no QML round-trip), the
+    // sleep interval is the dominant cost and we can run at ~60 Hz.
     Process {
         id: cursorProc
-        command: [bin.hyprctl, "cursorpos"]
+        running: root.showing && root.mode === "pick"
+        command: [
+            bin.bash, "-c",
+            "while :; do " + bin.hyprctl + " cursorpos || exit 0; sleep 0.016; done"
+        ]
         stdout: SplitParser {
             onRead: (line) => functionality.onCursorRead(line)
         }
-    }
-    Timer {
-        id: cursorTimer
-        interval: 50
-        repeat: true
-        running: root.showing && root.mode === "pick"
-        onTriggered: functionality.pollCursor()
     }
 
     // ── Active-window probe (used by inspectActive) ──────────────────────────
@@ -101,17 +105,15 @@ ShellRoot {
             root.frozenIpc  = null
         }
         // ui only — fires once per layer surface when the layer becomes
-        // visible. Refresh is cheap and idempotent across calls.
+        // visible. Refresh is cheap and idempotent across calls. The
+        // cursor stream starts on its own via `cursorProc.running`.
         function onShow(): void {
             Hyprland.refreshToplevels()
-            pollCursor()
         }
         // ui only
         function onVisibleChanged(): void { if (root.showing) onShow() }
 
         // ── Cursor + hit-testing ──────────────────────────────────────────────
-        // ui only
-        function pollCursor(): void { cursorProc.running = true }
         // ui only
         // Output is "X, Y" (comma + space). Parse and update state, then
         // recompute the picked window.
