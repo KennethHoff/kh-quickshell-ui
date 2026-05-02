@@ -1,55 +1,34 @@
 // Details panel — secondary surface attached to the picked window.
 //
-// Hosts copy / dispatch keybinds in a scope where they can be mnemonic
-// without colliding with the global keymap (the inspector's top level
-// stays at f / Esc / q / Enter). Anchored at the centre of the focused
-// monitor and sized statically; the parent gates visibility on
-// `detailsShowing`.
-//
-// Auto-freezes when opened upstream, so the cursor can move freely
-// while the user reads / acts here.
+// Hosts a vim-style row navigator: `j`/`k` (or arrows) move row by
+// row, `h`/`l` jump section by section, `y` yanks the highlighted
+// row. Each row carries the value to display *and* the value to
+// yank — for matcher-capable fields that's a `windowrulev2` line,
+// for raw fields (live class/title, geometry) it's the value itself.
+// The orchestrator owns the model + selection index; this component
+// is purely presentational.
 import QtQuick
 
 Item {
     id: root
 
     // ── Inputs ────────────────────────────────────────────────────────────────
-    property var ipc: null
+    property var rows:          []   // [{ section, label, value, yank }]
+    property int selectedIndex: 0
 
     // ── Style ─────────────────────────────────────────────────────────────────
-    property color  bgColor:     "#181825"
-    property color  headerBg:    "#313244"
-    property color  textColor:   "#cdd6f4"
-    property color  mutedColor:  "#6c7086"
-    property color  keyColor:    "#89b4fa"
-    property color  warnColor:   "#f9e2af"
-    property color  stableColor: "#a6e3a1"
-    property string fontFamily:  "monospace"
-    property int    fontSize:    14
+    property color  bgColor:        "#181825"
+    property color  headerBg:       "#313244"
+    property color  textColor:      "#cdd6f4"
+    property color  mutedColor:     "#6c7086"
+    property color  keyColor:       "#89b4fa"
+    property color  warnColor:      "#f9e2af"
+    property color  stableColor:    "#a6e3a1"
+    property color  highlightColor: "#45475a"
+    property string fontFamily:     "monospace"
+    property int    fontSize:       14
 
-    // ── Pre-computed strings — same shape as InspectorTag ─────────────────────
-    readonly property string _initialClass: (ipc && ipc.initialClass) || ""
-    readonly property string _liveClass:    (ipc && ipc.class)        || ""
-    readonly property string _initialTitle: (ipc && ipc.initialTitle) || ""
-    readonly property string _liveTitle:    (ipc && ipc.title)        || ""
-    readonly property string _address:      (ipc && ipc.address)      || ""
-    readonly property string _pid:          ipc && ipc.pid !== undefined ? String(ipc.pid) : ""
-    readonly property string _wsName:       ipc && ipc.workspace ? (ipc.workspace.name || String(ipc.workspace.id)) : ""
-    readonly property string _monitor:      ipc && ipc.monitor !== undefined ? String(ipc.monitor) : ""
-    readonly property string _flags:        {
-        if (!ipc) return ""
-        const f = []
-        if (ipc.floating) f.push("floating")
-        if (ipc.fullscreen) f.push("fullscreen")
-        if (ipc.pinned) f.push("pinned")
-        return f.length ? f.join(" · ") : "—"
-    }
-    readonly property string _atGlobal:   ipc && ipc.at   ? ipc.at[0]   + "," + ipc.at[1]   : ""
-    readonly property string _sizeGlobal: ipc && ipc.size ? ipc.size[0] + "x" + ipc.size[1] : ""
-
-    function _show(s) { return s !== "" ? s : "—" }
-
-    readonly property int _panelW: 520
+    readonly property int _panelW: 560
 
     // ── Backdrop — dim everything else on this surface ───────────────────────
     Rectangle {
@@ -73,7 +52,7 @@ Item {
             anchors.right: parent.right
             anchors.top: parent.top
             anchors.margins: 12
-            spacing: 10
+            spacing: 6
 
             // Header
             Row {
@@ -87,7 +66,7 @@ Item {
                     font.letterSpacing: 1
                 }
                 Text {
-                    visible: !root.ipc
+                    visible: root.rows.length === 0
                     text: "no window picked"
                     color: root.mutedColor
                     font.family: root.fontFamily
@@ -95,118 +74,86 @@ Item {
                 }
             }
 
-            // Class column
-            Row {
-                spacing: 16
-                Column {
-                    spacing: 1
+            // Section + row repeater. Section header is emitted whenever
+            // the row's section name differs from the previous row's,
+            // so we don't have to maintain a parallel "sections" array.
+            Repeater {
+                model: root.rows
+                delegate: Item {
+                    id: rowItem
+                    required property var modelData
+                    required property int index
+
+                    readonly property bool _isSectionStart:
+                        index === 0 || root.rows[index - 1].section !== modelData.section
+                    readonly property bool _isSelected: index === root.selectedIndex
+                    readonly property int  _headerH: _isSectionStart ? 22 : 0
+
+                    width: contentCol.width
+                    height: _headerH + 22
+
                     Text {
-                        text: "initialClass (rule-stable)"
-                        color: root.stableColor
+                        visible: rowItem._isSectionStart
+                        anchors.left: parent.left
+                        anchors.top: parent.top
+                        anchors.topMargin: rowItem.index === 0 ? 0 : 8
+                        text: rowItem.modelData.section.toUpperCase()
+                        color: root.keyColor
                         font.family: root.fontFamily
                         font.pixelSize: root.fontSize - 4
-                    }
-                    Text {
-                        text: root._show(root._initialClass)
-                        color: root.textColor
-                        font.family: root.fontFamily
-                        font.pixelSize: root.fontSize
                         font.bold: true
+                        font.letterSpacing: 1
                     }
-                }
-                Column {
-                    spacing: 1
-                    Text {
-                        text: "class (live)"
-                        color: root.mutedColor
-                        font.family: root.fontFamily
-                        font.pixelSize: root.fontSize - 4
+
+                    // Highlight bg — extends the full panel width so the
+                    // selected row reads as a clear cursor in a list.
+                    Rectangle {
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.bottom: parent.bottom
+                        height: 22
+                        color: rowItem._isSelected ? root.highlightColor : "transparent"
+                        radius: 3
+
+                        // Subtle left-edge caret on the selected row, for
+                        // an extra signal beyond the bg highlight.
+                        Rectangle {
+                            visible: rowItem._isSelected
+                            anchors.left: parent.left
+                            anchors.top: parent.top
+                            anchors.bottom: parent.bottom
+                            width: 3
+                            color: root.warnColor
+                            radius: 1
+                        }
+
+                        Row {
+                            anchors.left: parent.left
+                            anchors.leftMargin: 10
+                            anchors.verticalCenter: parent.verticalCenter
+                            spacing: 12
+
+                            Text {
+                                text: rowItem.modelData.label
+                                color: rowItem.modelData.section === "Identity"
+                                       && (rowItem.modelData.label === "initialClass"
+                                        || rowItem.modelData.label === "initialTitle")
+                                       ? root.stableColor : root.mutedColor
+                                font.family: root.fontFamily
+                                font.pixelSize: root.fontSize - 2
+                                width: 130
+                            }
+                            Text {
+                                text: rowItem.modelData.value || "—"
+                                color: root.textColor
+                                font.family: root.fontFamily
+                                font.pixelSize: root.fontSize - 1
+                                font.bold: rowItem._isSelected
+                                elide: Text.ElideRight
+                                width: card.width - 180
+                            }
+                        }
                     }
-                    Text {
-                        text: root._show(root._liveClass)
-                        color: root.textColor
-                        font.family: root.fontFamily
-                        font.pixelSize: root.fontSize
-                    }
-                }
-            }
-
-            // Title column
-            Column {
-                spacing: 1
-                Text {
-                    text: "initialTitle (rule-stable)"
-                    color: root.stableColor
-                    font.family: root.fontFamily
-                    font.pixelSize: root.fontSize - 4
-                }
-                Text {
-                    text: root._show(root._initialTitle)
-                    color: root.textColor
-                    font.family: root.fontFamily
-                    font.pixelSize: root.fontSize
-                    elide: Text.ElideRight
-                    width: root._panelW - 24
-                }
-                Text {
-                    text: "title (live)"
-                    color: root.mutedColor
-                    font.family: root.fontFamily
-                    font.pixelSize: root.fontSize - 4
-                    topPadding: 4
-                }
-                Text {
-                    text: root._show(root._liveTitle)
-                    color: root.textColor
-                    font.family: root.fontFamily
-                    font.pixelSize: root.fontSize
-                    elide: Text.ElideRight
-                    width: root._panelW - 24
-                }
-            }
-
-            // Identity row
-            Row {
-                spacing: 18
-                Column {
-                    spacing: 1
-                    Text { text: "pid"; color: root.mutedColor; font.family: root.fontFamily; font.pixelSize: root.fontSize - 4 }
-                    Text { text: root._show(root._pid); color: root.textColor; font.family: root.fontFamily; font.pixelSize: root.fontSize - 1 }
-                }
-                Column {
-                    spacing: 1
-                    Text { text: "address"; color: root.mutedColor; font.family: root.fontFamily; font.pixelSize: root.fontSize - 4 }
-                    Text { text: root._show(root._address); color: root.textColor; font.family: root.fontFamily; font.pixelSize: root.fontSize - 1 }
-                }
-                Column {
-                    spacing: 1
-                    Text { text: "workspace"; color: root.mutedColor; font.family: root.fontFamily; font.pixelSize: root.fontSize - 4 }
-                    Text { text: root._show(root._wsName); color: root.textColor; font.family: root.fontFamily; font.pixelSize: root.fontSize - 1 }
-                }
-                Column {
-                    spacing: 1
-                    Text { text: "monitor"; color: root.mutedColor; font.family: root.fontFamily; font.pixelSize: root.fontSize - 4 }
-                    Text { text: root._show(root._monitor); color: root.textColor; font.family: root.fontFamily; font.pixelSize: root.fontSize - 1 }
-                }
-            }
-
-            // Geometry row
-            Row {
-                spacing: 18
-                Column {
-                    spacing: 1
-                    Text { text: "at (global)"; color: root.mutedColor; font.family: root.fontFamily; font.pixelSize: root.fontSize - 4 }
-                    Text { text: root._show(root._atGlobal); color: root.textColor; font.family: root.fontFamily; font.pixelSize: root.fontSize - 1 }
-                }
-                Column {
-                    spacing: 1
-                    Text { text: "size"; color: root.mutedColor; font.family: root.fontFamily; font.pixelSize: root.fontSize - 4 }
-                    Text { text: root._show(root._sizeGlobal); color: root.textColor; font.family: root.fontFamily; font.pixelSize: root.fontSize - 1 }
-                }
-                Column {
-                    spacing: 1
-                    Text { text: "flags"; color: root.mutedColor; font.family: root.fontFamily; font.pixelSize: root.fontSize - 4 }
-                    Text { text: root._show(root._flags); color: root.warnColor; font.family: root.fontFamily; font.pixelSize: root.fontSize - 1 }
                 }
             }
 
@@ -217,57 +164,13 @@ Item {
                 color: root.headerBg
             }
 
-            // Copy menu
-            Column {
-                width: parent.width
-                spacing: 4
-
-                Text {
-                    text: "COPY AS WINDOWRULEV2"
-                    color: root.keyColor
-                    font.family: root.fontFamily
-                    font.pixelSize: root.fontSize - 4
-                    font.bold: true
-                    font.letterSpacing: 1
-                }
-
-                Repeater {
-                    model: [
-                        { key: "c", desc: "initialClass" },
-                        { key: "t", desc: "initialTitle" },
-                        { key: "p", desc: "pid" },
-                        { key: "a", desc: "address" },
-                        { key: "w", desc: "workspace" },
-                        { key: "m", desc: "monitor" },
-                        { key: "J", desc: "full record (JSON)" }
-                    ]
-                    delegate: Row {
-                        required property var modelData
-                        spacing: 12
-                        Text {
-                            text: modelData.key
-                            color: root.keyColor
-                            font.family: root.fontFamily
-                            font.pixelSize: root.fontSize
-                            width: 24
-                        }
-                        Text {
-                            text: modelData.desc
-                            color: root.textColor
-                            font.family: root.fontFamily
-                            font.pixelSize: root.fontSize - 1
-                        }
-                    }
-                }
-            }
-
             // Footer
             Text {
-                text: "Esc back · q quit"
+                text: "j/k row · h/l section · y yank · Esc back · q quit"
                 color: root.mutedColor
                 font.family: root.fontFamily
                 font.pixelSize: root.fontSize - 4
-                topPadding: 4
+                topPadding: 6
             }
         }
     }

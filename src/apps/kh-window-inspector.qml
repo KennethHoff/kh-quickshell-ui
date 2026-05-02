@@ -47,6 +47,9 @@ ShellRoot {
     // Auto-freezes on open so the cursor can move without changing the
     // window under inspection.
     property bool   detailsShowing: false
+    // Highlighted row inside the details panel. Reset to 0 on every
+    // open. The panel binds its visual selection to this index.
+    property int    panelSelected:  0
     // Cursor position in global Hyprland coords.
     property int    cursorX:        0
     property int    cursorY:        0
@@ -317,6 +320,7 @@ ShellRoot {
         function openDetails(): void {
             if (!root.pickedAddr) return
             if (root.mode !== "frozen") freeze()
+            root.panelSelected  = 0
             root.detailsShowing = true
         }
         // ui+ipc
@@ -326,42 +330,106 @@ ShellRoot {
             root.detailsShowing ? closeDetails() : openDetails()
         }
 
-        // ── Copy ──────────────────────────────────────────────────────────────
-        // ui only
-        // Format a windowrulev2 line for the picked window using the requested
-        // matcher field. The action is left as `<action>` so the user fills
-        // it in — there's no sensible default, and emitting `float` would
-        // surprise people who actually wanted `tile` or `move`.
-        function ruleLine(ipc, variant: string): string {
+        // ── Row model ─────────────────────────────────────────────────────────
+        // Build the flat row list the panel renders and navigates over. Each
+        // row carries the value to display *and* the value to yank — for
+        // matcher-capable fields that's a `windowrulev2` line, for raw
+        // fields (live class/title, geometry) it's the value itself.
+        function buildRows(ipc): var {
+            if (!ipc) return []
             const cls   = ipc.initialClass || ""
+            const lcls  = ipc.class        || ""
             const ttl   = ipc.initialTitle || ""
+            const lttl  = ipc.title        || ""
             const pid   = ipc.pid !== undefined ? String(ipc.pid) : ""
             const addr  = ipc.address || ""
             const ws    = ipc.workspace ? (ipc.workspace.name || String(ipc.workspace.id)) : ""
             const mon   = ipc.monitor !== undefined ? String(ipc.monitor) : ""
-            if (variant === "t") return "windowrulev2 = <action>, initialTitle:^" + escapeRegex(ttl) + "$"
-            if (variant === "p") return "windowrulev2 = <action>, pid:" + pid
-            if (variant === "a") return "windowrulev2 = <action>, address:" + addr
-            if (variant === "w") return "windowrulev2 = <action>, workspace:" + ws
-            if (variant === "m") return "windowrulev2 = <action>, monitor:" + mon
-            // Default ("c") — initialClass.
-            return "windowrulev2 = <action>, initialClass:^" + escapeRegex(cls) + "$"
+            const atG   = ipc.at   ? ipc.at[0]   + "," + ipc.at[1]   : ""
+            const sizeG = ipc.size ? ipc.size[0] + "x" + ipc.size[1] : ""
+            const flags = (function () {
+                const f = []
+                if (ipc.floating)   f.push("floating")
+                if (ipc.fullscreen) f.push("fullscreen")
+                if (ipc.pinned)     f.push("pinned")
+                return f.length ? f.join(" · ") : ""
+            })()
+            const rule = function (kind, val, exact) {
+                if (!val) return ""
+                return "windowrulev2 = <action>, " + kind + ":"
+                    + (exact ? "^" + escapeRegex(val) + "$" : val)
+            }
+            return [
+                // Identity — rule-stable matchers come first; the live values
+                // are shown so the drift is visible but yank the raw value
+                // (rules off live class/title would silently break on retitle).
+                { section: "Identity",   label: "initialClass",  value: cls,   yank: rule("initialClass",  cls,  true)  },
+                { section: "Identity",   label: "class (live)",  value: lcls,  yank: lcls  },
+                { section: "Identity",   label: "initialTitle",  value: ttl,   yank: rule("initialTitle",  ttl,  true)  },
+                { section: "Identity",   label: "title (live)",  value: lttl,  yank: lttl  },
+                { section: "Attributes", label: "pid",           value: pid,   yank: rule("pid",       pid,   false) },
+                { section: "Attributes", label: "address",       value: addr,  yank: rule("address",   addr,  false) },
+                { section: "Attributes", label: "workspace",     value: ws,    yank: rule("workspace", ws,    false) },
+                { section: "Attributes", label: "monitor",       value: mon,   yank: rule("monitor",   mon,   false) },
+                { section: "Geometry",   label: "at (global)",   value: atG,   yank: atG   },
+                { section: "Geometry",   label: "size",          value: sizeG, yank: sizeG },
+                { section: "Geometry",   label: "flags",         value: flags || "—", yank: flags },
+                { section: "Raw",        label: "full record",   value: "(JSON)", yank: JSON.stringify(ipc, null, 2) }
+            ]
         }
-        // ui only
+        // ui only — escape regex metacharacters so initialClass / initialTitle
+        // matchers stay literal even when the value contains `.` or `(` etc.
         function escapeRegex(s: string): string {
             return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
         }
+
+        // ── Panel navigation ──────────────────────────────────────────────────
         // ui+ipc
-        function copyRule(variant: string): void {
-            const ipc = root.pickedIpc
-            if (!ipc) return
-            impl.copyText(ruleLine(ipc, variant))
+        function selectNext(): void {
+            const n = buildRows(root.pickedIpc).length
+            if (n === 0) return
+            root.panelSelected = Math.min(n - 1, root.panelSelected + 1)
         }
         // ui+ipc
-        function copyJson(): void {
-            const ipc = root.pickedIpc
-            if (!ipc) return
-            impl.copyText(JSON.stringify(ipc, null, 2))
+        function selectPrev(): void {
+            root.panelSelected = Math.max(0, root.panelSelected - 1)
+        }
+        // ui+ipc — `l`. Jump to the first row of the next section.
+        function selectNextSection(): void {
+            const rows = buildRows(root.pickedIpc)
+            if (rows.length === 0) return
+            const cur = rows[root.panelSelected].section
+            for (let i = root.panelSelected + 1; i < rows.length; i++) {
+                if (rows[i].section !== cur) { root.panelSelected = i; return }
+            }
+            // Already in the last section — jump to its end.
+            root.panelSelected = rows.length - 1
+        }
+        // ui+ipc — `h`. If not at the section's first row, jump to it;
+        // otherwise jump to the previous section's first row.
+        function selectPrevSection(): void {
+            const rows = buildRows(root.pickedIpc)
+            if (rows.length === 0) return
+            const idx = root.panelSelected
+            const cur = rows[idx].section
+            // Walk back to find this section's first row.
+            let sectionStart = idx
+            while (sectionStart > 0 && rows[sectionStart - 1].section === cur) sectionStart--
+            if (idx > sectionStart) { root.panelSelected = sectionStart; return }
+            // Already at section start — find the previous section's first row.
+            if (sectionStart === 0) return
+            const prev = rows[sectionStart - 1].section
+            let prevStart = sectionStart - 1
+            while (prevStart > 0 && rows[prevStart - 1].section === prev) prevStart--
+            root.panelSelected = prevStart
+        }
+        // ui+ipc
+        function yankSelected(): void {
+            const rows = buildRows(root.pickedIpc)
+            if (rows.length === 0) return
+            const idx = Math.max(0, Math.min(rows.length - 1, root.panelSelected))
+            const text = rows[idx].yank
+            if (text) impl.copyText(text)
         }
 
         // ── Hyprland events — refresh toplevels on relevant ones ──────────────
@@ -405,22 +473,17 @@ ShellRoot {
         // ui only
         // Esc closes only the panel (back to pick/frozen mode). q closes
         // the inspector entirely so the user always has a one-press exit
-        // even when buried in a sub-mode.
+        // even when buried in a sub-mode. hjkl + arrow keys mirror each
+        // other so non-vim users aren't punished.
         function handleDetailsKeyEvent(event): void {
             if (event.key === Qt.Key_Escape) { closeDetails(); event.accepted = true; return }
             if (event.text === "q")          { close();        event.accepted = true; return }
 
-            const t = event.text
-            if      (t === "c") copyRule("c")
-            else if (t === "t") copyRule("t")
-            else if (t === "p") copyRule("p")
-            else if (t === "a") copyRule("a")
-            else if (t === "w") copyRule("w")
-            else if (t === "m") copyRule("m")
-            else if (t === "J") copyJson()
-            else return
-
-            event.accepted = true
+            if (event.key === Qt.Key_Down  || event.text === "j") { selectNext();        event.accepted = true; return }
+            if (event.key === Qt.Key_Up    || event.text === "k") { selectPrev();        event.accepted = true; return }
+            if (event.key === Qt.Key_Left  || event.text === "h") { selectPrevSection(); event.accepted = true; return }
+            if (event.key === Qt.Key_Right || event.text === "l") { selectNextSection(); event.accepted = true; return }
+            if (event.text === "y")                               { yankSelected();      event.accepted = true; return }
         }
 
         // ── Key handling (IPC) ────────────────────────────────────────────────
@@ -436,13 +499,11 @@ ShellRoot {
             if (lk === "f") { toggleFreeze(); return }
             if (lk === "enter" || lk === "return") { openDetails(); return }
             if (!root.detailsShowing) return
-            if      (lk === "c")              copyRule("c")
-            else if (lk === "t")              copyRule("t")
-            else if (lk === "p")              copyRule("p")
-            else if (lk === "a")              copyRule("a")
-            else if (lk === "w")              copyRule("w")
-            else if (lk === "m")              copyRule("m")
-            else if (k === "J" || lk === "j") copyJson()
+            if      (lk === "j" || lk === "down")  selectNext()
+            else if (lk === "k" || lk === "up")    selectPrev()
+            else if (lk === "h" || lk === "left")  selectPrevSection()
+            else if (lk === "l" || lk === "right") selectNextSection()
+            else if (lk === "y")                   yankSelected()
         }
         // ipc only
         function setMode(m: string): void {
@@ -459,6 +520,7 @@ ShellRoot {
         readonly property string mode:           root.mode
         readonly property string pickedAddress:  root.pickedAddr
         readonly property bool   detailsShowing: root.detailsShowing
+        readonly property int    panelSelected:  root.panelSelected
 
         function toggle(): void                       { functionality.toggle() }
         function open(): void                         { functionality.open() }
@@ -469,8 +531,11 @@ ShellRoot {
         function unfreeze(): void                     { functionality.unfreeze() }
         function openDetails(): void                  { functionality.openDetails() }
         function closeDetails(): void                 { functionality.closeDetails() }
-        function copyRule(variant: string): void      { functionality.copyRule(variant) }
-        function copyJson(): void                     { functionality.copyJson() }
+        function selectNext(): void                   { functionality.selectNext() }
+        function selectPrev(): void                   { functionality.selectPrev() }
+        function selectNextSection(): void            { functionality.selectNextSection() }
+        function selectPrevSection(): void            { functionality.selectPrevSection() }
+        function yank(): void                         { functionality.yankSelected() }
         function inspectActive(): void                { functionality.inspectActive() }
         function inspectByAddress(addr: string): void { functionality.inspectByAddress(addr) }
         function inspectByPid(pid: int): void         { functionality.inspectByPid(pid) }
@@ -560,17 +625,19 @@ ShellRoot {
                 // Only render on the cursor's monitor so we don't ghost
                 // the panel on every output.
                 visible: root.detailsShowing && win.isCursorMonitor
-                ipc: root.pickedIpc
+                rows: functionality.buildRows(root.pickedIpc)
+                selectedIndex: root.panelSelected
 
-                bgColor:     cfg.color.base01
-                headerBg:    cfg.color.base02
-                textColor:   cfg.color.base05
-                mutedColor:  cfg.color.base03
-                keyColor:    cfg.color.base0D
-                warnColor:   cfg.color.base0A
-                stableColor: cfg.color.base0B
-                fontFamily:  cfg.fontFamily
-                fontSize:    cfg.fontSize
+                bgColor:        cfg.color.base01
+                headerBg:       cfg.color.base02
+                textColor:      cfg.color.base05
+                mutedColor:     cfg.color.base03
+                keyColor:       cfg.color.base0D
+                warnColor:      cfg.color.base0A
+                stableColor:    cfg.color.base0B
+                highlightColor: cfg.color.base02
+                fontFamily:     cfg.fontFamily
+                fontSize:       cfg.fontSize
             }
         }
     }

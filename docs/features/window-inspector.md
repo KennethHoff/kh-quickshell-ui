@@ -42,9 +42,8 @@ mnemonic without crowding the top-level namespace. Auto-freezes the
 picked window on open so the cursor can move freely while you read.
 
 - [1] ✅ Panel surface — opens on `Enter` from pick/frozen mode; `Esc` returns to pick/frozen, `q` closes the inspector entirely
-- [2] ✅ Copy as Hyprland rule — `c` (initialClass), `t` (initialTitle), `p` (pid), `a` (address), `w` (workspace), `m` (monitor) emit a ready-to-paste `windowrulev2` line with `<action>` placeholder
-- [3] ✅ Copy as JSON — `J` copies the full `hyprctl clients -j` record
-- [4] ⬜ Dispatch — close / focus / toggle floating / toggle pinned / move to workspace 1–9
+- [2] ✅ Vim-style row navigator — `j`/`k` (or arrows) move row by row, `h`/`l` jump section by section. The highlighted row gets a left-caret + bg highlight. `y` yanks: matcher-capable rows yield a `windowrulev2 = <action>, …` line; raw rows yank the value directly; `full record` yanks the JSON
+- [3] ⬜ Dispatch — close / focus / toggle floating / toggle pinned / move to workspace 1–9
 
 ## List View (secondary)
 
