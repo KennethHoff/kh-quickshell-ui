@@ -1,6 +1,6 @@
 ---
 name: headless
-description: Drive the persistent NixOS microvm running the quickshell apps (kh-bar, kh-launcher, kh-cliphist, kh-osd, kh-window-inspector, kh-view) via the `kh-headless` host CLI — load configs, invoke IPC methods, read/write properties, list targets, inspect IPC surfaces. Use to swap an app's config in the VM, set up UI state, or poke at IPC from the host. For screenshot capture, see the `screenshot` skill.
+description: Drive the persistent NixOS microvm running the quickshell apps (kh-bar, kh-launcher, kh-cliphist, kh-osd, kh-window-inspector, kh-view) via the `kh-headless` host CLI — load configs, invoke IPC methods, read/write properties, list targets, inspect IPC surfaces. Use to swap an app's config in the VM, set up UI state, or poke at IPC from the host.
 allowed-tools: Bash, Read
 ---
 
@@ -38,7 +38,7 @@ Whole API driven by `nix run .#kh-headless --`:
 | `prop` | `<target> <prop> [<value>]` | Read (no value) or write a prop. |
 | `show` | `[<target>]` | Print IPC surface — every method/prop on every target. Filters when given a target. |
 | `list` | — | Target names, one per line. |
-| `grim` | `"<x,y wxh>" [name]` | Capture a screen region. See the `screenshot` skill. |
+| `grim` | `"<x,y wxh>" [name]` | Capture a screen region. Output written to `/tmp/kh-headless/out/<name>`; absolute path echoed to stdout. |
 | `status` | — | `running <config>` or `idle`. |
 
 For multi-call loops, resolve the binary once instead of `nix run` per
@@ -69,8 +69,22 @@ nix run .#kh-headless -- call testbar.volume setMuted true
 | kh-launcher | `.#kh-launcher-headless` | `launcher` (`toggle`, `activatePlugin <name>`, `type`, `key`) — plugins (lowercase): `apps`, `emoji`, `hyprland-windows` |
 | kh-osd | `.#kh-osd` | `osd` (`showVolume <N>`, `showMuted`) |
 | kh-window-inspector | `.#kh-window-inspector` | `window-inspector` (`toggle`) |
-| kh-view | `.#kh-view` | — display target for `show-image` skill |
+| kh-view | `.#kh-view` | — image gallery |
 
 For most apps the dev config = test config. `kh-bar` and `kh-launcher`
 need overrides — the `-headless` variants pin `screen = "Virtual-1"`
 and wire fixtures for plugins that depend on real desktop state.
+
+## Live view
+
+To *watch* the VM render in real time (rather than capture static
+shots), run:
+
+```bash
+nix run .#kh-headless-view
+```
+
+Opens an auto-refreshing feh window backed by a 5 fps grim loop inside
+the VM that writes to `/tmp/kh-headless/state/live.png`. Requires the
+headless daemon. Window stays black until something is loaded
+(`load <config>`) — idle Hyprland with no clients is genuinely empty.

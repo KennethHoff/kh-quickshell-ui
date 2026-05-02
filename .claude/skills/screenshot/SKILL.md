@@ -1,6 +1,6 @@
 ---
 name: screenshot
-description: Capture and crop screenshots of quickshell apps from the headless VM via `kh-headless grim`, with app-specific crop sizing and settling. Use when the user asks for a screenshot / "take a shot", for visual verification after .qml or theme changes, to debug UI regressions, to compare revisions side-by-side ("it worked earlier" / "why does this look different"), or to compare multiple unimplemented variations/plans ("screenshot all three designs"). Assumes the VM is running and an app loaded — see the `headless` skill for the daemon, primitives, and app loading. Captures only — to display the captured shots back to the user, use the separate `show-image` skill.
+description: Capture and crop screenshots of quickshell apps from the headless VM via `kh-headless grim`, with app-specific crop sizing and settling. Use when the user asks for a screenshot / "take a shot", for visual verification after .qml or theme changes, to debug UI regressions, to compare revisions side-by-side ("it worked earlier" / "why does this look different"), or to compare multiple unimplemented variations/plans ("screenshot all three designs"). Assumes the VM is running and an app loaded — see the `headless` skill for the daemon, primitives, and app loading. Captures only — prints absolute file paths and stops.
 allowed-tools: Bash, Read
 ---
 
@@ -16,10 +16,8 @@ For VM setup, primitives, and app loading, see the `headless` skill.
 
 ## Default behaviour
 
-After capture, print file paths back to user. Do **not** open
-`kh-view` — paths alone are enough. If user asks to see shots ("show
-me", "open them", "view the screenshots"), hand off to the
-`show-image` skill.
+After capture, print absolute file paths back to user and stop.
+Do not auto-open any viewer — paths alone are enough.
 
 ## Settling
 
@@ -71,4 +69,3 @@ launcher crop derivation from `panel.width`/`panel.height`.
 | Screenshot kh-launcher (per-plugin variants, crop) | [kh-launcher.md](references/kh-launcher.md) |
 | Compare how UI looked across git revisions | [compare-revisions.md](references/compare-revisions.md) |
 | Compare uncommitted plan variations (A/B/C) | [compare-plans.md](references/compare-plans.md) |
-| Display captured shots to user | Use the `show-image` skill. |

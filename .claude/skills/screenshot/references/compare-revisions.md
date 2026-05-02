@@ -47,6 +47,6 @@ Notes:
 - For revisions *before* `src/test/` existed, fall back to a manual
   build of the bar config with `screen = "Virtual-1"`. Or skip those
   revisions.
-- When the user asks to see the shots, hand off to the `show-image`
-  skill, sourcing each pane's label/desc from
-  `git log --format='%h %s' -1 <rev>`.
+- For each captured revision the commit hash and subject line can be
+  obtained via `git log --format='%h %s' -1 <rev>` — useful as label
+  metadata when the orchestrator presents the shots downstream.

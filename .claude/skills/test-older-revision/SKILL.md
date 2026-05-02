@@ -37,8 +37,3 @@ git log --oneline          # recent commits
 git log --oneline <file>   # commits touching a specific file
 ```
 
-## Pinned revisions
-
-The `show-image` skill keeps a pinned known-good `kh-view` commit for
-its display step. Update that pin whenever `kh-view` reaches a new
-stable state.

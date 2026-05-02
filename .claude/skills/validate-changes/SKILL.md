@@ -43,18 +43,7 @@ nix build \
   2>&1
 ```
 
-A passing run produces no output. On failure, see [references/nix-build.md](references/nix-build.md) for how to interpret errors.
-
-### Inspecting generated QML
-
-Some files are generated at build time (e.g. `BarLayout.qml` from `bar-layout.nix`). After building `kh-bar`, inspect the actual output to verify the generated code looks right — especially after changes to `bar-layout.nix` or adding new plugins:
-
-```bash
-nix build .#kh-bar --no-link --print-out-paths 2>/dev/null \
-  | xargs -I{} cat {}/BarLayout.qml
-```
-
-This is the code Quickshell actually runs. If plugins aren't rendering or there are runtime errors, this is the first place to look.
+A passing run produces no output. On failure, see [references/nix-build.md](references/nix-build.md) for how to interpret errors and how to inspect generated QML files (e.g. `BarLayout.qml`) — essential when debugging bar plugin rendering.
 
 ## Step 4 — Screenshot (QML changes)
 
