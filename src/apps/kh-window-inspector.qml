@@ -549,7 +549,10 @@ ShellRoot {
             if (event.key === Qt.Key_Up    || event.text === "k") { selectPrev();        event.accepted = true; return }
             if (event.key === Qt.Key_Left  || event.text === "h") { selectPrevSection(); event.accepted = true; return }
             if (event.key === Qt.Key_Right || event.text === "l") { selectNextSection(); event.accepted = true; return }
-            if (event.key === Qt.Key_Space)                       { toggleMark();        event.accepted = true; return }
+            // Match Space by both key code and the literal " " text — some
+            // keyboard layouts report only one or the other, and IPC `key`
+            // callers might pass either form.
+            if (event.key === Qt.Key_Space || event.text === " ") { toggleMark();        event.accepted = true; return }
             if (event.text === "y")                               { yankSelected();      event.accepted = true; return }
         }
 
@@ -566,12 +569,12 @@ ShellRoot {
             if (lk === "f") { toggleFreeze(); return }
             if (lk === "enter" || lk === "return") { openDetails(); return }
             if (!root.detailsShowing) return
-            if      (lk === "j" || lk === "down")  selectNext()
-            else if (lk === "k" || lk === "up")    selectPrev()
-            else if (lk === "h" || lk === "left")  selectPrevSection()
-            else if (lk === "l" || lk === "right") selectNextSection()
-            else if (lk === "space")               toggleMark()
-            else if (lk === "y")                   yankSelected()
+            if      (lk === "j" || lk === "down")    selectNext()
+            else if (lk === "k" || lk === "up")      selectPrev()
+            else if (lk === "h" || lk === "left")    selectPrevSection()
+            else if (lk === "l" || lk === "right")   selectNextSection()
+            else if (lk === "space" || k === " ")    toggleMark()
+            else if (lk === "y")                     yankSelected()
         }
         // ipc only
         function setMode(m: string): void {
