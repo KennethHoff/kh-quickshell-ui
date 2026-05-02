@@ -1,6 +1,6 @@
 ---
 name: screenshot
-description: Capture headless screenshots of a quickshell app (kh-bar, kh-launcher, kh-cliphist, kh-osd, kh-view) via a sway + quickshell + grim pipeline. Use when the user asks for a screenshot / "show me" / "take a shot", for visual verification after .qml or theme changes, to debug UI regressions, to compare revisions side-by-side ("it worked earlier" / "why does this look different"), or to compare multiple unimplemented variations/plans ("show me both options", "screenshot all three designs").
+description: Capture headless screenshots of a quickshell app (kh-bar, kh-launcher, kh-cliphist, kh-osd, kh-view) via a sway + quickshell + grim pipeline. Use when the user asks for a screenshot / "take a shot", for visual verification after .qml or theme changes, to debug UI regressions, to compare revisions side-by-side ("it worked earlier" / "why does this look different"), or to compare multiple unimplemented variations/plans ("screenshot all three designs"). This skill only captures — to display the captured shots back to the user, use the separate `show-image` skill.
 allowed-tools: Bash, Read
 ---
 
@@ -9,10 +9,10 @@ allowed-tools: Bash, Read
 Output files go to `/tmp/qs-screenshots/<timestamp>/<name>.png`.
 
 **Default behaviour:** after capture, print the file paths back to the
-user. Do **not** open `kh-view` unless the user explicitly asks to see
-the shots (e.g. "show me", "open them", "view the screenshots") — the
-paths alone are enough for the user to inspect them on their own. When
-they do ask, see [references/kh-view.md](references/kh-view.md).
+user. Do **not** open `kh-view` — the paths alone are enough for the
+user to inspect them on their own. If the user explicitly asks to see
+the shots (e.g. "show me", "open them", "view the screenshots"), hand
+off to the `show-image` skill.
 
 ## App table
 
@@ -22,7 +22,7 @@ they do ask, see [references/kh-view.md](references/kh-view.md).
 | kh-cliphist | `.#kh-cliphist` | `cliphist` (`toggle`) | full screen | |
 | kh-launcher | `.#kh-launcher` | `launcher` (`toggle`) | full screen | |
 | kh-osd | `.#kh-osd` | `osd` (`showVolume N`, `showMuted`) | `1720,2000 400x100` | OSD fades; screenshot before it disappears. |
-| kh-view | `.#kh-view` | — | full screen | Accepts file **or directory** paths. See [references/kh-view.md](references/kh-view.md). |
+| kh-view | `.#kh-view` | — | full screen | Accepts file or directory paths. |
 
 ## References
 
@@ -32,6 +32,6 @@ Read the reference for the specific task — don't load them all up front.
 |---|---|
 | Capture one or more shots of a single app | [pipeline.md](references/pipeline.md) — bash pipeline, readiness probe, timing table, multi-shot, fonts |
 | Screenshot kh-bar (dynamic crop, popup settling) | [kh-bar.md](references/kh-bar.md) |
-| Label panes or open the gallery for the user | [kh-view.md](references/kh-view.md) |
 | Compare how the UI looked across git revisions | [compare-revisions.md](references/compare-revisions.md) |
 | Compare multiple **uncommitted** plan variations (A/B/C) | [compare-plans.md](references/compare-plans.md) — includes worktree layout and Agent parallelisation |
+| Display captured shots to the user | Use the `show-image` skill. |

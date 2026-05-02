@@ -26,5 +26,6 @@ for rev in "${revs[@]}"; do
 done
 ```
 
-Open the gallery per [kh-view.md § Display](kh-view.md#display-only-when-the-user-asks),
-sourcing each pane's label/desc from `git log --format='%h %s' -1 <rev>`.
+When the user asks to see the shots, hand off to the `show-image`
+skill, sourcing each pane's label/desc from
+`git log --format='%h %s' -1 <rev>`.
