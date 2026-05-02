@@ -90,17 +90,19 @@ ShellRoot {
 
         // ── Lifecycle ─────────────────────────────────────────────────────────
         // ui+ipc
-        function toggle(): void { root.showing = !root.showing }
+        function toggle(): void { root.showing ? close() : open() }
         // ipc only
         function open(): void   { root.showing = true }
-        // ui+ipc
-        function close(): void  { root.showing = false }
-        // ui only
-        function onShow(): void {
-            root.mode = "pick"
+        // ui+ipc — also resets mode so the next open starts in live pick.
+        function close(): void  {
+            root.showing    = false
+            root.mode       = "pick"
             root.frozenAddr = ""
             root.frozenIpc  = null
-            keyHandler.forceActiveFocus()
+        }
+        // ui only — fires once per layer surface when the layer becomes
+        // visible. Refresh is cheap and idempotent across calls.
+        function onShow(): void {
             Hyprland.refreshToplevels()
             pollCursor()
         }
@@ -343,67 +345,81 @@ ShellRoot {
     }
 
     // ── Window ────────────────────────────────────────────────────────────────
-    WlrLayershell {
-        id: win
-        visible: root.showing
-        color: "transparent"
-        layer: WlrLayer.Overlay
-        keyboardFocus: WlrKeyboardFocus.Exclusive
-        exclusionMode: ExclusionMode.Ignore
-        namespace: "kh-window-inspector"
-        anchors { top: true; bottom: true; left: true; right: true }
+    // One WlrLayershell per output, because layer surfaces don't migrate
+    // when the cursor moves to another monitor — `screen` is set at create
+    // time and is not retroactively reassigned. Each surface decides
+    // independently whether to draw the outline (only on the picked
+    // window's monitor) and the tag (only on the cursor's monitor), and
+    // requests keyboard focus only while the cursor is on it so a single
+    // surface owns input at a time.
+    Variants {
+        model: Quickshell.screens
 
-        // Empty input region — pointer events fall through to underlying
-        // windows so the user can hover them. Keyboard focus is unaffected.
-        mask: Region {}
+        delegate: WlrLayershell {
+            id: win
 
-        onVisibleChanged: functionality.onVisibleChanged()
+            required property var modelData    // QsScreen
+            readonly property var monitor: Hyprland.monitorFor(modelData)
+            readonly property bool isCursorMonitor:
+                monitor && Hyprland.focusedMonitor && monitor.id === Hyprland.focusedMonitor.id
 
-        // Key dispatcher — single Item that holds focus while the layer is up.
-        Item {
-            id: keyHandler
-            anchors.fill: parent
-            focus: true
-
-            Keys.onPressed: (event) => functionality.handleKeyEvent(event)
-        }
-
-        // ── Outline + tag (pick mode visuals) ─────────────────────────────────
-        WindowOutline {
-            id: outline
-            anchors.fill: parent
-
-            ipc: root.pickedIpc
-            monitorOf: outline.ipc && outline.ipc.at
-                ? functionality.monitorAt(outline.ipc.at[0], outline.ipc.at[1])
-                : null
-            frozen: root.mode === "frozen"
-            outlineColor: cfg.color.base0D
-            frozenColor:  cfg.color.base0A
-        }
-
-        InspectorTag {
-            id: tag
-            anchors.fill: parent
+            screen: modelData
             visible: root.showing
-            ipc: root.pickedIpc
-            // Layer surface coords are local to its output; convert global
-            // cursor coords by subtracting the focused monitor's origin.
-            cursorX: root.cursorX - (Hyprland.focusedMonitor ? Hyprland.focusedMonitor.x : 0)
-            cursorY: root.cursorY - (Hyprland.focusedMonitor ? Hyprland.focusedMonitor.y : 0)
-            screenW: win.width
-            screenH: win.height
-            frozen: root.mode === "frozen"
+            color: "transparent"
+            layer: WlrLayer.Overlay
+            keyboardFocus: win.isCursorMonitor ? WlrKeyboardFocus.Exclusive
+                                               : WlrKeyboardFocus.None
+            exclusionMode: ExclusionMode.Ignore
+            namespace: "kh-window-inspector"
+            anchors { top: true; bottom: true; left: true; right: true }
 
-            bgColor:     cfg.color.base01
-            headerBg:    cfg.color.base02
-            textColor:   cfg.color.base05
-            mutedColor:  cfg.color.base03
-            keyColor:    cfg.color.base0D
-            warnColor:   cfg.color.base0A
-            stableColor: cfg.color.base0B
-            fontFamily:  cfg.fontFamily
-            fontSize:    cfg.fontSize
+            // Empty input region — pointer events fall through to underlying
+            // windows so the user can hover them. Keyboard focus is unaffected.
+            mask: Region {}
+
+            onVisibleChanged: functionality.onVisibleChanged()
+
+            // Key dispatcher — only the cursor-monitor surface holds focus.
+            Item {
+                id: keyHandler
+                anchors.fill: parent
+                focus: win.isCursorMonitor
+
+                Keys.onPressed: (event) => functionality.handleKeyEvent(event)
+            }
+
+            // ── Outline + tag (pick mode visuals) ─────────────────────────────
+            WindowOutline {
+                anchors.fill: parent
+
+                ipc:          root.pickedIpc
+                thisMonitor:  win.monitor
+                frozen:       root.mode === "frozen"
+                outlineColor: cfg.color.base0D
+                frozenColor:  cfg.color.base0A
+            }
+
+            InspectorTag {
+                anchors.fill: parent
+                visible: root.showing && win.isCursorMonitor
+                ipc: root.pickedIpc
+                // Convert global cursor coords to this surface's local coords.
+                cursorX: root.cursorX - (win.monitor ? win.monitor.x : 0)
+                cursorY: root.cursorY - (win.monitor ? win.monitor.y : 0)
+                screenW: win.width
+                screenH: win.height
+                frozen: root.mode === "frozen"
+
+                bgColor:     cfg.color.base01
+                headerBg:    cfg.color.base02
+                textColor:   cfg.color.base05
+                mutedColor:  cfg.color.base03
+                keyColor:    cfg.color.base0D
+                warnColor:   cfg.color.base0A
+                stableColor: cfg.color.base0B
+                fontFamily:  cfg.fontFamily
+                fontSize:    cfg.fontSize
+            }
         }
     }
 }
