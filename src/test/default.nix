@@ -22,6 +22,8 @@ let
 
   mocks = import ./mocks { inherit pkgs lib; };
 
+  launcherFixture = import ./launcher-fixture.nix { inherit pkgs lib; };
+
   testConfigs = import ./configs.nix {
     inherit
       pkgs
@@ -49,7 +51,12 @@ let
       (
         { ... }:
         import ./vm.nix {
-          inherit pkgs lib hyprConfigPath;
+          inherit
+            pkgs
+            lib
+            hyprConfigPath
+            launcherFixture
+            ;
           fakeFs = ./fake-fs.nix;
         }
       )

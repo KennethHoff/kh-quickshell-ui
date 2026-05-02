@@ -8,6 +8,7 @@
   lib,
   hyprConfigPath,
   fakeFs,
+  launcherFixture,
   ...
 }:
 {
@@ -135,6 +136,10 @@
     MESA_LOADER_DRIVER_OVERRIDE = "llvmpipe";
     WLR_RENDERER = "pixman";
     WLR_NO_HARDWARE_CURSORS = "1";
+    # Curated app fixture — gives the launcher's Apps plugin a deterministic
+    # set of .desktop entries, and the hyprland-windows plugin matching
+    # icons via StartupWMClass when fake-clients spawns weston-terminal.
+    XDG_DATA_DIRS = "${launcherFixture}/share:/run/current-system/sw/share:/usr/share";
   };
 
   # ── Audio (PipeWire) ──────────────────────────────────────────────────
@@ -159,7 +164,7 @@
     hyprland
     quickshell
     grim
-    weston # provides weston-simple-shm for fake-clients.sh
+    foot # tiny Wayland terminal for fake-clients.sh — supports -a/-T
     inotify-tools
     coreutils
     bash

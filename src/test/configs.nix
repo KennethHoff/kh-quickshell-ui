@@ -102,4 +102,10 @@ let
 in
 {
   kh-bar-headless = bar;
+  # The launcher's dev config already does the right thing — the headless
+  # variant is currently identical, exposed under a `*-headless` alias for
+  # naming symmetry with the bar. The screenshot harness relies on
+  # XDG_DATA_DIRS (set in vm.nix) and the curated app fixture
+  # (launcher-fixture.nix) to populate the Apps plugin.
+  kh-launcher-headless = dev.packages.kh-launcher;
 }
