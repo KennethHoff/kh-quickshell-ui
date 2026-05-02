@@ -73,14 +73,13 @@ The final command echoes `/tmp/kh-headless/out/muted-bar.png`.
 |---|---|---|---|
 | kh-bar | `.#kh-bar-headless` | `testbar` (root) + `testbar.<plugin>` | Dropdowns are addressable as `testbar.stats`, `testbar.controlcenter`. See [references/kh-bar.md](references/kh-bar.md) for crop sizing and dropdown variants. |
 | kh-cliphist | `.#kh-cliphist` | `cliphist` (`toggle`) | Reuses the dev config (no test overrides needed). |
-| kh-launcher | `.#kh-launcher` | `launcher` (`toggle`) | Reuses the dev config. |
+| kh-launcher | `.#kh-launcher-headless` | `launcher` (`toggle`) | All three plugins (`apps`, `emoji`, `hyprland-windows`) populate via fixtures. See [references/kh-launcher.md](references/kh-launcher.md) for crop, plugin variants, and gotchas. |
 | kh-osd | `.#kh-osd` | `osd` (`showVolume N`, `showMuted`) | OSD popup at bottom-center, fades after 2s. Crop suggestion: `1720,2000 400x100`. |
 | kh-window-inspector | `.#kh-window-inspector` | `window-inspector` (`toggle`) | Hyprland-only — finally captureable in this VM. |
 | kh-view | `.#kh-view` | — | Used as the *display* target by `show-image`; rarely needs to be screenshotted. |
 
-For most apps the *dev* config is the test config. Only `kh-bar` needs
-overrides (the test bar is pinned to `Virtual-1` and points its
-`/proc`/`/sys` plugins at fake fixtures under `/run/kh-headless`).
+For most apps the *dev* config is the test config. `kh-bar` and
+`kh-launcher` need overrides — see their reference docs.
 
 ## Settling
 
@@ -95,6 +94,7 @@ enough — they don't change size.
 | Task | Reference |
 |---|---|
 | Screenshot kh-bar (dynamic crop, dropdown variants) | [kh-bar.md](references/kh-bar.md) |
+| Screenshot kh-launcher (per-plugin variants, crop) | [kh-launcher.md](references/kh-launcher.md) |
 | Compare how the UI looked across git revisions | [compare-revisions.md](references/compare-revisions.md) |
 | Compare uncommitted plan variations (A/B/C) | [compare-plans.md](references/compare-plans.md) |
 | Display captured shots to the user | Use the `show-image` skill. |
