@@ -42,14 +42,16 @@
         ];
       };
 
-      packages.${system} = dev.packages // {
-        kh-test-vm = test.runner;
-        kh-bar-vm-test = test.barConfig;
-      };
+      packages.${system} =
+        dev.packages
+        // test.testConfigs
+        // {
+          kh-test-vm = test.runner;
+        };
 
       apps.${system} = dev.apps // {
         kh-test-vm-daemon = test.daemonApp;
-        screenshot-bar-vm = test.screenshotApp;
+        kh-test = test.khTestApp;
       };
 
       nixosConfigurations.kh-test-vm = test.nixosConfig;

@@ -68,7 +68,7 @@
     serviceConfig.RemainAfterExit = true;
     # 2026-01-15T14:23:00Z = 1768537380
     script = ''
-      ${pkgs.coreutils}/bin/date -s '@1768537380'
+      ${lib.getExe' pkgs.coreutils "date"} -s '@1768537380'
     '';
   };
 
@@ -102,19 +102,23 @@
         echo "=== /dev/dri ==="
         ls -la /dev/dri 2>&1 || true
         echo "=== lsmod | grep -E 'drm|vkms' ==="
-        ${pkgs.kmod}/bin/lsmod | grep -E 'drm|vkms' 2>&1 || true
+        ${lib.getExe' pkgs.kmod "lsmod"} | grep -E 'drm|vkms' 2>&1 || true
         echo "=== modprobe vkms ==="
-        ${pkgs.kmod}/bin/modprobe vkms 2>&1 || true
+        ${lib.getExe' pkgs.kmod "modprobe"} vkms 2>&1 || true
         echo "=== /dev/dri after modprobe ==="
         ls -la /dev/dri 2>&1 || true
       } > /shared/state/probe.log 2>&1
-      ${pkgs.hyprland}/bin/Hyprland --config ${hyprConfigPath} \
+      # start-hyprland is the upstream watchdog wrapper. Launching the
+      # `Hyprland` binary directly trips the on-screen "started without
+      # start-hyprland" CHyprError overlay, which obscures the right
+      # half of the bar in screenshots.
+      ${lib.getExe' pkgs.hyprland "start-hyprland"} -- --config ${hyprConfigPath} \
         > /shared/state/hypr.log 2>&1
       # If Hyprland died, salvage its runtime log + crash report so we can
       # see what happened from the host.
       cp -f /run/user/1000/hypr/*/hyprland.log /shared/state/hypr-runtime.log 2>/dev/null || true
       cp -f /home/test/.cache/hyprland/hyprlandCrashReport*.txt /shared/state/ 2>/dev/null || true
-      ${pkgs.coreutils}/bin/sleep infinity
+      ${lib.getExe' pkgs.coreutils "sleep"} infinity
     fi
   '';
 

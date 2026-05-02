@@ -11,6 +11,7 @@
 #      requests off /shared/cmd.
 {
   pkgs,
+  lib,
   mocks,
   harness,
 }:
@@ -45,9 +46,9 @@ pkgs.writeText "hyprland.conf" ''
       disable_logs = false
   }
 
-  exec-once = ${pkgs.dbus}/bin/dbus-update-activation-environment --systemd WAYLAND_DISPLAY HYPRLAND_INSTANCE_SIGNATURE XDG_CURRENT_DESKTOP
+  exec-once = ${lib.getExe' pkgs.dbus "dbus-update-activation-environment"} --systemd WAYLAND_DISPLAY HYPRLAND_INSTANCE_SIGNATURE XDG_CURRENT_DESKTOP
   exec-once = ${mocks}/bin/mock-mpris
   exec-once = ${mocks}/bin/mock-tray
   exec-once = ${mocks}/bin/fake-clients
-  exec-once = sh -c '${harness}/bin/kh-test-harness > /shared/state/harness.log 2>&1'
+  exec-once = sh -c '${lib.getExe harness} > /shared/state/harness.log 2>&1'
 ''

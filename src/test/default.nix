@@ -1,13 +1,13 @@
-# Test infrastructure entry point. Wires the test bar config, mocks,
-# Hyprland config, harness, NixOS test VM, and host-side daemon/client into
-# a single attrset consumed by flake.nix.
+# Test infrastructure entry point. Wires the test qs configs, mocks,
+# Hyprland config, harness, NixOS test VM, and host-side daemon + kh-test
+# CLI into a single attrset consumed by flake.nix.
 #
 # Returns:
-#   nixosConfig      — nixosSystem result (declares the test VM)
-#   runner           — the microvm runner derivation (boot-the-VM script)
-#   barConfig        — kh-bar-vm-test config derivation (consumed by client)
-#   daemonApp        — flake `app` for kh-test-vm-daemon (boot+hold)
-#   screenshotApp    — flake `app` for screenshot-bar-vm (one-shot client)
+#   nixosConfig    — nixosSystem result (declares the test VM)
+#   runner         — the microvm runner derivation
+#   testConfigs    — { kh-bar-vm-test = <derivation>; ... }
+#   daemonApp      — flake `app` for kh-test-vm-daemon
+#   khTestApp      — flake `app` for kh-test (single primitive CLI)
 {
   pkgs,
   lib,
@@ -21,14 +21,25 @@ let
 
   mocks = import ./mocks { inherit pkgs lib; };
 
-  barConfig = import ./test-bar.nix { inherit dev mocks; };
-
-  harness = import ./harness.nix {
-    inherit pkgs;
-    defaultBarConfig = barConfig;
+  testConfigs = import ./configs.nix {
+    inherit
+      pkgs
+      lib
+      dev
+      mocks
+      ;
   };
 
-  hyprConfigPath = import ./hypr-config.nix { inherit pkgs mocks harness; };
+  harness = import ./harness.nix { inherit pkgs; };
+
+  hyprConfigPath = import ./hypr-config.nix {
+    inherit
+      pkgs
+      lib
+      mocks
+      harness
+      ;
+  };
 
   nixosConfig = nixpkgs.lib.nixosSystem {
     inherit system;
@@ -54,30 +65,27 @@ let
   daemonApp = mkApp (
     let
       pkg = import ./daemon.nix {
-        inherit pkgs;
+        inherit pkgs lib;
         vmRunner = runner;
         virtiofsd = nixosConfig.config.microvm.virtiofsd.package;
       };
     in
-    "${pkg}/bin/kh-test-vm-daemon"
+    lib.getExe pkg
   );
 
-  screenshotApp = mkApp (
+  khTestApp = mkApp (
     let
-      pkg = import ./client.nix {
-        inherit pkgs;
-        defaultBarConfig = barConfig;
-      };
+      pkg = import ./kh-test.nix { inherit pkgs; };
     in
-    "${pkg}/bin/screenshot-bar-vm"
+    lib.getExe pkg
   );
 in
 {
   inherit
     nixosConfig
     runner
-    barConfig
+    testConfigs
     daemonApp
-    screenshotApp
+    khTestApp
     ;
 }

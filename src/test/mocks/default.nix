@@ -35,6 +35,6 @@ let
 in
 pkgs.runCommand "kh-test-mocks" { } ''
   mkdir -p $out/bin
-  ${install "#!/usr/bin/env bash" "#!${pkgs.bash}/bin/bash" shellMocks}
-  ${install "#!/usr/bin/env python3" "#!${py}/bin/python3" pythonMocks}
+  ${install "#!/usr/bin/env bash" "#!${lib.getExe' pkgs.bash "bash"}" shellMocks}
+  ${install "#!/usr/bin/env python3" "#!${lib.getExe' py "python3"}" pythonMocks}
 ''

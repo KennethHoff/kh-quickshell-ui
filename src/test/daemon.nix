@@ -1,7 +1,10 @@
 # Host-side daemon launcher. Prepares the share dir, spawns one virtiofsd
 # per microvm.shares entry as the current user, waits for the sockets, then
-# execs the qemu microvm runner in the foreground. Ctrl-C cleanly tears
-# down the VM and the virtiofsd processes.
+# runs the qemu microvm runner. Cleanup trap kills both virtiofsd and qemu
+# children so SIGTERM teardown is leak-free.
+#
+# Refuses to start a second daemon while one is already running — a lock
+# file under /tmp/khtest-current/state/daemon.pid encodes the live PID.
 #
 # The share path is hardcoded at /tmp/khtest-current to match what's baked
 # into the VM's microvm.shares config.
@@ -12,6 +15,7 @@
 # privilege-drop path branches on `id -u`.
 {
   pkgs,
+  lib,
   vmRunner,
   virtiofsd,
 }:
@@ -35,21 +39,51 @@ pkgs.writeShellApplication {
     SHARE=/tmp/khtest-current
     mkdir -p "$SHARE/cmd" "$SHARE/out" "$SHARE/state"
 
-    # Wipe any stale request/done/sentinel files from a previous run so the
-    # client never reads a result the new daemon didn't produce.
-    rm -f "$SHARE/cmd"/*.req "$SHARE/out"/*.done "$SHARE/out"/*.err "$SHARE/state/ready" "$SHARE/state/qs.config" "$SHARE/state/qs.log"
+    PIDFILE="$SHARE/state/daemon.pid"
+    if [[ -f "$PIDFILE" ]]; then
+      old_pid=$(cat "$PIDFILE" 2>/dev/null || echo)
+      if [[ -n "$old_pid" ]] && kill -0 "$old_pid" 2>/dev/null; then
+        echo "kh-test-vm-daemon: already running (pid $old_pid)" >&2
+        echo "  stop it first with: kill $old_pid" >&2
+        exit 1
+      fi
+      # Stale pidfile — previous daemon died without cleanup.
+      rm -f "$PIDFILE"
+    fi
+    echo $$ > "$PIDFILE"
+
+    # Wipe stale state files so a client never reads a result this daemon
+    # didn't produce.
+    rm -f "$SHARE/cmd"/*.req "$SHARE/out"/*.done "$SHARE/out"/*.err \
+          "$SHARE/state/ready" "$SHARE/state/qs.config" "$SHARE/state/qs.log" \
+          "$SHARE/state/harness.log" "$SHARE/state/hypr.log" \
+          "$SHARE/state/probe.log" "$SHARE/state/virtiofsd.log"
 
     WORKDIR=$(mktemp -d -t khtest-vm-XXXXXX)
     cd "$WORKDIR"
 
     declare -a VFPIDS=()
+    QEMU_PID=""
+
     cleanup() {
       local pid
-      for pid in "''${VFPIDS[@]}"; do
+      if [[ -n "$QEMU_PID" ]]; then
+        kill "$QEMU_PID" 2>/dev/null || true
+        # qemu's SIGTERM handler is fast; give it 2s before SIGKILL.
+        for _ in $(seq 20); do
+          kill -0 "$QEMU_PID" 2>/dev/null || break
+          sleep 0.1
+        done
+        kill -9 "$QEMU_PID" 2>/dev/null || true
+      fi
+      for pid in "''${VFPIDS[@]+"''${VFPIDS[@]}"}"; do
         kill "$pid" 2>/dev/null || true
+        sleep 0.05
+        kill -9 "$pid" 2>/dev/null || true
       done
       cd /
       rm -rf "$WORKDIR"
+      rm -f "$PIDFILE"
     }
     trap cleanup EXIT INT TERM
 
@@ -59,10 +93,9 @@ pkgs.writeShellApplication {
     for shared in ${vmRunner}/share/microvm/virtiofs/*/; do
       src=$(cat "$shared/source")
       sock=$(cat "$shared/socket")
-      # No --socket-group: as a non-root user we can't chgrp the socket to
-      # 'kvm'. Default ownership (user-only) is fine because qemu runs as
-      # the same user.
-      ${virtiofsd}/bin/virtiofsd \
+      # No --socket-group: as a non-root user we can't chgrp to 'kvm'.
+      # Default user-only ownership is fine because qemu runs as us.
+      ${lib.getExe virtiofsd} \
         --socket-path="$sock" \
         --shared-dir="$src" \
         --thread-pool-size "$(nproc)" \
@@ -87,6 +120,8 @@ pkgs.writeShellApplication {
     done
 
     echo "kh-test-vm-daemon: share at $SHARE — booting VM (Ctrl-C to stop)" >&2
-    ${vmRunner}/bin/microvm-run
+    ${lib.getExe' vmRunner "microvm-run"} &
+    QEMU_PID=$!
+    wait "$QEMU_PID"
   '';
 }
