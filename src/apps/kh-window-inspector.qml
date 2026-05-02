@@ -50,6 +50,9 @@ ShellRoot {
     // Highlighted row inside the details panel. Reset to 0 on every
     // open. The panel binds its visual selection to this index.
     property int    panelSelected:  0
+    // Bumps on every yank so the panel can flash the selected row as
+    // visual confirmation. Same pattern as ClipDelegate's flash().
+    property int    yankTick:       0
     // Cursor position in global Hyprland coords.
     property int    cursorX:        0
     property int    cursorY:        0
@@ -429,7 +432,9 @@ ShellRoot {
             if (rows.length === 0) return
             const idx = Math.max(0, Math.min(rows.length - 1, root.panelSelected))
             const text = rows[idx].yank
-            if (text) impl.copyText(text)
+            if (!text) return
+            impl.copyText(text)
+            root.yankTick = root.yankTick + 1   // panel flashes the selected row
         }
 
         // ── Hyprland events — refresh toplevels on relevant ones ──────────────
@@ -521,6 +526,7 @@ ShellRoot {
         readonly property string pickedAddress:  root.pickedAddr
         readonly property bool   detailsShowing: root.detailsShowing
         readonly property int    panelSelected:  root.panelSelected
+        readonly property int    yankTick:       root.yankTick
 
         function toggle(): void                       { functionality.toggle() }
         function open(): void                         { functionality.open() }
@@ -627,6 +633,7 @@ ShellRoot {
                 visible: root.detailsShowing && win.isCursorMonitor
                 rows: functionality.buildRows(root.pickedIpc)
                 selectedIndex: root.panelSelected
+                yankTick: root.yankTick
 
                 bgColor:        cfg.color.base01
                 headerBg:       cfg.color.base02

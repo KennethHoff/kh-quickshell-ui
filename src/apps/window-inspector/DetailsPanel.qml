@@ -15,6 +15,9 @@ Item {
     // ── Inputs ────────────────────────────────────────────────────────────────
     property var rows:          []   // [{ section, label, value, yank }]
     property int selectedIndex: 0
+    // Bumped externally on every yank — the row at `selectedIndex` flashes.
+    // Same pattern as ClipDelegate.flash() in cliphist.
+    property int yankTick:      0
 
     // ── Style ─────────────────────────────────────────────────────────────────
     property color  bgColor:        "#181825"
@@ -108,6 +111,7 @@ Item {
                     // Highlight bg — extends the full panel width so the
                     // selected row reads as a clear cursor in a list.
                     Rectangle {
+                        id: rowBg
                         anchors.left: parent.left
                         anchors.right: parent.right
                         anchors.bottom: parent.bottom
@@ -152,6 +156,35 @@ Item {
                                 elide: Text.ElideRight
                                 width: card.width - 180
                             }
+                        }
+
+                        // Yank flash — pulses when this row is the selected
+                        // row at the moment of a yank tick. Same shape as
+                        // ClipDelegate.flash() in cliphist.
+                        Rectangle {
+                            id: flashOverlay
+                            anchors.fill: parent
+                            radius: rowBg.radius
+                            color: root.stableColor
+                            opacity: 0
+                            SequentialAnimation {
+                                id: flashAnim
+                                NumberAnimation {
+                                    target: flashOverlay; property: "opacity"
+                                    to: 0.55; duration: 60; easing.type: Easing.OutQuad
+                                }
+                                NumberAnimation {
+                                    target: flashOverlay; property: "opacity"
+                                    to: 0; duration: 220; easing.type: Easing.InQuad
+                                }
+                            }
+                        }
+                    }
+
+                    Connections {
+                        target: root
+                        function onYankTickChanged() {
+                            if (rowItem._isSelected) flashAnim.restart()
                         }
                     }
                 }
