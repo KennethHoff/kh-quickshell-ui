@@ -58,7 +58,7 @@ This is the code Quickshell actually runs. If plugins aren't rendering or there 
 
 ## Step 4 — Screenshot (QML changes)
 
-For any change that affects the UI (`.qml` files, or Nix changes that affect runtime behavior), take a screenshot to visually confirm the result matches expectations. Use the `screenshot` skill.
+For any change that affects the UI (`.qml` files, or Nix changes that affect runtime behavior), take a screenshot to visually confirm the result matches expectations. Use the `screenshot` skill (with the `headless` skill for VM/IPC setup).
 
 - Target the specific app and view affected by the change
 - Compare against a before screenshot if one was taken prior to editing

@@ -38,4 +38,4 @@ Both apps define the help overlay as an inline `Column` with two inline componen
 
 ## IPC
 
-Apps are controlled externally via `quickshell ipc call <target> <function>`. Each app declares an `IpcHandler` with a `target` string and functions for `toggle`, `setView`, `nav`, `type`, and `key`. The `screenshot` skill uses these to set up UI state before capturing.
+Apps are controlled externally via `quickshell ipc call <target> <function>`. Each app declares an `IpcHandler` with a `target` string and functions for `toggle`, `setView`, `nav`, `type`, and `key`. The `headless` skill uses these to set up UI state, which the `screenshot` skill then captures.
