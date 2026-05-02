@@ -51,3 +51,19 @@ When showing screenshots produced by the `screenshot` skill's
 revision-comparison flow, source each pane's label/desc from
 `git log --format='%h %s' -1 <rev>` so the gallery shows the commit
 hash and subject for each revision.
+
+## Live view of the headless VM
+
+If the user wants to *watch* the test VM render in real time (rather
+than view static screenshots), run `nix run .#kh-headless-view`
+instead. It opens an auto-refreshing feh window backed by a 5 fps grim
+loop inside the VM that writes to `/tmp/kh-headless/state/live.png`.
+
+Requires the headless daemon to be running (`nix run
+.#kh-headless-daemon`). The window stays black until something is
+loaded into the VM (`nix run .#kh-headless -- load <config>`); idle
+Hyprland with no clients is genuinely empty.
+
+This is for *watching* the VM. To grab one-off shots from it, use the
+`screenshot` skill; to display already-captured PNGs, keep using the
+labelled `kh-view` flow above.

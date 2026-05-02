@@ -8,6 +8,7 @@
 #   testConfigs    — { kh-bar-headless = <derivation>; ... }
 #   daemonApp      — flake `app` for kh-headless-daemon
 #   khTestApp      — flake `app` for kh-headless (single primitive CLI)
+#   viewApp        — flake `app` for kh-headless-view (vncviewer wrapper)
 {
   pkgs,
   lib,
@@ -79,6 +80,13 @@ let
     in
     lib.getExe pkg
   );
+
+  viewApp = mkApp (
+    let
+      pkg = import ./view.nix { inherit pkgs lib; };
+    in
+    lib.getExe pkg
+  );
 in
 {
   inherit
@@ -87,5 +95,6 @@ in
     testConfigs
     daemonApp
     khTestApp
+    viewApp
     ;
 }

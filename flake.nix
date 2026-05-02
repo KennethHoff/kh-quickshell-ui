@@ -52,6 +52,7 @@
       apps.${system} = dev.apps // {
         kh-headless-daemon = test.daemonApp;
         kh-headless = test.khTestApp;
+        kh-headless-view = test.viewApp;
       };
 
       nixosConfigurations.kh-headless-vm = test.nixosConfig;
