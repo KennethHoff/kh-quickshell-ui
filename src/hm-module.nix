@@ -598,25 +598,49 @@ in
       })
 
       (lib.mkIf config.programs.kh-ui.enable {
+        # Mirror each generated config into XDG so `quickshell -c <name>` resolves
+        # for both daemon launch and IPC (`qs ipc -c <name> ...`). Required since
+        # quickshell 0.3.0: `-c` no longer matches `-p`-launched instances by
+        # basename, only by XDG-discovered configs.
+        xdg.configFile = lib.mapAttrs' (
+          name: cfg: lib.nameValuePair "quickshell/${name}" { source = cfg; }
+        ) qsConfigs;
+
         systemd.user.services =
           let
-            mkQsService = configName: serviceOpts: {
-              Unit = {
-                Description = "Quickshell instance: ${configName}";
-                PartOf = [ "graphical-session.target" ];
-                After = [ "graphical-session.target" ];
+            mkQsService =
+              configName: serviceOpts:
+              let
+                base = {
+                  # Launch by config name so IPC `-c ${configName}` matches the
+                  # running instance (see xdg.configFile above for the XDG link).
+                  ExecStart = "${lib.getExe pkgs.quickshell} -c ${configName}";
+                  Restart = "on-failure";
+                  RestartSec = 2;
+                  # ExecStart no longer mutates with QML content (only on quickshell
+                  # version bumps). Carry the config store path as an env var so
+                  # sd-switch sees a Service-section diff on every QML change and
+                  # restarts the unit.
+                  Environment = [ "KH_CONFIG_REV=${qsConfigs.${configName}}" ];
+                };
+                extraEnv = serviceOpts.Environment or [ ];
+                extraEnvList = if builtins.isList extraEnv then extraEnv else [ extraEnv ];
+                serviceOptsRest = builtins.removeAttrs serviceOpts [ "Environment" ];
+              in
+              {
+                Unit = {
+                  Description = "Quickshell instance: ${configName}";
+                  PartOf = [ "graphical-session.target" ];
+                  After = [ "graphical-session.target" ];
+                };
+                Service =
+                  base
+                  // serviceOptsRest
+                  // {
+                    Environment = base.Environment ++ extraEnvList;
+                  };
+                Install.WantedBy = [ "graphical-session.target" ];
               };
-              Service = {
-                # -p <store-path> instead of -c <name> so each QML change produces a
-                # new ExecStart, which sd-switch diffs to trigger a restart. With
-                # -c <name>, ExecStart only changes on a quickshell version bump.
-                ExecStart = "${lib.getExe pkgs.quickshell} -p ${qsConfigs.${configName}}";
-                Restart = "on-failure";
-                RestartSec = 2;
-              }
-              // serviceOpts;
-              Install.WantedBy = [ "graphical-session.target" ];
-            };
           in
           lib.optionalAttrs config.programs.kh-ui.clipboard-history.enable {
             kh-cliphist = mkQsService "kh-cliphist" { };
